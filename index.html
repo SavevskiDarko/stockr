@@ -783,8 +783,11 @@ const LS={
 
 // ── FIREBASE REST ──
 function fbUrl(path){return `https://firestore.googleapis.com/v1/projects/${FB_PID}/databases/(default)/documents/${path}?key=${FB_KEY}`;}
-// User-scoped path: users/{uid}/key → for logged-in users
-function userPath(key){return USER_ID?`users/${USER_ID}/${key}`:key;}
+function userPath(key){
+  if(USER_ID)return `users/${USER_ID}/${key}`;
+  // Guest mode: use local-only prefix so it never touches shared Firestore paths
+  return `local_guest/${key}`;
+}
 
 async function ensureToken(){
   if(!REFRESH_TOKEN)return;
@@ -1956,6 +1959,9 @@ async function setAuthState(d){
   AUTH_EXPIRY=Date.now()+parseInt(d.expiresIn||3600)*1000;
   IS_GUEST=false;FB_ACTIVE=true;
   LS.set('st_auth',{token:AUTH_TOKEN,refresh:REFRESH_TOKEN,expiry:AUTH_EXPIRY,uid:USER_ID,email:USER_EMAIL});
+  // Clear any locally cached data from a previous user or old shared paths
+  LS.del('st_ck');LS.del('st_fk');LS.del('st_portfolios');LS.del('st_watch');LS.del('st_sessions');LS.del('st_active_port');LS.del('st_ticker_cache');
+  CK='';FK='';PORTFOLIOS=[];WATCH=[];sessions=[];PC={};
 }
 
 function authLogout(){
