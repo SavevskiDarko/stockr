@@ -274,11 +274,22 @@ input,button,select{font-family:'Montserrat',sans-serif;}
   .hdr-btn{padding:4px 10px;font-size:9px;}
   .sync-pill{font-size:9px;padding:4px 10px;}
 
-  #ct,#pt,#wt{padding-bottom:68px;}
+  /* Chat: ibar sits just above bottom nav, msgs scroll freely */
+  #ct{display:flex;flex-direction:column;flex:1;min-height:0;padding-bottom:0;}
+  #chat-main{display:flex;flex-direction:column;flex:1;min-height:0;}
+  .msgs{flex:1;overflow-y:auto;}
+  .ibar{flex-shrink:0;padding-bottom:calc(10px + 60px + env(safe-area-inset-bottom,0px));}
+
+  /* Portfolio & Watchlist: content scrolls above bottom nav */
+  #pt{padding-bottom:0;}
+  #wt{padding-bottom:0;}
+  .pt-center{display:flex;flex-direction:column;flex:1;min-height:0;}
+  .pt-center-scr{flex:1;overflow-y:auto;padding:12px;padding-bottom:calc(80px + env(safe-area-inset-bottom,0px));}
 
   .bnav{
     display:flex;position:fixed;bottom:0;left:0;right:0;
-    height:60px;padding-bottom:env(safe-area-inset-bottom,0px);
+    height:calc(60px + env(safe-area-inset-bottom,0px));
+    padding-bottom:env(safe-area-inset-bottom,0px);
     background:#fff;border-top:1px solid #e2e8f0;
     box-shadow:0 -4px 20px rgba(0,0,0,0.08);z-index:100;
   }
@@ -310,14 +321,13 @@ input,button,select{font-family:'Montserrat',sans-serif;}
 
   .pt-left,.pt-right{display:none!important;}
   .pt-center{width:100%!important;background:#f0f2f8;}
-  .pt-center-scr{padding:12px;}
-  .pt-center .port-switcher{padding:10px 12px;overflow-x:auto;}
-  .pt-center .pbar{padding:8px 14px;background:#fff;}
+  .pt-center .port-switcher{padding:10px 12px;overflow-x:auto;flex-shrink:0;}
+  .pt-center .pbar{padding:8px 14px;background:#fff;flex-shrink:0;}
 
   .wt-left{display:none!important;}
-  .wt-inner{display:block!important;}
-  .wt-right{padding:12px;background:#f0f2f8;}
-  .wt-right .pbar{background:#fff;margin:-12px -12px 12px;border-radius:0;}
+  .wt-inner{display:flex;flex-direction:column;flex:1;min-height:0;}
+  .wt-right{flex:1;overflow-y:auto;padding:12px;padding-bottom:calc(80px + env(safe-area-inset-bottom,0px));background:#f0f2f8;}
+  .wt-right .pbar{background:#fff;margin:-12px -12px 12px;border-radius:0;flex-shrink:0;}
   .watch-grid{display:flex!important;flex-direction:column;gap:10px;}
   .wcard{padding:14px;}
   .wprice{font-size:20px;}
@@ -645,7 +655,7 @@ input,button,select{font-family:'Montserrat',sans-serif;}
   </div>
 
   <!-- WATCHLIST FAB + Sheet (mobile only) -->
-  <button class="mob-wfab" style="display:none" onclick="openWatchSheet()" title="Add to watchlist">＋</button>
+  <button class="mob-wfab" onclick="openWatchSheet()" title="Add to watchlist">＋</button>
   <div class="mob-w-sheet-overlay" id="watch-sheet-overlay" onclick="if(event.target===this)closeWatchSheet()">
     <div class="mob-sheet">
       <div class="mob-sheet-handle"></div>
@@ -1280,8 +1290,8 @@ function renderPORT(){
   pos.forEach(p=>{const q=PC[p.ticker];if(q){lT+=p.shares*q.c;lC+=p.shares*p.cost;}});
   const pnl=lT-lC,pnlP=lC>0?pnl/lC*100:0,hasPx=lT>0;
 
-  // ── Left panel / top of mobile: name + add form ──
-  const leftH=`
+  // ── Left panel (desktop only): name + add form ──
+  const desktopAddForm=`
   <div class="fcrd" style="padding:12px 14px;">
     <div style="font-size:9px;font-weight:700;color:var(--p);letter-spacing:2px;margin-bottom:6px;">PORTFOLIO NAME</div>
     <input class="port-name-field" id="port-name-inp"
@@ -1299,6 +1309,21 @@ function renderPORT(){
     <input class="finp" id="fc" placeholder="Avg $ Cost" type="number" style="width:88px">
     <button class="abtn" onclick="addP()">+ Add</button>
   </div></div>`;
+
+  // Mobile top bar: just portfolio name (add is via FAB)
+  const mobileNameBar=`
+  <div style="padding:12px 14px 8px;background:#fff;border-bottom:1px solid var(--b);">
+    <div style="font-size:9px;font-weight:700;color:var(--p);letter-spacing:2px;margin-bottom:5px;">PORTFOLIO NAME</div>
+    <input class="port-name-field" id="port-name-inp"
+      value="${port.name}"
+      placeholder="Portfolio name..."
+      onblur="renamePort(this.value)"
+      onkeydown="if(event.key==='Enter'){this.blur();} if(event.key==='Escape'){this.value='${port.name}';this.blur();}"
+      oninput="markUnsaved()"
+    >
+  </div>`;
+
+  const leftH = isDesktop ? desktopAddForm : mobileNameBar;
 
   // ── Right panel / bottom of mobile: summary cards + analyze + delete ──
   const top=[...pos].sort((a,b)=>b.shares*b.cost-a.shares*a.cost)[0];
@@ -1360,12 +1385,11 @@ function renderPORT(){
   }
 
   if(isDesktop){
-    // 3-column desktop layout
     document.getElementById('pscr-left').innerHTML=leftH;
     document.getElementById('pscr').innerHTML=centerH;
     document.getElementById('pscr-right').innerHTML=rightH;
   }else{
-    // Mobile: everything stacked in center scroll area
+    // Mobile: name bar at top of scroll, then positions, then summary cards
     document.getElementById('pscr').innerHTML=leftH+centerH+rightH;
     document.getElementById('pscr-left').innerHTML='';
     document.getElementById('pscr-right').innerHTML='';
@@ -1761,11 +1785,11 @@ function ST(t){
   const navMap={c:'bnic',p:'bnip',w:'bniw'};
   Object.values(navMap).forEach(id=>{const el=document.getElementById(id);if(el)el.classList.remove('on');});
   const activeNav=document.getElementById(navMap[t]);if(activeNav)activeNav.classList.add('on');
-  // Show correct FAB
+  // Show correct FAB on mobile (CSS hides both on desktop)
   const fab=document.querySelector('.mob-fab');
   const wfab=document.querySelector('.mob-wfab');
-  if(fab)fab.style.display=t==='p'?'':'none';
-  if(wfab)wfab.style.display=t==='w'?'':'none';
+  if(fab){fab.style.display=t==='p'?'flex':'none';}
+  if(wfab){wfab.style.display=t==='w'?'flex':'none';}
   if(t==='p'){renderPortSwitcher();renderPORT();if((activePort()?.positions||[]).length)refresh('p');}
   if(t==='w'){renderWATCH();if(WATCH.length)refresh('w');}
 }
