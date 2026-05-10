@@ -840,21 +840,14 @@ async function startApp(){
       PORTFOLIOS=saved;
       ACTIVE_PORT_ID=LS.get('st_active_port')||PORTFOLIOS[0].id;
     } else {
-      // Default portfolios
-      PORTFOLIOS=[
-        {id:'p_'+Date.now(),name:'Main Portfolio',positions:[
-          {ticker:'AAPL',shares:10,cost:178.5},
-          {ticker:'NVDA',shares:5,cost:520},
-          {ticker:'MSFT',shares:8,cost:380}
-        ]}
-      ];
+      PORTFOLIOS=[{id:'p_'+Date.now(),name:'My Portfolio',positions:[]}];
       ACTIVE_PORT_ID=PORTFOLIOS[0].id;
       saveLocal();
     }
   }
 
-  // Load watchlist
-  if(!WATCH.length){WATCH=LS.get('st_watch')||[{ticker:'TSLA',note:'EV play'},{ticker:'AMD',note:'AI chips'},{ticker:'GOOGL',note:'AI + ads'}];}
+  // Load watchlist from local only (no hardcoded defaults)
+  if(!WATCH.length){WATCH=LS.get('st_watch')||[];}
 
   // Load sessions
   if(!sessions.length){
@@ -868,6 +861,7 @@ async function startApp(){
   }
 
   renderPortSwitcher();renderSB();renderMSGS();
+  ST('p'); // default to Portfolio tab
 }
 
 function initUI(){
