@@ -528,9 +528,7 @@ async function manualSync(){
   btn.disabled=true;btn.textContent='⟳ Syncing...';
   setSyncPill('syncing','⟳ Syncing');
   try{
-    // Always pull first to get latest Firebase data, then push local additions
     await pullFromFirebase();
-    await pushAllToFirebase();
     setSyncPill('cloud','☁ Synced');
     btn.textContent='↑ Synced ✓';
     setTimeout(()=>{btn.textContent='↑ Sync';btn.disabled=false;},2000);
@@ -592,6 +590,11 @@ function saveLocal(){
 }
 function saveLocalSessions(){
   LS.set('st_sessions',sessions.slice(0,50).map(s=>({...s,msgs:(s.msgs||[]).slice(-60)})));
+}
+function saveSessionsToFirebase(){
+  if(!FB_ACTIVE)return;
+  const toSave=sessions.slice(0,30).map(s=>({...s,msgs:(s.msgs||[]).slice(-60)}));
+  fbWrite('st_data/sessions',{sessions:toSave,updatedAt:Date.now()}).catch(()=>{});
 }
 
 // ── FIREBASE CONNECT / DISCONNECT ──
@@ -1121,13 +1124,13 @@ function addP(){
   if(i>=0)port.positions[i]={ticker:t,shares:s,cost:c};
   else port.positions.push({ticker:t,shares:s,cost:c});
   saveLocal();renderPORT();refresh('p');
+  if(FB_ACTIVE)fbWrite('st_data/portfolios',{portfolios:PORTFOLIOS,updatedAt:Date.now()}).catch(()=>{});
 }
 
 function toggleEdit(i){
   const panel=document.getElementById(`pr-edit-${i}`);
   if(!panel)return;
   const isOpen=!panel.classList.contains('hide');
-  // Close all open panels first
   document.querySelectorAll('.pr-edit-panel').forEach(p=>p.classList.add('hide'));
   document.querySelectorAll('.prow-wrap').forEach(p=>p.classList.remove('editing'));
   if(!isOpen){
@@ -1147,12 +1150,14 @@ function saveEdit(i){
   port.positions[i].shares=shares;
   port.positions[i].cost=cost;
   saveLocal();renderPORT();refresh('p');
+  if(FB_ACTIVE)fbWrite('st_data/portfolios',{portfolios:PORTFOLIOS,updatedAt:Date.now()}).catch(()=>{});
 }
 
 function delP(i){
   const port=activePort();if(!port)return;
   if(!confirm(`Remove ${port.positions[i].ticker} from portfolio?`))return;
   port.positions.splice(i,1);saveLocal();renderPORT();
+  if(FB_ACTIVE)fbWrite('st_data/portfolios',{portfolios:PORTFOLIOS,updatedAt:Date.now()}).catch(()=>{});
 }
 
 function deletePortfolio(){
@@ -1161,6 +1166,7 @@ function deletePortfolio(){
   PORTFOLIOS=PORTFOLIOS.filter(p=>p.id!==ACTIVE_PORT_ID);
   ACTIVE_PORT_ID=PORTFOLIOS[0].id;
   saveLocal();renderPortSwitcher();renderPORT();
+  if(FB_ACTIVE)fbWrite('st_data/portfolios',{portfolios:PORTFOLIOS,updatedAt:Date.now()}).catch(()=>{});
 }
 
 // ── WATCHLIST ──
@@ -1199,8 +1205,12 @@ function addW(){
   const i=WATCH.findIndex(w=>w.ticker===t);
   if(i>=0)WATCH[i]={ticker:t,note:n||WATCH[i].note};else WATCH.push({ticker:t,note:n});
   LS.set('st_watch',WATCH);renderWATCH();refresh('w');
+  if(FB_ACTIVE)fbWrite('st_data/watchlist',{watchlist:WATCH,updatedAt:Date.now()}).catch(()=>{});
 }
-function delW(i){WATCH.splice(i,1);LS.set('st_watch',WATCH);renderWATCH();}
+function delW(i){
+  WATCH.splice(i,1);LS.set('st_watch',WATCH);renderWATCH();
+  if(FB_ACTIVE)fbWrite('st_data/watchlist',{watchlist:WATCH,updatedAt:Date.now()}).catch(()=>{});
+}
 
 // ── PRICES ──
 // Cache resolved ticker → full Yahoo symbol (e.g. VUAA → VUAA.L) persisted to localStorage
@@ -1349,7 +1359,7 @@ async function newSess(){
   const id='s_'+Date.now();
   const sess={id,title:'New chat',date:new Date().toLocaleDateString(),msgs:[{r:'a',c:"New conversation started.\n→ Ask me about any stock, your portfolio, or today's market news."}],updatedAt:Date.now()};
   sessions.unshift(sess);curId=id;MSGS=sess.msgs;
-  saveLocalSessions();renderSB();renderMSGS();closeSB();
+  saveLocalSessions();saveSessionsToFirebase();renderSB();renderMSGS();closeSB();
   setTimeout(()=>document.getElementById('minp').focus(),100);
 }
 function loadSess(id){
@@ -1363,7 +1373,7 @@ function delSess(id,e){
     if(sessions.length){curId=sessions[0].id;MSGS=sessions[0].msgs||[];}
     else{newSess();return;}
   }
-  saveLocalSessions();renderSB();renderMSGS();
+  saveLocalSessions();saveSessionsToFirebase();renderSB();renderMSGS();
 }
 function updateTitle(msg){
   const s=sessions.find(s=>s.id===curId);
@@ -1413,7 +1423,7 @@ async function doSend(ov){
   const si=sessions.findIndex(s=>s.id===curId);
   const upd={id:curId,title:sessions[si]?.title||'Chat',date:new Date().toLocaleDateString(),msgs:MSGS,updatedAt:Date.now()};
   if(si>=0)sessions[si]=upd;else sessions.unshift(upd);
-  saveLocalSessions();renderSB();
+  saveLocalSessions();saveSessionsToFirebase();renderSB();
   setTimeout(()=>document.getElementById('minp').focus(),100);
 }
 
