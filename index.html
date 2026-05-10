@@ -24,7 +24,7 @@ if('serviceWorker' in navigator){
 <style>
 :root{--p:#6366f1;--pd:#4f46e5;--pl:#eef2ff;--g:#10b981;--r:#ef4444;--a:#f59e0b;--t:#0f172a;--t2:#334155;--t3:#64748b;--t4:#94a3b8;--b:#e2e8f0;--bg:#f8fafc;--w:#fff;}
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
-body{font-family:'Montserrat',sans-serif;background:var(--bg);color:var(--t);height:100vh;overflow:hidden;display:flex;flex-direction:column;}
+body{font-family:'Montserrat',sans-serif;background:var(--bg);color:var(--t);height:100dvh;overflow:hidden;display:flex;flex-direction:column;}
 input,button,select{font-family:'Montserrat',sans-serif;}
 ::-webkit-scrollbar{width:4px;}::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:4px;}
 
@@ -277,7 +277,25 @@ input,button,select{font-family:'Montserrat',sans-serif;}
   /* Push content above fixed bottom nav */
   .ibar{margin-bottom:60px;}
 
-  /* iPhone home indicator extra space */
+  /* Sticky analyze bar above bottom nav */
+  .mob-analyze-bar{
+    display:flex;position:fixed;
+    bottom:calc(60px + env(safe-area-inset-bottom,0px));
+    left:0;right:0;
+    padding:8px 14px;
+    background:rgba(255,255,255,0.95);
+    backdrop-filter:blur(8px);
+    border-top:1px solid #e2e8f0;
+    z-index:49;gap:8px;
+  }
+  .mob-analyze-bar .abig{margin:0;flex:1;padding:11px;font-size:12px;border-radius:12px;box-shadow:none;}
+  /* ⋯ tab options menu */
+  .tab-menu-overlay{position:fixed;inset:0;z-index:150;}
+  .tab-menu{position:absolute;background:#fff;border-radius:14px;padding:6px;box-shadow:0 8px 30px rgba(0,0,0,0.18);min-width:160px;z-index:151;}
+  .tab-menu-item{display:flex;align-items:center;gap:10px;padding:11px 13px;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;border:none;background:none;width:100%;font-family:inherit;color:var(--t);}
+  .tab-menu-item:hover{background:var(--bg);}
+  .tab-menu-item.danger{color:var(--r);}
+  .tab-menu-item.danger:hover{background:#fef2f2;}
   @supports(padding-bottom: env(safe-area-inset-bottom)){
     .ibar{margin-bottom:calc(60px + env(safe-area-inset-bottom,0px));}
     .pt-center-scr{padding-bottom:calc(80px + env(safe-area-inset-bottom,0px));}
@@ -1263,7 +1281,22 @@ function renderPortSwitcher(){
       dragSrcIdx=null;touchMoved=false;
     });
 
-    el.appendChild(btn);
+    // Wrap tab + ⋯ menu button
+    const wrap=document.createElement('div');
+    wrap.style.cssText='display:flex;align-items:center;gap:2px;flex-shrink:0;';
+    wrap.appendChild(btn);
+
+    // ⋯ options button (rename + delete) — visible on mobile and desktop
+    if(PORTFOLIOS.length>0){
+      const more=document.createElement('button');
+      more.style.cssText='background:none;border:none;color:#94a3b8;font-size:16px;cursor:pointer;padding:2px 4px;line-height:1;border-radius:6px;flex-shrink:0;';
+      more.textContent='⋯';
+      more.title='Portfolio options';
+      more.onclick=(e)=>{e.stopPropagation();showPortMenu(e,p.id);};
+      wrap.appendChild(more);
+    }
+
+    el.appendChild(wrap);
   });
 
   // Add new portfolio button
@@ -1335,9 +1368,9 @@ function renderPORT(){
 
   const leftH = isDesktop ? desktopAddForm : mobileNameBar;
 
-  // ── Right panel / bottom of mobile: summary cards + analyze + delete ──
+  // ── Summary cards + desktop actions ──
   const top=[...pos].sort((a,b)=>b.shares*b.cost-a.shares*a.cost)[0];
-  const rightH=pos.length?`
+  const summaryCards=pos.length?`
   <div class="sgrid">
     <div class="sc2" style="background:#eef2ff;border-color:#c7d2fe;cursor:pointer" onclick="showDepositBreakdown()"><div class="slbl" style="color:#6366f1">DEPOSIT</div><div class="sval" style="color:#4f46e5">$${tot.toLocaleString('en',{maximumFractionDigits:0})}</div><div style="font-size:9px;color:#818cf8;margin-top:2px">tap for breakdown ↗</div></div>
     <div class="sc2" style="background:${hasPx?(pnl>=0?'#ecfdf5':'#fef2f2'):'#f8fafc'};border-color:${hasPx?(pnl>=0?'#a7f3d0':'#fecaca'):'#e2e8f0'}">
@@ -1346,10 +1379,21 @@ function renderPORT(){
     </div>
     <div class="sc2" style="background:#ecfdf5;border-color:#a7f3d0"><div class="slbl" style="color:#10b981">POSITIONS</div><div class="sval" style="color:#047857">${pos.length}</div></div>
     <div class="sc2" style="background:#fffbeb;border-color:#fde68a"><div class="slbl" style="color:#f59e0b">TOP HOLDING</div><div class="sval" style="color:#b45309">${top?.ticker||'—'}</div></div>
-  </div>
+  </div>`:'';
+  // Desktop: analyze + delete inside right panel. Mobile: sticky bar + ⋯ menu
+  const rightH=summaryCards+(isDesktop&&pos.length?`
   <button class="abig" onclick="anzAll()">🔍  Analyze ${port.name}</button>
-  ${PORTFOLIOS.length>1?`<button class="del-port-btn" onclick="deletePortfolio()">🗑 Delete "${port.name}"</button>`:''}
-  `:'';
+  ${PORTFOLIOS.length>1?`<button class="del-port-btn" onclick="deletePortfolio()">🗑 Delete "${port.name}"</button>`:''}`:``);
+
+  // Mobile sticky analyze bar
+  const existingBar=document.getElementById('mob-analyze-bar');
+  if(existingBar)existingBar.remove();
+  if(!isDesktop&&pos.length){
+    const bar=document.createElement('div');
+    bar.id='mob-analyze-bar';bar.className='mob-analyze-bar';
+    bar.innerHTML=`<button class="abig" onclick="anzAll()" style="margin:0;flex:1;padding:11px;font-size:12px;border-radius:12px;box-shadow:none;">🔍 Analyze ${port.name}</button>`;
+    document.body.appendChild(bar);
+  }
 
   // ── Center / main: position rows ──
   let centerH='';
@@ -1786,6 +1830,40 @@ function mobAddW(){
   closeWatchSheet();
 }
 
+function showPortMenu(e,portId){
+  // Remove any existing menu
+  document.querySelectorAll('.tab-menu-overlay').forEach(el=>el.remove());
+  const port=PORTFOLIOS.find(p=>p.id===portId);if(!port)return;
+  const overlay=document.createElement('div');
+  overlay.className='tab-menu-overlay';
+  const rect=e.target.getBoundingClientRect();
+  const menu=document.createElement('div');
+  menu.className='tab-menu';
+  menu.style.cssText=`top:${rect.bottom+6}px;left:${Math.min(rect.left,window.innerWidth-180)}px;`;
+  menu.innerHTML=`
+    <button class="tab-menu-item" onclick="closePortMenu();promptRenamePort('${portId}')">✏️ Rename</button>
+    ${PORTFOLIOS.length>1?`<button class="tab-menu-item danger" onclick="closePortMenu();deletePortfolioById('${portId}')">🗑 Delete portfolio</button>`:''}`;
+  overlay.appendChild(menu);
+  overlay.addEventListener('click',e=>{if(e.target===overlay)closePortMenu();});
+  document.body.appendChild(overlay);
+}
+function closePortMenu(){document.querySelectorAll('.tab-menu-overlay').forEach(el=>el.remove());}
+function promptRenamePort(id){
+  const port=PORTFOLIOS.find(p=>p.id===id);if(!port)return;
+  const name=prompt('Rename portfolio:',port.name);
+  if(name&&name.trim()){port.name=name.trim();saveLocal();renderPortSwitcher();renderPORT();
+    if(FB_ACTIVE)fbWrite('st_data/portfolios',{portfolios:PORTFOLIOS,updatedAt:Date.now()}).catch(()=>{});}
+}
+function deletePortfolioById(id){
+  if(!confirm(`Delete this portfolio? This cannot be undone.`))return;
+  PORTFOLIOS=PORTFOLIOS.filter(p=>p.id!==id);
+  if(ACTIVE_PORT_ID===id)ACTIVE_PORT_ID=PORTFOLIOS[0]?.id||'';
+  saveLocal();renderPortSwitcher();renderPORT();
+  if(FB_ACTIVE)fbWrite('st_data/portfolios',{portfolios:PORTFOLIOS,updatedAt:Date.now()}).catch(()=>{});
+}
+
+function showPortMenu_close(){closePortMenu();}
+
 function ST(t){
   ['c','p','w'].forEach(x=>{
     document.getElementById(x==='c'?'ct':x+'t').style.display=x===t?'flex':'none';
@@ -1795,6 +1873,8 @@ function ST(t){
   const navMap={c:'bnic',p:'bnip',w:'bniw'};
   Object.values(navMap).forEach(id=>{const el=document.getElementById(id);if(el)el.classList.remove('on');});
   const activeNav=document.getElementById(navMap[t]);if(activeNav)activeNav.classList.add('on');
+  // Remove sticky analyze bar when leaving portfolio
+  if(t!=='p'){const b=document.getElementById('mob-analyze-bar');if(b)b.remove();}
   // Show correct FAB on mobile (CSS hides both on desktop)
   const fab=document.querySelector('.mob-fab');
   const wfab=document.querySelector('.mob-wfab');
