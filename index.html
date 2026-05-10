@@ -1964,10 +1964,17 @@ async function setAuthState(d){
   CK='';FK='';PORTFOLIOS=[];WATCH=[];sessions=[];PC={};
 }
 
+function clearAllLocalData(){
+  LS.del('st_ck');LS.del('st_fk');LS.del('st_portfolios');LS.del('st_watch');
+  LS.del('st_sessions');LS.del('st_active_port');LS.del('st_ticker_cache');LS.del('st_auth');LS.del('st_fbcfg');
+  CK='';FK='';PORTFOLIOS=[];WATCH=[];sessions=[];curId=null;MSGS=[];PC={};ACTIVE_PORT_ID='';
+}
+
 function authLogout(){
   if(!confirm('Sign out of Stockr?'))return;
+  clearAllLocalData();
   AUTH_TOKEN='';REFRESH_TOKEN='';USER_ID='';USER_EMAIL='';AUTH_EXPIRY=0;IS_GUEST=false;
-  LS.del('st_auth');FB_ACTIVE=false;PORTFOLIOS=[];WATCH=[];sessions=[];CK='';FK='';PC={};
+  FB_ACTIVE=false;FB_PID='';FB_KEY='';
   const bar=document.getElementById('mob-analyze-bar');if(bar)bar.remove();
   document.getElementById('app').style.display='none';
   document.getElementById('auth-screen').style.display='flex';
@@ -1975,7 +1982,12 @@ function authLogout(){
   showErr('auth-err','');
 }
 
-function guestMode(){IS_GUEST=true;USER_ID='';AUTH_TOKEN='';document.getElementById('auth-screen').style.display='none';startApp();}
+function guestMode(){
+  clearAllLocalData();
+  IS_GUEST=true;USER_ID='';AUTH_TOKEN='';FB_ACTIVE=false;
+  document.getElementById('auth-screen').style.display='none';
+  startApp();
+}
 
 // ── PROFILE ──────────────────────────────────────
 function renderProfile(){
