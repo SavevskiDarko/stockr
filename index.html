@@ -267,6 +267,91 @@ input,button,select{font-family:'Montserrat',sans-serif;}
 .hist-btn{display:none;background:rgba(255,255,255,0.14);border:1px solid rgba(255,255,255,0.22);border-radius:20px;padding:3px 9px;font-size:9px;color:rgba(255,255,255,0.8);font-weight:600;cursor:pointer;font-family:inherit;align-items:center;gap:3px;}
 .overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.3);z-index:9;}
 .overlay.show{display:block;}
+
+/* ── DESKTOP LAYOUT ────────────────────────────────────────────── */
+@media(min-width:900px){
+  body{background:#eef0f6;}
+  #app{max-width:1400px;margin:0 auto;height:100vh;}
+
+  /* Header */
+  .hdr{padding:12px 24px;border-radius:0;}
+  .hdr-title{font-size:17px;letter-spacing:4px;}
+
+  /* Tabs */
+  .tabs{padding:0 24px;gap:0;}
+  .tb{flex:none;padding:14px 28px;font-size:12px;letter-spacing:0.5px;}
+
+  /* ── CHAT ── */
+  #sb{width:240px;}
+  .sb-hdr{padding:12px 14px;}
+  .sb-ttl{font-size:10px;}
+  .sess{padding:10px 11px;}
+  .ss-ttl{font-size:12px;}
+  .msgs{padding:18px 20px;gap:14px;}
+  .bbl{padding:11px 15px;}
+  .m-plain,.m-btxt{font-size:13px;}
+  .ibar{padding:12px 16px;gap:10px;}
+  .ifield{font-size:13px;padding:11px 15px;}
+  .qrow{padding:10px 16px;gap:8px;}
+  .qbtn{font-size:11px;padding:7px 14px;}
+
+  /* ── PORTFOLIO ── */
+  #pt{display:none;flex-direction:row;flex:1;min-height:0;}
+  #pt[style*="flex"]{display:flex;}
+
+  /* Left sidebar: add form + portfolio name/actions */
+  .pt-left{width:280px;flex-shrink:0;background:#fff;border-right:1px solid var(--b);display:flex;flex-direction:column;overflow-y:auto;}
+  .pt-left .scr{padding:16px;}
+  .pt-left .fcrd{background:var(--bg);margin-bottom:0;}
+
+  /* Center: portfolio tabs + position list */
+  .pt-center{flex:1;min-width:0;display:flex;flex-direction:column;background:#f8fafc;}
+  .pt-center .port-switcher{padding:12px 16px;background:#fff;border-bottom:1px solid var(--b);}
+  .pt-center .pbar{padding:8px 16px;background:#fff;}
+  .pt-center-scr{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:0;}
+  .pt-center-scr .pcrd{margin-bottom:10px;}
+
+  /* Right sidebar: summary cards */
+  .pt-right{width:260px;flex-shrink:0;background:#fff;border-left:1px solid var(--b);overflow-y:auto;padding:16px;}
+  .pt-right .sgrid{grid-template-columns:1fr;gap:10px;margin-bottom:12px;}
+  .pt-right .sc2{padding:14px;}
+  .pt-right .sval{font-size:20px;}
+  .pt-right .abig{margin-bottom:10px;padding:14px;}
+  .pt-right .del-port-btn{margin-bottom:0;}
+
+  /* ── WATCHLIST ── */
+  #wt{display:none;flex-direction:column;flex:1;}
+  #wt[style*="flex"]{display:flex;}
+  .wt-inner{display:flex;flex:1;min-height:0;}
+
+  /* Watchlist left: add form */
+  .wt-left{width:300px;flex-shrink:0;background:#fff;border-right:1px solid var(--b);overflow-y:auto;padding:16px;}
+  .wt-left .fcrd{background:var(--bg);}
+  .wt-left .bigbtn{margin-top:4px;}
+
+  /* Watchlist right: stock cards grid */
+  .wt-right{flex:1;overflow-y:auto;padding:16px;background:#f8fafc;}
+  .watch-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;}
+  .watch-grid .wcard{margin-bottom:0;}
+
+  /* Bigger font / spacing for desktop watch cards */
+  .wprice{font-size:22px;}
+  .wname{font-size:14px;}
+  .wcard{padding:14px 16px;}
+
+  /* Scrollable areas */
+  .scr{padding:16px 20px;}
+
+  /* Summary grid stays 2-col on desktop right panel */
+  .pt-right .sgrid{grid-template-columns:1fr 1fr;}
+}
+
+@media(min-width:1100px){
+  .pt-left{width:300px;}
+  .pt-right{width:290px;}
+  .wt-left{width:320px;}
+  .watch-grid{grid-template-columns:repeat(auto-fill,minmax(320px,1fr));}
+}
 </style>
 </head>
 <body>
@@ -417,22 +502,33 @@ input,button,select{font-family:'Montserrat',sans-serif;}
 
   <!-- PORTFOLIO -->
   <div id="pt">
-    <!-- Portfolio tab switcher -->
-    <div class="port-switcher" id="port-switcher"></div>
-    <div class="pbar">
-      <div class="pbar-ts" id="p-ts">Prices not loaded</div>
-      <button class="rbtn" id="p-rb" onclick="refresh('p')"><span class="ri">↻</span> Refresh</button>
+    <!-- Desktop: 3-column layout. Mobile: stacked -->
+    <div class="pt-left">
+      <div class="scr" id="pscr-left"><!-- add form + name + delete rendered here on desktop --></div>
     </div>
-    <div class="scr" id="pscr"></div>
+    <div class="pt-center">
+      <div class="port-switcher" id="port-switcher"></div>
+      <div class="pbar">
+        <div class="pbar-ts" id="p-ts">Prices not loaded</div>
+        <button class="rbtn" id="p-rb" onclick="refresh('p')"><span class="ri">↻</span> Refresh</button>
+      </div>
+      <div class="pt-center-scr" id="pscr"></div>
+    </div>
+    <div class="pt-right" id="pscr-right"><!-- summary cards rendered here on desktop --></div>
   </div>
 
   <!-- WATCHLIST -->
   <div id="wt">
-    <div class="pbar">
-      <div class="pbar-ts" id="w-ts">Prices not loaded</div>
-      <button class="rbtn" id="w-rb" onclick="refresh('w')"><span class="ri">↻</span> Refresh</button>
+    <div class="wt-inner">
+      <div class="wt-left" id="wscr-left"><!-- add form rendered here on desktop --></div>
+      <div class="wt-right">
+        <div class="pbar" style="margin:-0px;border-radius:0;background:#f8fafc;border:none;border-bottom:1px solid var(--b);margin-bottom:12px;">
+          <div class="pbar-ts" id="w-ts">Prices not loaded</div>
+          <button class="rbtn" id="w-rb" onclick="refresh('w')"><span class="ri">↻</span> Refresh</button>
+        </div>
+        <div class="watch-grid" id="wscr"></div>
+      </div>
     </div>
-    <div class="scr" id="wscr"></div>
   </div>
 </div>
 
@@ -865,6 +961,17 @@ async function startApp(){
 
   renderPortSwitcher();renderSB();renderMSGS();
   ST('p'); // default to Portfolio tab
+
+  // Re-render on resize so desktop↔mobile layout switches correctly
+  let resizeTimer;
+  window.addEventListener('resize',()=>{
+    clearTimeout(resizeTimer);
+    resizeTimer=setTimeout(()=>{
+      const t=document.querySelector('.tb.on')?.id?.replace('tb','');
+      if(t==='p'){renderPortSwitcher();renderPORT();}
+      else if(t==='w')renderWATCH();
+    },150);
+  });
 }
 
 function initUI(){
@@ -1003,15 +1110,20 @@ function createPortfolio(){
 
 function renderPORT(){
   const port=activePort();
-  if(!port){document.getElementById('pscr').innerHTML='<div class="empty"><div class="eico">📂</div><div class="etit">No portfolio</div></div>';return;}
+  const isDesktop=window.innerWidth>=900;
+  if(!port){
+    document.getElementById('pscr').innerHTML='<div class="empty"><div class="eico">📂</div><div class="etit">No portfolio</div></div>';
+    if(isDesktop){document.getElementById('pscr-left').innerHTML='';document.getElementById('pscr-right').innerHTML='';}
+    return;
+  }
   const pos=port.positions||[];
   const tot=pos.reduce((s,p)=>s+p.shares*p.cost,0);
   let lT=0,lC=0;
   pos.forEach(p=>{const q=PC[p.ticker];if(q){lT+=p.shares*q.c;lC+=p.shares*p.cost;}});
   const pnl=lT-lC,pnlP=lC>0?pnl/lC*100:0,hasPx=lT>0;
 
-  let h=`
-  <!-- Portfolio name — click to edit inline -->
+  // ── Left panel / top of mobile: name + add form ──
+  const leftH=`
   <div class="fcrd" style="padding:12px 14px;">
     <div style="font-size:9px;font-weight:700;color:var(--p);letter-spacing:2px;margin-bottom:6px;">PORTFOLIO NAME</div>
     <input class="port-name-field" id="port-name-inp"
@@ -1023,8 +1135,6 @@ function renderPORT(){
     >
     <div class="port-name-hint" id="port-name-hint">✏️ Click to rename · Enter to save</div>
   </div>
-
-  <!-- Add position -->
   <div class="fcrd"><div class="flbl">ADD / UPDATE POSITION</div><div class="frow">
     <input class="finp" id="ft" placeholder="Ticker" style="width:85px">
     <input class="finp" id="fs" placeholder="Shares" type="number" style="width:68px">
@@ -1032,12 +1142,30 @@ function renderPORT(){
     <button class="abtn" onclick="addP()">+ Add</button>
   </div></div>`;
 
+  // ── Right panel / bottom of mobile: summary cards + analyze + delete ──
+  const top=[...pos].sort((a,b)=>b.shares*b.cost-a.shares*a.cost)[0];
+  const rightH=pos.length?`
+  <div class="sgrid">
+    <div class="sc2" style="background:#eef2ff;border-color:#c7d2fe;cursor:pointer" onclick="showDepositBreakdown()"><div class="slbl" style="color:#6366f1">DEPOSIT</div><div class="sval" style="color:#4f46e5">$${tot.toLocaleString('en',{maximumFractionDigits:0})}</div><div style="font-size:9px;color:#818cf8;margin-top:2px">tap for breakdown ↗</div></div>
+    <div class="sc2" style="background:${hasPx?(pnl>=0?'#ecfdf5':'#fef2f2'):'#f8fafc'};border-color:${hasPx?(pnl>=0?'#a7f3d0':'#fecaca'):'#e2e8f0'}">
+      <div class="slbl" style="color:${hasPx?(pnl>=0?'#10b981':'#ef4444'):'#94a3b8'}">UNREALIZED P&L</div>
+      <div class="sval ${hasPx?(pnl>=0?'up':'dn'):''}">${hasPx?(pnl>=0?'+':'-')+'$'+Math.abs(pnl).toLocaleString('en',{maximumFractionDigits:0})+' ('+fpct(pnlP)+')':'—'}</div>
+    </div>
+    <div class="sc2" style="background:#ecfdf5;border-color:#a7f3d0"><div class="slbl" style="color:#10b981">POSITIONS</div><div class="sval" style="color:#047857">${pos.length}</div></div>
+    <div class="sc2" style="background:#fffbeb;border-color:#fde68a"><div class="slbl" style="color:#f59e0b">TOP HOLDING</div><div class="sval" style="color:#b45309">${top?.ticker||'—'}</div></div>
+  </div>
+  <button class="abig" onclick="anzAll()">🔍  Analyze ${port.name}</button>
+  ${PORTFOLIOS.length>1?`<button class="del-port-btn" onclick="deletePortfolio()">🗑 Delete "${port.name}"</button>`:''}
+  `:'';
+
+  // ── Center / main: position rows ──
+  let centerH='';
   if(pos.length){
-    h+=`<div class="pcrd">`;
+    centerH+=`<div class="pcrd">`;
     pos.forEach((p,i)=>{
       const col=COLS[i%COLS.length],q=PC[p.ticker],up=q?q.d>=0:true;
       const pv=q?(q.c-p.cost)*p.shares:null,pp=q?((q.c/p.cost)-1)*100:null;
-      h+=`<div class="prow-wrap" id="prow-wrap-${i}">
+      centerH+=`<div class="prow-wrap" id="prow-wrap-${i}">
         <div class="prow" onclick="toggleEdit(${i})">
           <div class="pr-dot" style="background:${col};box-shadow:0 0 5px ${col}55"></div>
           <div class="pr-inf"><div class="pr-name">${p.ticker}</div><div class="pr-sub">${p.shares}sh · avg $${p.cost}</div></div>
@@ -1068,28 +1196,23 @@ function renderPORT(){
         </div>
       </div>`;
     });
-    h+=`</div>`;
-    const top=[...pos].sort((a,b)=>b.shares*b.cost-a.shares*a.cost)[0];
-    h+=`<div class="sgrid">
-      <div class="sc2" style="background:#eef2ff;border-color:#c7d2fe;cursor:pointer" onclick="showDepositBreakdown()"><div class="slbl" style="color:#6366f1">DEPOSIT</div><div class="sval" style="color:#4f46e5">$${tot.toLocaleString('en',{maximumFractionDigits:0})}</div><div style="font-size:9px;color:#818cf8;margin-top:2px">tap for breakdown ↗</div></div>
-      <div class="sc2" style="background:${hasPx?(pnl>=0?'#ecfdf5':'#fef2f2'):'#f8fafc'};border-color:${hasPx?(pnl>=0?'#a7f3d0':'#fecaca'):'#e2e8f0'}">
-        <div class="slbl" style="color:${hasPx?(pnl>=0?'#10b981':'#ef4444'):'#94a3b8'}">UNREALIZED P&L</div>
-        <div class="sval ${hasPx?(pnl>=0?'up':'dn'):''}">${hasPx?(pnl>=0?'+':'-')+'$'+Math.abs(pnl).toLocaleString('en',{maximumFractionDigits:0})+' ('+fpct(pnlP)+')':'—'}</div>
-      </div>
-      <div class="sc2" style="background:#ecfdf5;border-color:#a7f3d0"><div class="slbl" style="color:#10b981">POSITIONS</div><div class="sval" style="color:#047857">${pos.length}</div></div>
-      <div class="sc2" style="background:#fffbeb;border-color:#fde68a"><div class="slbl" style="color:#f59e0b">TOP HOLDING</div><div class="sval" style="color:#b45309">${top?.ticker||'—'}</div></div>
-    </div>
-    <button class="abig" onclick="anzAll()">🔍  Analyze ${port.name}</button>`;
+    centerH+=`</div>`;
   }else{
-    h+=`<div class="empty"><div class="eico">📊</div><div class="etit">No positions yet</div><div class="esub">Add your first stock above</div></div>`;
+    centerH=`<div class="empty"><div class="eico">📊</div><div class="etit">No positions yet</div><div class="esub">Add your first stock in the panel on the left</div></div>`;
   }
 
-  // Delete portfolio option (only if more than 1)
-  if(PORTFOLIOS.length>1){
-    h+=`<button class="del-port-btn" onclick="deletePortfolio()">🗑 Delete "${port.name}"</button>`;
+  if(isDesktop){
+    // 3-column desktop layout
+    document.getElementById('pscr-left').innerHTML=leftH;
+    document.getElementById('pscr').innerHTML=centerH;
+    document.getElementById('pscr-right').innerHTML=rightH;
+  }else{
+    // Mobile: everything stacked in center scroll area
+    document.getElementById('pscr').innerHTML=leftH+centerH+rightH;
+    document.getElementById('pscr-left').innerHTML='';
+    document.getElementById('pscr-right').innerHTML='';
   }
 
-  document.getElementById('pscr').innerHTML=h;
   const ft=document.getElementById('ft');if(ft)ft.addEventListener('keydown',e=>{if(e.key==='Enter')addP();});
 }
 
@@ -1171,16 +1294,20 @@ function deletePortfolio(){
 
 // ── WATCHLIST ──
 function renderWATCH(){
-  let h=`<div class="fcrd"><div class="flbl">⭐ ADD TO WATCHLIST</div><div class="frow">
+  const isDesktop=window.innerWidth>=900;
+
+  const addFormH=`<div class="fcrd"><div class="flbl">⭐ ADD TO WATCHLIST</div><div class="frow">
     <input class="finp" id="wt-tk" placeholder="Ticker" style="width:100px">
     <input class="finp" id="wt-nt" placeholder="Note (optional)" style="flex:1;min-width:100px">
     <button class="abtn" onclick="addW()">+ Add</button>
-  </div></div>`;
+  </div></div>
+  ${WATCH.length?`<button class="bigbtn" onclick="anzWatchAll()">🔍  Analyze ALL Watchlist Stocks</button>`:''}`;
+
+  let cardsH='';
   if(WATCH.length){
-    h+=`<button class="bigbtn" onclick="anzWatchAll()">🔍  Analyze ALL Watchlist Stocks</button>`;
     WATCH.forEach((w,i)=>{
       const col=COLS[i%COLS.length],q=PC[w.ticker],up=q?q.d>=0:true;
-      h+=`<div class="wcard">
+      cardsH+=`<div class="wcard">
         <div class="wct"><div class="wdot" style="background:${col};box-shadow:0 0 5px ${col}66"></div>
           <div style="flex:1"><div class="wname">${w.ticker}</div>${w.note?`<div class="wnote">${w.note}</div>`:''}</div></div>
         <div class="wprow">
@@ -1193,8 +1320,18 @@ function renderWATCH(){
         </div>
       </div>`;
     });
-  }else{h+=`<div class="empty"><div class="eico">⭐</div><div class="etit">Watchlist empty</div><div class="esub">Add stocks to watch closely</div></div>`;}
-  document.getElementById('wscr').innerHTML=h;
+  }else{
+    cardsH=`<div class="empty"><div class="eico">⭐</div><div class="etit">Watchlist empty</div><div class="esub">Add stocks to watch closely</div></div>`;
+  }
+
+  if(isDesktop){
+    document.getElementById('wscr-left').innerHTML=addFormH;
+    document.getElementById('wscr').innerHTML=cardsH;
+  }else{
+    document.getElementById('wscr-left').innerHTML='';
+    document.getElementById('wscr').innerHTML=addFormH+cardsH;
+  }
+
   const wt=document.getElementById('wt-tk');if(wt)wt.addEventListener('keydown',e=>{if(e.key==='Enter')addW();});
   const wn=document.getElementById('wt-nt');if(wn)wn.addEventListener('keydown',e=>{if(e.key==='Enter')addW();});
 }
