@@ -13,6 +13,9 @@
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%2311998E'/%3E%3Cstop offset='1' stop-color='%2338EF7D'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='100' height='100' rx='14' fill='%236366f1'/%3E%3Crect x='10' y='55' width='18' height='30' rx='4' fill='white' opacity='.9'/%3E%3Crect x='37' y='38' width='18' height='47' rx='4' fill='white' opacity='.9'/%3E%3Cpath d='M62 92 L80 92 L80 34 L96 34 L72 6 L48 34 L62 34Z' fill='url(%23g)'/%3E%3C/svg%3E">
 <link rel="apple-touch-icon" href="icon-192.png">
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<!-- Firebase SDK (auth only — Firestore uses REST API) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <link rel="manifest" href="manifest.json">
 <script>
 if('serviceWorker' in navigator){
@@ -531,14 +534,6 @@ input,button,select{font-family:'Montserrat',sans-serif;}
 
     <div id="auth-mode-label" style="font-size:11px;font-weight:700;color:var(--p);letter-spacing:2px;margin-bottom:14px;">SIGN IN TO YOUR ACCOUNT</div>
 
-    <!-- Firebase setup (needed for auth) -->
-    <div id="auth-fb-section" style="background:#f0f4ff;border:1px solid #c7d2fe;border-radius:12px;padding:12px 14px;margin-bottom:14px;">
-      <div style="font-size:10px;font-weight:700;color:#6366f1;letter-spacing:2px;margin-bottom:8px;">FIREBASE PROJECT</div>
-      <div style="font-size:11px;color:#6366f1;margin-bottom:10px;line-height:1.5;">Required for accounts. <a href="https://console.firebase.google.com" target="_blank" style="font-weight:700;">Setup guide →</a></div>
-      <input class="inp" id="auth-fb-pid" placeholder="Project ID (e.g. my-app-12345)" autocomplete="off" spellcheck="false" style="margin-bottom:8px;">
-      <input class="inp" id="auth-fb-key" placeholder="Web API Key (AIzaSy...)" autocomplete="off" spellcheck="false" style="margin-bottom:0">
-    </div>
-
     <div class="lbl">EMAIL</div>
     <input class="inp" id="auth-email" type="email" placeholder="you@example.com" autocomplete="email" spellcheck="false">
     <div class="lbl">PASSWORD</div>
@@ -547,7 +542,18 @@ input,button,select{font-family:'Montserrat',sans-serif;}
     <div class="err" id="auth-err"></div>
     <button class="btn pri" id="auth-submit-btn" onclick="authSubmit()">Sign In</button>
 
-    <div style="text-align:center;margin-top:8px;">
+    <div style="display:flex;align-items:center;gap:10px;margin:4px 0;">
+      <div style="flex:1;height:1px;background:#e2e8f0"></div>
+      <div style="font-size:11px;color:#94a3b8;font-weight:600;">OR</div>
+      <div style="flex:1;height:1px;background:#e2e8f0"></div>
+    </div>
+
+    <button id="auth-google-btn" onclick="authWithGoogle()" style="width:100%;display:flex;align-items:center;justify-content:center;gap:10px;background:#fff;border:1.5px solid #e2e8f0;color:#1e293b;padding:12px;border-radius:11px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:8px;transition:border-color 0.15s;" onmouseover="this.style.borderColor='#6366f1'" onmouseout="this.style.borderColor='#e2e8f0'">
+      <svg style="width:18px;height:18px;flex-shrink:0" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+      Continue with Google
+    </button>
+
+    <div style="text-align:center;">
       <button onclick="guestMode()" style="background:none;border:none;color:var(--t3);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;text-decoration:underline;text-underline-offset:3px;">Continue as Guest (local only)</button>
     </div>
   </div>
@@ -740,8 +746,14 @@ input,button,select{font-family:'Montserrat',sans-serif;}
 // ══════════════════════════════════════════════════
 
 // ── STATE ──
-let FB_PID='', FB_KEY='', FB_ACTIVE=false;
-let CK='', FK='';
+// ── PRE-CONFIGURED CREDENTIALS (shared for all users) ──
+const APP_FB_PID='stockr-app-65c0e';
+const APP_FB_KEY='AIzaSyBOgX2B9euy64XMO7gBfHWvWctN74Wt2Tc';
+const APP_FK='d7udv7pr01qnv95n8q0gd7udv7pr01qnv95n8q10';
+
+let _fbApp=null, _fbAuth=null;
+let FB_PID=APP_FB_PID, FB_KEY=APP_FB_KEY, FB_ACTIVE=false;
+let CK='', FK=APP_FK;
 let PORTFOLIOS=[];   // [{id, name, positions:[{ticker,shares,cost}]}]
 let ACTIVE_PORT_ID='';
 let WATCH=[];
@@ -1920,12 +1932,8 @@ function authSubmit(){const btn=document.getElementById('auth-submit-btn');if(bt
 async function authLogin(){
   const email=document.getElementById('auth-email').value.trim();
   const pass=document.getElementById('auth-pass').value;
-  const pid=document.getElementById('auth-fb-pid').value.trim();
-  const key=document.getElementById('auth-fb-key').value.trim();
   showErr('auth-err','');
   if(!email||!pass){showErr('auth-err','Please enter email and password.');return;}
-  if(!pid||!key){showErr('auth-err','Firebase Project ID and Web API Key are required.');return;}
-  FB_PID=pid;FB_KEY=key;LS.set('st_fbcfg',{pid,key});
   const btn=document.getElementById('auth-submit-btn');btn.disabled=true;btn.textContent='Signing in...';
   try{
     const r=await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${FB_KEY}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password:pass,returnSecureToken:true})});
@@ -1935,16 +1943,36 @@ async function authLogin(){
   }catch(e){showErr('auth-err',e.message);btn.disabled=false;btn.textContent='Sign In';}
 }
 
+async function authWithGoogle(){
+  const btn=document.getElementById('auth-google-btn');
+  btn.disabled=true;btn.textContent='Opening Google...';
+  showErr('auth-err','');
+  try{
+    const provider=new firebase.auth.GoogleAuthProvider();
+    const result=await _fbAuth.signInWithPopup(provider);
+    const idToken=await result.user.getIdToken();
+    await setAuthState({
+      idToken,
+      refreshToken:result.user.refreshToken,
+      localId:result.user.uid,
+      email:result.user.email,
+      expiresIn:'3600'
+    });
+    await startApp();
+  }catch(e){
+    if(e.code!=='auth/popup-closed-by-user'){
+      showErr('auth-err',e.message||'Google sign-in failed.');
+    }
+    btn.disabled=false;btn.innerHTML=`<svg style="width:18px;height:18px;flex-shrink:0" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg> Continue with Google`;
+  }
+}
+
 async function authRegister(){
   const email=document.getElementById('auth-email').value.trim();
   const pass=document.getElementById('auth-pass').value;
-  const pid=document.getElementById('auth-fb-pid').value.trim();
-  const key=document.getElementById('auth-fb-key').value.trim();
   showErr('auth-err','');
   if(!email||!pass){showErr('auth-err','Please enter email and password.');return;}
   if(pass.length<6){showErr('auth-err','Password must be at least 6 characters.');return;}
-  if(!pid||!key){showErr('auth-err','Firebase Project ID and Web API Key are required.');return;}
-  FB_PID=pid;FB_KEY=key;LS.set('st_fbcfg',{pid,key});
   const btn=document.getElementById('auth-submit-btn');btn.disabled=true;btn.textContent='Creating account...';
   try{
     const r=await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${FB_KEY}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password:pass,returnSecureToken:true})});
@@ -1968,7 +1996,7 @@ async function setAuthState(d){
 function clearAllLocalData(){
   LS.del('st_ck');LS.del('st_fk');LS.del('st_portfolios');LS.del('st_watch');
   LS.del('st_sessions');LS.del('st_active_port');LS.del('st_ticker_cache');LS.del('st_auth');LS.del('st_fbcfg');
-  CK='';FK='';PORTFOLIOS=[];WATCH=[];sessions=[];curId=null;MSGS=[];PC={};ACTIVE_PORT_ID='';
+  CK='';FK=APP_FK;PORTFOLIOS=[];WATCH=[];sessions=[];curId=null;MSGS=[];PC={};ACTIVE_PORT_ID='';
 }
 
 function authLogout(){
@@ -2000,28 +2028,27 @@ function renderProfile(){
   el.innerHTML=`
   <div style="background:#fff;border-radius:16px;padding:20px;margin-bottom:12px;display:flex;align-items:center;gap:14px;box-shadow:0 1px 4px rgba(0,0,0,0.06);">
     <div style="width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,var(--p),var(--pd));display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;color:#fff;flex-shrink:0;">${avatar}</div>
-    <div style="flex:1;min-width:0;">
-      <div style="font-size:15px;font-weight:800;color:var(--t);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${USER_EMAIL||'Guest'}</div>
-      <div style="font-size:11px;color:var(--t3);margin-top:2px;">${IS_GUEST?'Local only — data not synced':'Synced with Firebase'}</div>
-    </div>
+    <div style="flex:1;min-width:0;"><div style="font-size:15px;font-weight:800;color:var(--t);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${USER_EMAIL||'Guest'}</div>
+    <div style="font-size:11px;color:var(--t3);margin-top:2px;">${IS_GUEST?'Local only':'Synced with Firebase ✓'}</div></div>
     ${!IS_GUEST?`<button onclick="authLogout()" style="background:#fee2e2;border:none;color:var(--r);font-size:11px;font-weight:700;padding:7px 12px;border-radius:9px;cursor:pointer;font-family:inherit;flex-shrink:0;">Sign out</button>`:''}
   </div>
-  <div style="font-size:10px;font-weight:700;color:var(--t3);letter-spacing:2px;margin:0 2px 8px;">CONNECTED SERVICES</div>
-  ${serviceCard('ck-panel','🤖','Claude AI Analysis',ckOk?'Connected — AI analysis enabled':'Not connected — analysis disabled',ckOk,'ON','OFF',`
+  <div style="font-size:10px;font-weight:700;color:var(--t3);letter-spacing:2px;margin:0 2px 8px;">SERVICES</div>
+  ${serviceCard('ck-panel','🤖','Claude AI Analysis',ckOk?'Connected — AI analysis enabled':'Add your key to enable AI analysis',ckOk,'ON','OFF',`
     <div style="font-size:10px;font-weight:700;color:var(--p);letter-spacing:2px;margin-bottom:6px;">ANTHROPIC API KEY</div>
     <input class="mob-finp" id="prof-ck" type="password" placeholder="sk-ant-api03-..." value="${CK||''}" style="margin-bottom:8px;display:block;">
-    <div style="font-size:11px;color:var(--t4);margin-bottom:10px;line-height:1.5;">Free key at <a href="https://console.anthropic.com/settings/keys" target="_blank" style="color:var(--p);font-weight:600;">console.anthropic.com</a>. ~$0.01 per analysis.</div>
-    <button onclick="saveProfileKey('ck')" class="mob-add-btn" style="font-size:13px;padding:12px;">${ckOk?'Update Key':'Connect'}</button>`)}
-  ${serviceCard('fk-panel','📈','Finnhub Real-Time Prices',fkOk?'Connected — fast real-time prices':'Using Yahoo Finance (free, delayed)',fkOk,'ON','FREE',`
-    <div style="font-size:10px;font-weight:700;color:var(--p);letter-spacing:2px;margin-bottom:6px;">FINNHUB API KEY</div>
-    <input class="mob-finp" id="prof-fk" type="password" placeholder="your_finnhub_key..." value="${FK||''}" style="margin-bottom:8px;display:block;">
-    <div style="font-size:11px;color:var(--t4);margin-bottom:10px;line-height:1.5;">Free key at <a href="https://finnhub.io/register" target="_blank" style="color:var(--p);font-weight:600;">finnhub.io/register</a>. Without it, Yahoo Finance is used automatically.</div>
-    <button onclick="saveProfileKey('fk')" class="mob-add-btn" style="font-size:13px;padding:12px;">${fkOk?'Update Key':'Connect'}</button>`)}
-  ${serviceCard('fb-panel','☁️','Firebase Sync',fbOk?`Syncing as ${USER_EMAIL}`:'Local only — data not synced',fbOk,'ON','OFF',IS_GUEST?`
-    <div style="font-size:11px;color:var(--t4);margin-bottom:10px;line-height:1.5;">Sign in or create an account to sync across all your devices.</div>
-    <button onclick="document.getElementById('app').style.display='none';document.getElementById('auth-screen').style.display='flex';" class="mob-add-btn" style="font-size:13px;padding:12px;">Sign in / Create Account</button>`:
-    `<div style="font-size:12px;color:var(--t3);line-height:1.6;">Signed in as <strong>${USER_EMAIL}</strong><br>Project: <strong>${FB_PID}</strong></div>`)}
-  ${IS_GUEST?`<button onclick="document.getElementById('app').style.display='none';document.getElementById('auth-screen').style.display='flex';" style="width:100%;background:linear-gradient(135deg,var(--p),var(--pd));border:none;color:#fff;padding:14px;border-radius:14px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:4px;box-shadow:0 4px 14px rgba(99,102,241,0.35);">Sign in / Create Account</button>`:''}`;
+    <div style="font-size:11px;color:var(--t4);margin-bottom:10px;line-height:1.5;">Get your key at <a href="https://console.anthropic.com/settings/keys" target="_blank" style="color:var(--p);font-weight:600;">console.anthropic.com</a>. ~$0.01–0.03 per analysis.</div>
+    <button onclick="saveProfileKey('ck')" class="mob-add-btn" style="font-size:13px;padding:12px;">${ckOk?'Update Key':'Connect Claude AI'}</button>`)}
+  <div style="background:#fff;border-radius:14px;padding:14px 16px;margin-bottom:10px;box-shadow:0 1px 4px rgba(0,0,0,0.05);display:flex;align-items:center;gap:12px;">
+    <div style="width:36px;height:36px;border-radius:10px;background:#ecfdf5;border:1px solid #a7f3d0;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">📈</div>
+    <div style="flex:1;"><div style="font-size:13px;font-weight:700;color:var(--t);">Real-Time Prices</div><div style="font-size:11px;color:#10b981;margin-top:1px;">Finnhub + Yahoo Finance — pre-configured ✓</div></div>
+    <div style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;background:#dcfce7;color:#047857;">ON</div>
+  </div>
+  <div style="background:#fff;border-radius:14px;padding:14px 16px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,0.05);display:flex;align-items:center;gap:12px;">
+    <div style="width:36px;height:36px;border-radius:10px;background:${fbOk?'#ecfdf5':'#f8fafc'};border:1px solid ${fbOk?'#a7f3d0':'#e2e8f0'};display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">☁️</div>
+    <div style="flex:1;"><div style="font-size:13px;font-weight:700;color:var(--t);">Firebase Sync</div><div style="font-size:11px;color:${fbOk?'#10b981':'#94a3b8'};margin-top:1px;">${fbOk?`Syncing as ${USER_EMAIL}`:'Sign in to enable sync'}</div></div>
+    <div style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;background:${fbOk?'#dcfce7':'#f1f5f9'};color:${fbOk?'#047857':'#94a3b8'};">${fbOk?'ON':'OFF'}</div>
+  </div>
+  ${IS_GUEST?`<button onclick="document.getElementById('app').style.display='none';document.getElementById('auth-screen').style.display='flex';" style="width:100%;background:linear-gradient(135deg,var(--p),var(--pd));border:none;color:#fff;padding:14px;border-radius:14px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;box-shadow:0 4px 14px rgba(99,102,241,0.35);">Sign in / Create Account</button>`:''}`;
 }
 
 function serviceCard(panelId,icon,title,subtitle,on,onLabel,offLabel,panelContent){
@@ -2137,14 +2164,9 @@ function closeSB(){document.getElementById('sb').classList.remove('open');docume
 
 // ── BOOT ──
 document.addEventListener('DOMContentLoaded',async()=>{
-  // Restore Firebase config (needed to attempt auth session restore)
-  const fbcfg=LS.get('st_fbcfg');
-  if(fbcfg?.pid){FB_PID=fbcfg.pid;FB_KEY=fbcfg.key;}
-  // Pre-fill login form if we have Firebase config
-  if(FB_PID&&document.getElementById('auth-fb-pid')){
-    document.getElementById('auth-fb-pid').value=FB_PID;
-    document.getElementById('auth-fb-key').value=FB_KEY;
-  }
+  // Initialize Firebase SDK (for Google Auth)
+  _fbApp=firebase.initializeApp({apiKey:APP_FB_KEY,authDomain:`${APP_FB_PID}.firebaseapp.com`,projectId:APP_FB_PID});
+  _fbAuth=firebase.auth(_fbApp);
   // Try to restore auth session
   const saved=LS.get('st_auth');
   if(saved?.uid&&saved?.refresh&&FB_PID&&FB_KEY){
