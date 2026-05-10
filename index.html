@@ -29,7 +29,7 @@ input,button,select{font-family:'Montserrat',sans-serif;}
 ::-webkit-scrollbar{width:4px;}::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:4px;}
 
 /* SETUP */
-#setup{position:fixed;inset:0;background:linear-gradient(135deg,#f0f4ff,#e8f4ff);display:flex;align-items:center;justify-content:center;padding:20px;z-index:200;overflow-y:auto;}
+#auth-screen{position:fixed;inset:0;background:linear-gradient(135deg,#f0f4ff,#e8f4ff);display:none;align-items:center;justify-content:center;padding:20px;z-index:200;overflow-y:auto;}
 #setup.hide{display:none;}
 .sc{background:#fff;border-radius:22px;box-shadow:0 8px 40px rgba(99,102,241,0.13);padding:28px 24px;max-width:440px;width:100%;}
 .logo{width:60px;height:60px;background:linear-gradient(135deg,var(--p),var(--pd));border-radius:16px;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;font-size:22px;font-weight:800;color:#fff;letter-spacing:2px;box-shadow:0 4px 18px rgba(99,102,241,0.35);}
@@ -505,54 +505,51 @@ input,button,select{font-family:'Montserrat',sans-serif;}
 <body>
 
 <!-- SETUP -->
-<div id="setup">
-  <div class="sc">
-    <div style="margin:0 auto 14px"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 200" style="width:260px;height:104px;display:block;margin:0 auto">
+<div id="auth-screen">
+  <div class="sc" style="max-width:380px">
+    <div style="margin:0 auto 20px"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 200" style="width:220px;height:88px;display:block;margin:0 auto">
   <defs>
-    <linearGradient id="logoBlue" x1="0%" y1="0%" x2="0%" y2="100%">
+    <linearGradient id="logoBlue2" x1="0%" y1="0%" x2="0%" y2="100%">
       <stop offset="0%" stop-color="#0052D4"/><stop offset="100%" stop-color="#4364F7"/>
     </linearGradient>
-    <linearGradient id="logoGreen" x1="0%" y1="0%" x2="100%" y2="100%">
+    <linearGradient id="logoGreen2" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#11998E"/><stop offset="100%" stop-color="#38EF7D"/>
     </linearGradient>
   </defs>
   <rect width="100%" height="100%" fill="#ffffff" rx="12"/>
-  <rect x="40" y="110" width="24" height="40" rx="6" fill="url(#logoBlue)"/>
-  <rect x="76" y="80" width="24" height="70" rx="6" fill="url(#logoBlue)"/>
-  <path d="M 112 150 L 136 150 L 136 70 L 156 70 L 124 30 L 92 70 L 112 70 Z" fill="url(#logoGreen)"/>
-  <text x="180" y="128" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif" font-size="76" font-weight="800" fill="#1A1A1A" letter-spacing="-2">Stock<tspan fill="url(#logoGreen)">r</tspan></text>
+  <rect x="40" y="110" width="24" height="40" rx="6" fill="url(#logoBlue2)"/>
+  <rect x="76" y="80" width="24" height="70" rx="6" fill="url(#logoBlue2)"/>
+  <path d="M 112 150 L 136 150 L 136 70 L 156 70 L 124 30 L 92 70 L 112 70 Z" fill="url(#logoGreen2)"/>
+  <text x="180" y="128" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif" font-size="76" font-weight="800" fill="#1A1A1A" letter-spacing="-2">Stock<tspan fill="url(#logoGreen2)">r</tspan></text>
 </svg></div>
-    <h1>Welcome to Stockr</h1>
-    <p class="sub">AI stock analyst · Real-time prices · Optional cloud sync</p>
-    <div class="box">
-      <div class="box-title">① CLAUDE API — AI ANALYSIS</div>
-      <div class="step"><div class="sn">1</div><div class="st">Go to <a href="https://console.anthropic.com/settings/keys" target="_blank">console.anthropic.com/settings/keys</a> → Create Key</div></div>
-    </div>
-    <div class="lbl">ANTHROPIC API KEY</div>
-    <input class="inp" id="k-claude" type="password" placeholder="sk-ant-api03-..." autocomplete="off" spellcheck="false">
-    <div class="hint" style="margin-bottom:16px">~$0.01–0.03 per analysis.</div>
-    <div class="box">
-      <div class="box-title">② FINNHUB — REAL-TIME PRICES<span class="badge">FREE</span></div>
-      <div class="step"><div class="sn">1</div><div class="st">Go to <a href="https://finnhub.io/register" target="_blank">finnhub.io/register</a> → copy key from dashboard</div></div>
-    </div>
-    <div class="lbl">FINNHUB API KEY</div>
-    <input class="inp" id="k-fh" type="password" placeholder="your_finnhub_key..." autocomplete="off" spellcheck="false">
-    <div class="hint">Free: 60 requests/min.</div>
 
-    <div class="box" style="margin-top:18px;border-color:#6366f1;background:linear-gradient(135deg,#f0f9ff,#eff6ff)">
-      <div class="box-title" style="color:#6366f1">③ FIREBASE SYNC<span class="badge" style="background:#6366f1;color:#fff">OPTIONAL</span></div>
-      <div style="font-size:11px;color:#6366f1;font-weight:500;margin-bottom:10px;line-height:1.5">Connect Firebase to sync your portfolios, watchlist and chat across all devices. If already set up on another device — enter your Firebase credentials here to instantly restore all your data.</div>
-      <div class="step"><div class="sn" style="background:#6366f1;color:#fff">1</div><div class="st">Go to <a href="https://console.firebase.google.com" target="_blank">console.firebase.google.com</a> → New project → Build → Firestore Database → Start in <strong>test mode</strong></div></div>
-      <div class="step"><div class="sn" style="background:#6366f1;color:#fff">2</div><div class="st">Project Settings → General → scroll to "Your apps" → copy <strong>Project ID</strong> and <strong>Web API Key</strong></div></div>
+    <!-- Mode toggle -->
+    <div style="display:flex;background:#f1f5f9;border-radius:12px;padding:4px;margin-bottom:20px;">
+      <button id="auth-login-tab" onclick="showAuthMode('login')" style="flex:1;padding:9px;border:none;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;background:var(--p);color:#fff;transition:all 0.2s;">Sign In</button>
+      <button id="auth-reg-tab" onclick="showAuthMode('register')" style="flex:1;padding:9px;border:none;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;background:transparent;color:var(--t3);transition:all 0.2s;">Create Account</button>
     </div>
-    <div class="lbl">FIREBASE PROJECT ID <span style="font-size:9px;font-weight:500;color:var(--t4)">(optional)</span></div>
-    <input class="inp" id="setup-fb-pid" placeholder="your-project-id" autocomplete="off" spellcheck="false">
-    <div class="lbl" style="margin-top:8px">FIREBASE WEB API KEY <span style="font-size:9px;font-weight:500;color:var(--t4)">(optional)</span></div>
-    <input class="inp" id="setup-fb-key" placeholder="AIzaSy..." autocomplete="off" spellcheck="false">
-    <div class="hint" style="margin-bottom:16px">Leave blank to use locally only. With Firebase, data syncs across all devices and you only need to enter your API keys once.</div>
 
-    <div class="err" id="setup-err"></div>
-    <button class="btn pri" id="setup-launch-btn" onclick="launch()">🚀 Launch Stockr</button>
+    <div id="auth-mode-label" style="font-size:11px;font-weight:700;color:var(--p);letter-spacing:2px;margin-bottom:14px;">SIGN IN TO YOUR ACCOUNT</div>
+
+    <!-- Firebase setup (needed for auth) -->
+    <div id="auth-fb-section" style="background:#f0f4ff;border:1px solid #c7d2fe;border-radius:12px;padding:12px 14px;margin-bottom:14px;">
+      <div style="font-size:10px;font-weight:700;color:#6366f1;letter-spacing:2px;margin-bottom:8px;">FIREBASE PROJECT</div>
+      <div style="font-size:11px;color:#6366f1;margin-bottom:10px;line-height:1.5;">Required for accounts. <a href="https://console.firebase.google.com" target="_blank" style="font-weight:700;">Setup guide →</a></div>
+      <input class="inp" id="auth-fb-pid" placeholder="Project ID (e.g. my-app-12345)" autocomplete="off" spellcheck="false" style="margin-bottom:8px;">
+      <input class="inp" id="auth-fb-key" placeholder="Web API Key (AIzaSy...)" autocomplete="off" spellcheck="false" style="margin-bottom:0">
+    </div>
+
+    <div class="lbl">EMAIL</div>
+    <input class="inp" id="auth-email" type="email" placeholder="you@example.com" autocomplete="email" spellcheck="false">
+    <div class="lbl">PASSWORD</div>
+    <input class="inp" id="auth-pass" type="password" placeholder="••••••••" autocomplete="current-password">
+
+    <div class="err" id="auth-err"></div>
+    <button class="btn pri" id="auth-submit-btn" onclick="authSubmit()">Sign In</button>
+
+    <div style="text-align:center;margin-top:8px;">
+      <button onclick="guestMode()" style="background:none;border:none;color:var(--t3);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;text-decoration:underline;text-underline-offset:3px;">Continue as Guest (local only)</button>
+    </div>
   </div>
 </div>
 
@@ -628,6 +625,7 @@ input,button,select{font-family:'Montserrat',sans-serif;}
     <button class="tb on" id="tbc" onclick="ST('c')">💬 Chat</button>
     <button class="tb" id="tbp" onclick="ST('p')">💼 Portfolios</button>
     <button class="tb" id="tbw" onclick="ST('w')">⭐ Watchlist</button>
+    <button class="tb" id="tbpr" onclick="ST('pr')">👤 Profile</button>
   </div>
 
   <!-- Bottom nav (mobile only) -->
@@ -643,6 +641,10 @@ input,button,select{font-family:'Montserrat',sans-serif;}
     <button class="bni" id="bnic" onclick="ST('c')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
       <span>Chat</span>
+    </button>
+    <button class="bni" id="bnipr" onclick="ST('pr')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+      <span>Profile</span>
     </button>
   </nav>
 
@@ -726,6 +728,10 @@ input,button,select{font-family:'Montserrat',sans-serif;}
       </div>
     </div>
   </div>
+  <!-- PROFILE -->
+  <div id="prt" style="display:none;flex-direction:column;flex:1;min-height:0;overflow-y:auto;background:#f0f2f8;padding:16px;padding-bottom:80px;">
+    <div id="profile-content"></div>
+  </div>
 </div>
 
 <script>
@@ -740,8 +746,11 @@ let PORTFOLIOS=[];   // [{id, name, positions:[{ticker,shares,cost}]}]
 let ACTIVE_PORT_ID='';
 let WATCH=[];
 let sessions=[], curId=null, MSGS=[];
-let loading=false, liv, li=0, PC={};
+let loading=false, liv, li=0, PC={}
 let syncTimer=null;
+// ── AUTH STATE ──
+let AUTH_TOKEN='', REFRESH_TOKEN='', USER_ID='', USER_EMAIL='', AUTH_EXPIRY=0;
+let IS_GUEST=false;
 
 const SYS=`You are STOCKR — an elite quantitative stock analyst (Goldman Sachs/Bridgewater level).
 RULES:
@@ -774,9 +783,30 @@ const LS={
 
 // ── FIREBASE REST ──
 function fbUrl(path){return `https://firestore.googleapis.com/v1/projects/${FB_PID}/databases/(default)/documents/${path}?key=${FB_KEY}`;}
+// User-scoped path: users/{uid}/key → for logged-in users
+function userPath(key){return USER_ID?`users/${USER_ID}/${key}`:key;}
+
+async function ensureToken(){
+  if(!REFRESH_TOKEN)return;
+  if(Date.now()<AUTH_EXPIRY-60000)return; // still valid
+  try{
+    const r=await fetch(`https://securetoken.googleapis.com/v1/token?key=${FB_KEY}`,{
+      method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},
+      body:`grant_type=refresh_token&refresh_token=${REFRESH_TOKEN}`
+    });
+    const d=await r.json();
+    if(d.id_token){
+      AUTH_TOKEN=d.id_token;REFRESH_TOKEN=d.refresh_token;
+      AUTH_EXPIRY=Date.now()+parseInt(d.expires_in||3600)*1000;
+      LS.set('st_auth',{token:AUTH_TOKEN,refresh:REFRESH_TOKEN,expiry:AUTH_EXPIRY,uid:USER_ID,email:USER_EMAIL});
+    }
+  }catch(e){console.warn('Token refresh failed',e);}
+}
 
 async function fbRead(path){
-  const r=await fetch(fbUrl(path));
+  await ensureToken();
+  const headers=AUTH_TOKEN?{Authorization:`Bearer ${AUTH_TOKEN}`}:{};
+  const r=await fetch(fbUrl(path),{headers});
   if(r.status===404)return null;
   if(!r.ok){const e=await r.json();throw new Error(e.error?.message||'Read error '+r.status);}
   const doc=await r.json();
@@ -785,10 +815,9 @@ async function fbRead(path){
 }
 
 async function fbWrite(path,data){
-  const r=await fetch(fbUrl(path),{
-    method:'PATCH',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({fields:{d:{stringValue:JSON.stringify(data)}}})
-  });
+  await ensureToken();
+  const headers={'Content-Type':'application/json',...(AUTH_TOKEN?{Authorization:`Bearer ${AUTH_TOKEN}`}:{})};
+  const r=await fetch(fbUrl(path),{method:'PATCH',headers,body:JSON.stringify({fields:{d:{stringValue:JSON.stringify(data)}}})});
   if(!r.ok){const e=await r.json();throw new Error(e.error?.message||'Write error '+r.status);}
 }
 
@@ -832,26 +861,22 @@ async function manualSync(){
 }
 
 async function pushAllToFirebase(){
-  // Save config (API keys)
-  await fbWrite('st_config/keys',{claudeKey:CK,finnhubKey:FK,updatedAt:Date.now()});
-  // Save all portfolios
-  await fbWrite('st_data/portfolios',{portfolios:PORTFOLIOS,updatedAt:Date.now()});
-  // Save watchlist
-  await fbWrite('st_data/watchlist',{watchlist:WATCH,updatedAt:Date.now()});
-  // Save sessions (last 30, last 60 msgs each)
+  const p=userPath;
+  await fbWrite(p('config'),{claudeKey:CK,finnhubKey:FK,updatedAt:Date.now()});
+  await fbWrite(p('portfolios'),{portfolios:PORTFOLIOS,updatedAt:Date.now()});
+  await fbWrite(p('watchlist'),{watchlist:WATCH,updatedAt:Date.now()});
   const toSave=sessions.slice(0,30).map(s=>({...s,msgs:(s.msgs||[]).slice(-60)}));
-  await fbWrite('st_data/sessions',{sessions:toSave,updatedAt:Date.now()});
+  await fbWrite(p('sessions'),{sessions:toSave,updatedAt:Date.now()});
 }
 
 async function pullFromFirebase(){
-  // Load config (API keys for new devices)
-  const cfg=await fbRead('st_config/keys');
+  const p=userPath;
+  const cfg=await fbRead(p('config'));
   if(cfg){
     if(cfg.claudeKey&&!CK){CK=cfg.claudeKey;LS.set('st_ck',CK);}
     if(cfg.finnhubKey&&!FK){FK=cfg.finnhubKey;LS.set('st_fk',FK);}
   }
-  // Load portfolios
-  const portData=await fbRead('st_data/portfolios');
+  const portData=await fbRead(p('portfolios'));
   if(portData?.portfolios?.length){
     PORTFOLIOS=portData.portfolios;
     if(!ACTIVE_PORT_ID||!PORTFOLIOS.find(p=>p.id===ACTIVE_PORT_ID)){
@@ -859,16 +884,13 @@ async function pullFromFirebase(){
     }
     saveLocal();
   }
-  // Load watchlist
-  const wlData=await fbRead('st_data/watchlist');
+  const wlData=await fbRead(p('watchlist'));
   if(wlData?.watchlist){WATCH=wlData.watchlist;LS.set('st_watch',WATCH);}
-  // Load sessions
-  const sessData=await fbRead('st_data/sessions');
+  const sessData=await fbRead(p('sessions'));
   if(sessData?.sessions?.length){
     sessions=sessData.sessions.sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
     saveLocalSessions();
   }
-  // Re-render all UI with fresh data
   if(document.getElementById('app')?.style.display!=='none'){
     renderPortSwitcher();renderPORT();renderWATCH();renderSB();renderMSGS();
   }
@@ -886,7 +908,7 @@ function saveLocalSessions(){
 function saveSessionsToFirebase(){
   if(!FB_ACTIVE)return;
   const toSave=sessions.slice(0,30).map(s=>({...s,msgs:(s.msgs||[]).slice(-60)}));
-  fbWrite('st_data/sessions',{sessions:toSave,updatedAt:Date.now()}).catch(()=>{});
+  fbWrite(userPath('sessions'),{sessions:toSave,updatedAt:Date.now()}).catch(()=>{});
 }
 
 // ── FIREBASE CONNECT / DISCONNECT ──
@@ -900,7 +922,7 @@ async function connectFirebase(){
   document.getElementById('fb-err').style.display='none';
   FB_PID=pid;FB_KEY=key;
   try{
-    await fbWrite('st_meta/ping',{ts:Date.now(),app:'stockr'});
+    await fbWrite(`users/${USER_ID||'ping'}/ping`,{ts:Date.now(),app:'stockr'});
     LS.set('st_fbcfg',{pid,key});
     FB_ACTIVE=true;
     // Push current data up then load any newer data from Firebase
@@ -972,22 +994,22 @@ async function fullPullFromFirebase(){
   setSyncPill('syncing','⟳ Pulling');
   try{
     // Load config (API keys)
-    const cfg=await fbRead('st_config/keys');
+    const cfg=await fbRead(userPath('config'));
     if(cfg){
       if(cfg.claudeKey){CK=cfg.claudeKey;LS.set('st_ck',CK);}
       if(cfg.finnhubKey){FK=cfg.finnhubKey;LS.set('st_fk',FK);}
     }
     // Load portfolios
-    const portData=await fbRead('st_data/portfolios');
+    const portData=await fbRead(userPath('portfolios'));
     if(portData?.portfolios?.length){
       PORTFOLIOS=portData.portfolios;
       if(!PORTFOLIOS.find(p=>p.id===ACTIVE_PORT_ID))ACTIVE_PORT_ID=PORTFOLIOS[0].id;
     }
     // Load watchlist
-    const wlData=await fbRead('st_data/watchlist');
+    const wlData=await fbRead(userPath('watchlist'));
     if(wlData?.watchlist)WATCH=wlData.watchlist;
     // Load sessions
-    const sessData=await fbRead('st_data/sessions');
+    const sessData=await fbRead(userPath('sessions'));
     if(sessData?.sessions?.length){
       sessions=sessData.sessions.sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
       if(!sessions.find(s=>s.id===curId)){curId=sessions[0].id;MSGS=sessions[0].msgs||[];}
@@ -1062,7 +1084,7 @@ async function launch(){
     FB_PID=fbpid;FB_KEY=fbkey;
     LS.set('st_fbcfg',{pid:fbpid,key:fbkey});
     try{
-      await fbRead('st_meta/ping');
+      await fbRead(`users/${USER_ID||'ping'}/ping`);
       FB_ACTIVE=true;
       btn.textContent='⟳ Loading your data...';
       await pullFromFirebase();
@@ -1095,22 +1117,24 @@ async function launch(){
 
 // ── APP START ──
 async function startApp(){
+  document.getElementById('auth-screen').style.display='none';
   document.getElementById('app').style.display='flex';
   initUI();
 
-  // If Firebase was already connected during launch() (new device setup), skip re-connecting
-  if(FB_ACTIVE){
+  // If Firebase already connected (login flow set it up)
+  if(FB_ACTIVE && USER_ID){
     updateFbUI(true);
     setSyncPill('cloud','☁ Synced');
-    startAutoSync();
-  } else {
-    // Check saved Firebase config (returning user / existing device)
-    const fbcfg=LS.get('st_fbcfg');
+    try{
+      await pullFromFirebase();
+      startAutoSync();
+    }catch(e){console.warn('Initial pull failed:',e.message);}
+  } else if(!IS_GUEST){
     if(fbcfg?.pid&&fbcfg?.key){
       FB_PID=fbcfg.pid;FB_KEY=fbcfg.key;
       setSyncPill('syncing','⟳ Connecting');
       try{
-        await fbRead('st_meta/ping');
+        await fbRead(`users/${USER_ID||'ping'}/ping`);
         FB_ACTIVE=true;updateFbUI(true);
         setSyncPill('syncing','⟳ Loading');
         await pullFromFirebase();
@@ -1483,7 +1507,7 @@ function addP(){
   if(i>=0)port.positions[i]={ticker:t,shares:s,cost:c};
   else port.positions.push({ticker:t,shares:s,cost:c});
   saveLocal();renderPORT();refresh('p');
-  if(FB_ACTIVE)fbWrite('st_data/portfolios',{portfolios:PORTFOLIOS,updatedAt:Date.now()}).catch(()=>{});
+  if(FB_ACTIVE)fbWrite(userPath('portfolios'),{portfolios:PORTFOLIOS,updatedAt:Date.now()}).catch(()=>{});
 }
 
 function toggleEdit(i){
@@ -1509,14 +1533,14 @@ function saveEdit(i){
   port.positions[i].shares=shares;
   port.positions[i].cost=cost;
   saveLocal();renderPORT();refresh('p');
-  if(FB_ACTIVE)fbWrite('st_data/portfolios',{portfolios:PORTFOLIOS,updatedAt:Date.now()}).catch(()=>{});
+  if(FB_ACTIVE)fbWrite(userPath('portfolios'),{portfolios:PORTFOLIOS,updatedAt:Date.now()}).catch(()=>{});
 }
 
 function delP(i){
   const port=activePort();if(!port)return;
   if(!confirm(`Remove ${port.positions[i].ticker} from portfolio?`))return;
   port.positions.splice(i,1);saveLocal();renderPORT();
-  if(FB_ACTIVE)fbWrite('st_data/portfolios',{portfolios:PORTFOLIOS,updatedAt:Date.now()}).catch(()=>{});
+  if(FB_ACTIVE)fbWrite(userPath('portfolios'),{portfolios:PORTFOLIOS,updatedAt:Date.now()}).catch(()=>{});
 }
 
 function deletePortfolio(){
@@ -1525,7 +1549,7 @@ function deletePortfolio(){
   PORTFOLIOS=PORTFOLIOS.filter(p=>p.id!==ACTIVE_PORT_ID);
   ACTIVE_PORT_ID=PORTFOLIOS[0].id;
   saveLocal();renderPortSwitcher();renderPORT();
-  if(FB_ACTIVE)fbWrite('st_data/portfolios',{portfolios:PORTFOLIOS,updatedAt:Date.now()}).catch(()=>{});
+  if(FB_ACTIVE)fbWrite(userPath('portfolios'),{portfolios:PORTFOLIOS,updatedAt:Date.now()}).catch(()=>{});
 }
 
 // ── WATCHLIST ──
@@ -1578,11 +1602,11 @@ function addW(){
   const i=WATCH.findIndex(w=>w.ticker===t);
   if(i>=0)WATCH[i]={ticker:t,note:n||WATCH[i].note};else WATCH.push({ticker:t,note:n});
   LS.set('st_watch',WATCH);renderWATCH();refresh('w');
-  if(FB_ACTIVE)fbWrite('st_data/watchlist',{watchlist:WATCH,updatedAt:Date.now()}).catch(()=>{});
+  if(FB_ACTIVE)fbWrite(userPath('watchlist'),{watchlist:WATCH,updatedAt:Date.now()}).catch(()=>{});
 }
 function delW(i){
   WATCH.splice(i,1);LS.set('st_watch',WATCH);renderWATCH();
-  if(FB_ACTIVE)fbWrite('st_data/watchlist',{watchlist:WATCH,updatedAt:Date.now()}).catch(()=>{});
+  if(FB_ACTIVE)fbWrite(userPath('watchlist'),{watchlist:WATCH,updatedAt:Date.now()}).catch(()=>{});
 }
 
 // ── PRICES ──
@@ -1641,14 +1665,16 @@ async function fetchPrice(t){
     return r;
   }
 
-  // Try Finnhub first — fast, no CORS issues, great for all US stocks
-  try{
-    const r=await fetch(`https://finnhub.io/api/v1/quote?symbol=${t}&token=${FK}`,{signal:AbortSignal.timeout(7000)});
-    if(r.ok){
-      const d=await r.json();
-      if(d.c&&d.c>0){TICKER_CACHE[t]=t;saveTCache();return{c:d.c,d:d.d,dp:d.dp,h:d.h,l:d.l,pc:d.pc,src:'finnhub',currency:'USD'};}
-    }
-  }catch{}
+  // Try Finnhub first — fast, no CORS issues, great for all US stocks (only if key is set)
+  if(FK&&FK.length>8){
+    try{
+      const r=await fetch(`https://finnhub.io/api/v1/quote?symbol=${t}&token=${FK}`,{signal:AbortSignal.timeout(7000)});
+      if(r.ok){
+        const d=await r.json();
+        if(d.c&&d.c>0){TICKER_CACHE[t]=t;saveTCache();return{c:d.c,d:d.d,dp:d.dp,h:d.h,l:d.l,pc:d.pc,src:'finnhub',currency:'USD'};}
+      }
+    }catch{}
+  }
 
   // Finnhub returned nothing → try Yahoo as-is (META, SPY etc. work here too)
   const direct=await fetchYahoo(t);
@@ -1769,6 +1795,14 @@ async function doSend(ov){
   inp.value='';
   if(!curId)await newSess();
   updateTitle(msg);
+  if(!CK||!CK.startsWith('sk-ant')){
+    MSGS.push({r:'u',c:msg});MSGS.push({r:'a',c:'⚠️ No Claude API key connected. Go to **Profile** → Claude AI Analysis to add your key and enable AI analysis.'});
+    renderMSGS();
+    const si=sessions.findIndex(s=>s.id===curId);
+    const upd={id:curId,title:sessions[si]?.title||'Chat',date:new Date().toLocaleDateString(),msgs:MSGS,updatedAt:Date.now()};
+    if(si>=0)sessions[si]=upd;else sessions.unshift(upd);
+    saveLocalSessions();saveSessionsToFirebase();renderSB();return;
+  }
   const allPortText=PORTFOLIOS.map(p=>`[${p.name}]: ${p.positions.map(x=>`${x.ticker} ${x.shares}sh@$${x.cost}`).join(', ')}`).join(' | ');
   const wl=WATCH.map(w=>w.ticker).join(',');
   MSGS.push({r:'u',c:msg});loading=true;
@@ -1812,7 +1846,7 @@ function mobAddP(){
   const i=port.positions.findIndex(p=>p.ticker===t);
   if(i>=0)port.positions[i]={ticker:t,shares:s,cost:c};else port.positions.push({ticker:t,shares:s,cost:c});
   saveLocal();renderPORT();refresh('p');
-  if(FB_ACTIVE)fbWrite('st_data/portfolios',{portfolios:PORTFOLIOS,updatedAt:Date.now()}).catch(()=>{});
+  if(FB_ACTIVE)fbWrite(userPath('portfolios'),{portfolios:PORTFOLIOS,updatedAt:Date.now()}).catch(()=>{});
   document.getElementById('mob-ft').value='';document.getElementById('mob-fs').value='';document.getElementById('mob-fc').value='';
   closePortSheet();
 }
@@ -1825,7 +1859,7 @@ function mobAddW(){
   const i=WATCH.findIndex(w=>w.ticker===t);
   if(i>=0)WATCH[i]={ticker:t,note:n||WATCH[i].note};else WATCH.push({ticker:t,note:n});
   LS.set('st_watch',WATCH);renderWATCH();refresh('w');
-  if(FB_ACTIVE)fbWrite('st_data/watchlist',{watchlist:WATCH,updatedAt:Date.now()}).catch(()=>{});
+  if(FB_ACTIVE)fbWrite(userPath('watchlist'),{watchlist:WATCH,updatedAt:Date.now()}).catch(()=>{});
   document.getElementById('mob-wt').value='';document.getElementById('mob-wn').value='';
   closeWatchSheet();
 }
@@ -1852,36 +1886,171 @@ function promptRenamePort(id){
   const port=PORTFOLIOS.find(p=>p.id===id);if(!port)return;
   const name=prompt('Rename portfolio:',port.name);
   if(name&&name.trim()){port.name=name.trim();saveLocal();renderPortSwitcher();renderPORT();
-    if(FB_ACTIVE)fbWrite('st_data/portfolios',{portfolios:PORTFOLIOS,updatedAt:Date.now()}).catch(()=>{});}
+    if(FB_ACTIVE)fbWrite(userPath('portfolios'),{portfolios:PORTFOLIOS,updatedAt:Date.now()}).catch(()=>{});}
 }
 function deletePortfolioById(id){
   if(!confirm(`Delete this portfolio? This cannot be undone.`))return;
   PORTFOLIOS=PORTFOLIOS.filter(p=>p.id!==id);
   if(ACTIVE_PORT_ID===id)ACTIVE_PORT_ID=PORTFOLIOS[0]?.id||'';
   saveLocal();renderPortSwitcher();renderPORT();
-  if(FB_ACTIVE)fbWrite('st_data/portfolios',{portfolios:PORTFOLIOS,updatedAt:Date.now()}).catch(()=>{});
+  if(FB_ACTIVE)fbWrite(userPath('portfolios'),{portfolios:PORTFOLIOS,updatedAt:Date.now()}).catch(()=>{});
 }
 
 function showPortMenu_close(){closePortMenu();}
 
+// ══════════════════════════════════════════════════
+// ── AUTH ──────────────────────────────────────────
+
+function showAuthMode(mode){
+  const isReg=mode==='register';
+  const onStyle=`flex:1;padding:9px;border:none;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;background:var(--p);color:#fff;transition:all 0.2s;`;
+  const offStyle=`flex:1;padding:9px;border:none;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;background:transparent;color:var(--t3);transition:all 0.2s;`;
+  document.getElementById('auth-login-tab').style.cssText=isReg?offStyle:onStyle;
+  document.getElementById('auth-reg-tab').style.cssText=isReg?onStyle:offStyle;
+  document.getElementById('auth-mode-label').textContent=isReg?'CREATE YOUR ACCOUNT':'SIGN IN TO YOUR ACCOUNT';
+  document.getElementById('auth-submit-btn').textContent=isReg?'Create Account':'Sign In';
+  document.getElementById('auth-submit-btn').onclick=isReg?authRegister:authLogin;
+}
+function authSubmit(){const btn=document.getElementById('auth-submit-btn');if(btn.textContent==='Create Account')authRegister();else authLogin();}
+
+async function authLogin(){
+  const email=document.getElementById('auth-email').value.trim();
+  const pass=document.getElementById('auth-pass').value;
+  const pid=document.getElementById('auth-fb-pid').value.trim();
+  const key=document.getElementById('auth-fb-key').value.trim();
+  showErr('auth-err','');
+  if(!email||!pass){showErr('auth-err','Please enter email and password.');return;}
+  if(!pid||!key){showErr('auth-err','Firebase Project ID and Web API Key are required.');return;}
+  FB_PID=pid;FB_KEY=key;LS.set('st_fbcfg',{pid,key});
+  const btn=document.getElementById('auth-submit-btn');btn.disabled=true;btn.textContent='Signing in...';
+  try{
+    const r=await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${FB_KEY}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password:pass,returnSecureToken:true})});
+    const d=await r.json();
+    if(d.error)throw new Error(d.error.message.replace(/_/g,' ').toLowerCase());
+    await setAuthState(d);await startApp();
+  }catch(e){showErr('auth-err',e.message);btn.disabled=false;btn.textContent='Sign In';}
+}
+
+async function authRegister(){
+  const email=document.getElementById('auth-email').value.trim();
+  const pass=document.getElementById('auth-pass').value;
+  const pid=document.getElementById('auth-fb-pid').value.trim();
+  const key=document.getElementById('auth-fb-key').value.trim();
+  showErr('auth-err','');
+  if(!email||!pass){showErr('auth-err','Please enter email and password.');return;}
+  if(pass.length<6){showErr('auth-err','Password must be at least 6 characters.');return;}
+  if(!pid||!key){showErr('auth-err','Firebase Project ID and Web API Key are required.');return;}
+  FB_PID=pid;FB_KEY=key;LS.set('st_fbcfg',{pid,key});
+  const btn=document.getElementById('auth-submit-btn');btn.disabled=true;btn.textContent='Creating account...';
+  try{
+    const r=await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${FB_KEY}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password:pass,returnSecureToken:true})});
+    const d=await r.json();
+    if(d.error)throw new Error(d.error.message.replace(/_/g,' ').toLowerCase());
+    await setAuthState(d);await startApp();
+  }catch(e){showErr('auth-err',e.message);btn.disabled=false;btn.textContent='Create Account';}
+}
+
+async function setAuthState(d){
+  AUTH_TOKEN=d.idToken;REFRESH_TOKEN=d.refreshToken;
+  USER_ID=d.localId;USER_EMAIL=d.email;
+  AUTH_EXPIRY=Date.now()+parseInt(d.expiresIn||3600)*1000;
+  IS_GUEST=false;FB_ACTIVE=true;
+  LS.set('st_auth',{token:AUTH_TOKEN,refresh:REFRESH_TOKEN,expiry:AUTH_EXPIRY,uid:USER_ID,email:USER_EMAIL});
+}
+
+function authLogout(){
+  if(!confirm('Sign out of Stockr?'))return;
+  AUTH_TOKEN='';REFRESH_TOKEN='';USER_ID='';USER_EMAIL='';AUTH_EXPIRY=0;IS_GUEST=false;
+  LS.del('st_auth');FB_ACTIVE=false;PORTFOLIOS=[];WATCH=[];sessions=[];CK='';FK='';PC={};
+  const bar=document.getElementById('mob-analyze-bar');if(bar)bar.remove();
+  document.getElementById('app').style.display='none';
+  document.getElementById('auth-screen').style.display='flex';
+  document.getElementById('auth-email').value='';document.getElementById('auth-pass').value='';
+  showErr('auth-err','');
+}
+
+function guestMode(){IS_GUEST=true;USER_ID='';AUTH_TOKEN='';document.getElementById('auth-screen').style.display='none';startApp();}
+
+// ── PROFILE ──────────────────────────────────────
+function renderProfile(){
+  const el=document.getElementById('profile-content');if(!el)return;
+  const avatar=USER_EMAIL?USER_EMAIL[0].toUpperCase():'G';
+  const ckOk=CK&&CK.startsWith('sk-ant');
+  const fkOk=FK&&FK.length>8;
+  const fbOk=FB_ACTIVE;
+  el.innerHTML=`
+  <div style="background:#fff;border-radius:16px;padding:20px;margin-bottom:12px;display:flex;align-items:center;gap:14px;box-shadow:0 1px 4px rgba(0,0,0,0.06);">
+    <div style="width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,var(--p),var(--pd));display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;color:#fff;flex-shrink:0;">${avatar}</div>
+    <div style="flex:1;min-width:0;">
+      <div style="font-size:15px;font-weight:800;color:var(--t);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${USER_EMAIL||'Guest'}</div>
+      <div style="font-size:11px;color:var(--t3);margin-top:2px;">${IS_GUEST?'Local only — data not synced':'Synced with Firebase'}</div>
+    </div>
+    ${!IS_GUEST?`<button onclick="authLogout()" style="background:#fee2e2;border:none;color:var(--r);font-size:11px;font-weight:700;padding:7px 12px;border-radius:9px;cursor:pointer;font-family:inherit;flex-shrink:0;">Sign out</button>`:''}
+  </div>
+  <div style="font-size:10px;font-weight:700;color:var(--t3);letter-spacing:2px;margin:0 2px 8px;">CONNECTED SERVICES</div>
+  ${serviceCard('ck-panel','🤖','Claude AI Analysis',ckOk?'Connected — AI analysis enabled':'Not connected — analysis disabled',ckOk,'ON','OFF',`
+    <div style="font-size:10px;font-weight:700;color:var(--p);letter-spacing:2px;margin-bottom:6px;">ANTHROPIC API KEY</div>
+    <input class="mob-finp" id="prof-ck" type="password" placeholder="sk-ant-api03-..." value="${CK||''}" style="margin-bottom:8px;display:block;">
+    <div style="font-size:11px;color:var(--t4);margin-bottom:10px;line-height:1.5;">Free key at <a href="https://console.anthropic.com/settings/keys" target="_blank" style="color:var(--p);font-weight:600;">console.anthropic.com</a>. ~$0.01 per analysis.</div>
+    <button onclick="saveProfileKey('ck')" class="mob-add-btn" style="font-size:13px;padding:12px;">${ckOk?'Update Key':'Connect'}</button>`)}
+  ${serviceCard('fk-panel','📈','Finnhub Real-Time Prices',fkOk?'Connected — fast real-time prices':'Using Yahoo Finance (free, delayed)',fkOk,'ON','FREE',`
+    <div style="font-size:10px;font-weight:700;color:var(--p);letter-spacing:2px;margin-bottom:6px;">FINNHUB API KEY</div>
+    <input class="mob-finp" id="prof-fk" type="password" placeholder="your_finnhub_key..." value="${FK||''}" style="margin-bottom:8px;display:block;">
+    <div style="font-size:11px;color:var(--t4);margin-bottom:10px;line-height:1.5;">Free key at <a href="https://finnhub.io/register" target="_blank" style="color:var(--p);font-weight:600;">finnhub.io/register</a>. Without it, Yahoo Finance is used automatically.</div>
+    <button onclick="saveProfileKey('fk')" class="mob-add-btn" style="font-size:13px;padding:12px;">${fkOk?'Update Key':'Connect'}</button>`)}
+  ${serviceCard('fb-panel','☁️','Firebase Sync',fbOk?`Syncing as ${USER_EMAIL}`:'Local only — data not synced',fbOk,'ON','OFF',IS_GUEST?`
+    <div style="font-size:11px;color:var(--t4);margin-bottom:10px;line-height:1.5;">Sign in or create an account to sync across all your devices.</div>
+    <button onclick="document.getElementById('app').style.display='none';document.getElementById('auth-screen').style.display='flex';" class="mob-add-btn" style="font-size:13px;padding:12px;">Sign in / Create Account</button>`:
+    `<div style="font-size:12px;color:var(--t3);line-height:1.6;">Signed in as <strong>${USER_EMAIL}</strong><br>Project: <strong>${FB_PID}</strong></div>`)}
+  ${IS_GUEST?`<button onclick="document.getElementById('app').style.display='none';document.getElementById('auth-screen').style.display='flex';" style="width:100%;background:linear-gradient(135deg,var(--p),var(--pd));border:none;color:#fff;padding:14px;border-radius:14px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:4px;box-shadow:0 4px 14px rgba(99,102,241,0.35);">Sign in / Create Account</button>`:''}`;
+}
+
+function serviceCard(panelId,icon,title,subtitle,on,onLabel,offLabel,panelContent){
+  return `<div style="background:#fff;border-radius:14px;overflow:hidden;margin-bottom:10px;box-shadow:0 1px 4px rgba(0,0,0,0.05);">
+    <div style="padding:14px 16px;display:flex;align-items:center;gap:12px;cursor:pointer;" onclick="toggleService('${panelId}')">
+      <div style="width:36px;height:36px;border-radius:10px;background:${on?'#ecfdf5':'#f8fafc'};border:1px solid ${on?'#a7f3d0':'#e2e8f0'};display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">${icon}</div>
+      <div style="flex:1;"><div style="font-size:13px;font-weight:700;color:var(--t);">${title}</div><div style="font-size:11px;color:${on?'#10b981':'#94a3b8'};margin-top:1px;">${subtitle}</div></div>
+      <div style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;background:${on?'#dcfce7':'#f1f5f9'};color:${on?'#047857':'#94a3b8'};">${on?onLabel:offLabel}</div>
+    </div>
+    <div id="${panelId}" style="display:none;padding:0 16px 14px;">${panelContent}</div>
+  </div>`;
+}
+
+function toggleService(id){const el=document.getElementById(id);if(el)el.style.display=el.style.display==='none'?'block':'none';}
+
+function saveProfileKey(type){
+  if(type==='ck'){
+    const val=(document.getElementById('prof-ck').value||'').trim();
+    if(!val.startsWith('sk-ant')){alert('Claude key must start with sk-ant-...');return;}
+    CK=val;LS.set('st_ck',CK);
+  }else{
+    const val=(document.getElementById('prof-fk').value||'').trim();
+    if(!val){alert('Please enter a Finnhub key.');return;}
+    FK=val;LS.set('st_fk',FK);
+  }
+  if(FB_ACTIVE)fbWrite(userPath('config'),{claudeKey:CK,finnhubKey:FK,updatedAt:Date.now()}).catch(()=>{});
+  renderProfile();alert('✓ Saved!');
+}
+
+function showErr(id,msg){const e=document.getElementById(id);if(!e)return;e.style.display=msg?'block':'none';e.textContent=msg||'';}
+
 function ST(t){
-  ['c','p','w'].forEach(x=>{
-    document.getElementById(x==='c'?'ct':x+'t').style.display=x===t?'flex':'none';
-    document.getElementById('tb'+x).className='tb'+(x===t?' on':'');
+  ['c','p','w','pr'].forEach(x=>{
+    const el=document.getElementById(x==='c'?'ct':x==='pr'?'prt':x+'t');
+    if(el)el.style.display=x===t?'flex':'none';
+    const tb=document.getElementById('tb'+x);if(tb)tb.className='tb'+(x===t?' on':'');
   });
-  // Bottom nav active state
-  const navMap={c:'bnic',p:'bnip',w:'bniw'};
+  const navMap={c:'bnic',p:'bnip',w:'bniw',pr:'bnipr'};
   Object.values(navMap).forEach(id=>{const el=document.getElementById(id);if(el)el.classList.remove('on');});
   const activeNav=document.getElementById(navMap[t]);if(activeNav)activeNav.classList.add('on');
-  // Remove sticky analyze bar when leaving portfolio
   if(t!=='p'){const b=document.getElementById('mob-analyze-bar');if(b)b.remove();}
-  // Show correct FAB on mobile (CSS hides both on desktop)
   const fab=document.querySelector('.mob-fab');
   const wfab=document.querySelector('.mob-wfab');
   if(fab){fab.style.display=t==='p'?'flex':'none';}
   if(wfab){wfab.style.display=t==='w'?'flex':'none';}
   if(t==='p'){renderPortSwitcher();renderPORT();if((activePort()?.positions||[]).length)refresh('p');}
   if(t==='w'){renderWATCH();if(WATCH.length)refresh('w');}
+  if(t==='pr'){document.getElementById('prt').style.display='flex';renderProfile();}
 }
 
 // ── HELPERS ──
@@ -1948,9 +2117,30 @@ function toggleSB(){document.getElementById('sb').classList.toggle('open');docum
 function closeSB(){document.getElementById('sb').classList.remove('open');document.getElementById('overlay').classList.remove('show');}
 
 // ── BOOT ──
-document.addEventListener('DOMContentLoaded',()=>{
-  const ck=LS.get('st_ck'),fk=LS.get('st_fk');
-  if(ck&&fk){CK=ck;FK=fk;document.getElementById('setup').classList.add('hide');startApp();}
+document.addEventListener('DOMContentLoaded',async()=>{
+  // Restore saved API keys
+  CK=LS.get('st_ck')||'';FK=LS.get('st_fk')||'';
+  // Restore Firebase config
+  const fbcfg=LS.get('st_fbcfg');
+  if(fbcfg?.pid){FB_PID=fbcfg.pid;FB_KEY=fbcfg.key;}
+  // Pre-fill login form if we have Firebase config
+  if(FB_PID&&document.getElementById('auth-fb-pid')){
+    document.getElementById('auth-fb-pid').value=FB_PID;
+    document.getElementById('auth-fb-key').value=FB_KEY;
+  }
+  // Try to restore auth session
+  const saved=LS.get('st_auth');
+  if(saved?.uid&&saved?.refresh&&FB_PID&&FB_KEY){
+    AUTH_TOKEN=saved.token||'';REFRESH_TOKEN=saved.refresh;
+    USER_ID=saved.uid;USER_EMAIL=saved.email||'';AUTH_EXPIRY=saved.expiry||0;
+    IS_GUEST=false;FB_ACTIVE=true;
+    // Silently refresh token if needed then launch
+    try{await ensureToken();}catch(e){}
+    await startApp();
+    return;
+  }
+  // No saved session — show login screen
+  document.getElementById('auth-screen').style.display='flex';
 });
 </script>
 </body>
