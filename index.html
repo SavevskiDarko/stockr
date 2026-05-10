@@ -2124,9 +2124,7 @@ function closeSB(){document.getElementById('sb').classList.remove('open');docume
 
 // ── BOOT ──
 document.addEventListener('DOMContentLoaded',async()=>{
-  // Restore saved API keys
-  CK=LS.get('st_ck')||'';FK=LS.get('st_fk')||'';
-  // Restore Firebase config
+  // Restore Firebase config (needed to attempt auth session restore)
   const fbcfg=LS.get('st_fbcfg');
   if(fbcfg?.pid){FB_PID=fbcfg.pid;FB_KEY=fbcfg.key;}
   // Pre-fill login form if we have Firebase config
@@ -2140,7 +2138,9 @@ document.addEventListener('DOMContentLoaded',async()=>{
     AUTH_TOKEN=saved.token||'';REFRESH_TOKEN=saved.refresh;
     USER_ID=saved.uid;USER_EMAIL=saved.email||'';AUTH_EXPIRY=saved.expiry||0;
     IS_GUEST=false;FB_ACTIVE=true;
-    // Silently refresh token if needed then launch
+    // Clear any stale locally cached keys/data — will reload fresh from Firebase
+    LS.del('st_ck');LS.del('st_fk');LS.del('st_portfolios');LS.del('st_watch');LS.del('st_sessions');LS.del('st_active_port');
+    CK='';FK='';
     try{await ensureToken();}catch(e){}
     await startApp();
     return;
