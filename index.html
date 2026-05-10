@@ -578,6 +578,10 @@ async function pullFromFirebase(){
     sessions=sessData.sessions.sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
     saveLocalSessions();
   }
+  // Re-render all UI with fresh data
+  if(document.getElementById('app')?.style.display!=='none'){
+    renderPortSwitcher();renderPORT();renderWATCH();renderSB();renderMSGS();
+  }
 }
 
 // ── LOCAL SAVE ──
