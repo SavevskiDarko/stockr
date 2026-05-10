@@ -274,8 +274,17 @@ input,button,select{font-family:'Montserrat',sans-serif;}
   .hdr-btn{padding:4px 10px;font-size:9px;}
   .sync-pill{font-size:9px;padding:4px 10px;}
 
-  /* Push everything above the fixed bottom nav — ONE rule, reliable on all phones */
-  #app{padding-bottom:calc(60px + env(safe-area-inset-bottom,0px));}
+  /* Push content above fixed bottom nav - explicit px, reliable on all Android/iOS */
+  .ibar{margin-bottom:60px;}
+  .pt-center-scr{padding-bottom:80px;}
+  .wt-right{padding-bottom:80px;}
+
+  /* iPhone home indicator extra space */
+  @supports(padding-bottom: env(safe-area-inset-bottom)){
+    .ibar{margin-bottom:calc(60px + env(safe-area-inset-bottom,0px));}
+    .pt-center-scr{padding-bottom:calc(80px + env(safe-area-inset-bottom,0px));}
+    .wt-right{padding-bottom:calc(80px + env(safe-area-inset-bottom,0px));}
+  }
 
   /* Chat: proper flex column so msgs scroll and ibar sticks at bottom */
   #ct{display:flex;flex-direction:column;flex:1;min-height:0;}
