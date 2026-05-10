@@ -784,9 +784,10 @@ const LS={
 // ── FIREBASE REST ──
 function fbUrl(path){return `https://firestore.googleapis.com/v1/projects/${FB_PID}/databases/(default)/documents/${path}?key=${FB_KEY}`;}
 function userPath(key){
-  if(USER_ID)return `users/${USER_ID}/${key}`;
-  // Guest mode: use local-only prefix so it never touches shared Firestore paths
-  return `local_guest/${key}`;
+  // Firestore paths must have even segments (collection/doc alternating)
+  // users/{uid}/data/{key} = 4 segments ✓
+  if(USER_ID)return `users/${USER_ID}/data/${key}`;
+  return `local_guest/data/${key}`;
 }
 
 async function ensureToken(){
@@ -836,7 +837,7 @@ async function fbList(colPath){
 }
 
 async function fbDelete(path){
-  await fetch(fbUrl(path),{method:'DELETE'}).catch(()=>{});
+  await fetch(fbUrl(path),{method:'DELETE'}).catch(e=>console.warn('FB:',e?.message||e));
 }
 
 // ── SYNC PILL ──
@@ -911,7 +912,7 @@ function saveLocalSessions(){
 function saveSessionsToFirebase(){
   if(!FB_ACTIVE)return;
   const toSave=sessions.slice(0,30).map(s=>({...s,msgs:(s.msgs||[]).slice(-60)}));
-  fbWrite(userPath('sessions'),{sessions:toSave,updatedAt:Date.now()}).catch(()=>{});
+  fbWrite(userPath('sessions'),{sessions:toSave,updatedAt:Date.now()}).catch(e=>console.warn('FB:',e?.message||e));
 }
 
 // ── FIREBASE CONNECT / DISCONNECT ──
@@ -925,7 +926,7 @@ async function connectFirebase(){
   document.getElementById('fb-err').style.display='none';
   FB_PID=pid;FB_KEY=key;
   try{
-    await fbWrite(`users/${USER_ID||'ping'}/ping`,{ts:Date.now(),app:'stockr'});
+    await fbWrite(`users/${USER_ID||'ping'}/meta/ping`,{ts:Date.now(),app:'stockr'});
     LS.set('st_fbcfg',{pid,key});
     FB_ACTIVE=true;
     // Push current data up then load any newer data from Firebase
@@ -1087,7 +1088,7 @@ async function launch(){
     FB_PID=fbpid;FB_KEY=fbkey;
     LS.set('st_fbcfg',{pid:fbpid,key:fbkey});
     try{
-      await fbRead(`users/${USER_ID||'ping'}/ping`);
+      await fbRead(`users/${USER_ID||'ping'}/meta/ping`);
       FB_ACTIVE=true;
       btn.textContent='⟳ Loading your data...';
       await pullFromFirebase();
@@ -1137,7 +1138,7 @@ async function startApp(){
       FB_PID=fbcfg.pid;FB_KEY=fbcfg.key;
       setSyncPill('syncing','⟳ Connecting');
       try{
-        await fbRead(`users/${USER_ID||'ping'}/ping`);
+        await fbRead(`users/${USER_ID||'ping'}/meta/ping`);
         FB_ACTIVE=true;updateFbUI(true);
         setSyncPill('syncing','⟳ Loading');
         await pullFromFirebase();
@@ -1510,7 +1511,7 @@ function addP(){
   if(i>=0)port.positions[i]={ticker:t,shares:s,cost:c};
   else port.positions.push({ticker:t,shares:s,cost:c});
   saveLocal();renderPORT();refresh('p');
-  if(FB_ACTIVE)fbWrite(userPath('portfolios'),{portfolios:PORTFOLIOS,updatedAt:Date.now()}).catch(()=>{});
+  if(FB_ACTIVE)fbWrite(userPath('portfolios'),{portfolios:PORTFOLIOS,updatedAt:Date.now()}).catch(e=>console.warn('FB:',e?.message||e));
 }
 
 function toggleEdit(i){
@@ -1536,14 +1537,14 @@ function saveEdit(i){
   port.positions[i].shares=shares;
   port.positions[i].cost=cost;
   saveLocal();renderPORT();refresh('p');
-  if(FB_ACTIVE)fbWrite(userPath('portfolios'),{portfolios:PORTFOLIOS,updatedAt:Date.now()}).catch(()=>{});
+  if(FB_ACTIVE)fbWrite(userPath('portfolios'),{portfolios:PORTFOLIOS,updatedAt:Date.now()}).catch(e=>console.warn('FB:',e?.message||e));
 }
 
 function delP(i){
   const port=activePort();if(!port)return;
   if(!confirm(`Remove ${port.positions[i].ticker} from portfolio?`))return;
   port.positions.splice(i,1);saveLocal();renderPORT();
-  if(FB_ACTIVE)fbWrite(userPath('portfolios'),{portfolios:PORTFOLIOS,updatedAt:Date.now()}).catch(()=>{});
+  if(FB_ACTIVE)fbWrite(userPath('portfolios'),{portfolios:PORTFOLIOS,updatedAt:Date.now()}).catch(e=>console.warn('FB:',e?.message||e));
 }
 
 function deletePortfolio(){
@@ -1552,7 +1553,7 @@ function deletePortfolio(){
   PORTFOLIOS=PORTFOLIOS.filter(p=>p.id!==ACTIVE_PORT_ID);
   ACTIVE_PORT_ID=PORTFOLIOS[0].id;
   saveLocal();renderPortSwitcher();renderPORT();
-  if(FB_ACTIVE)fbWrite(userPath('portfolios'),{portfolios:PORTFOLIOS,updatedAt:Date.now()}).catch(()=>{});
+  if(FB_ACTIVE)fbWrite(userPath('portfolios'),{portfolios:PORTFOLIOS,updatedAt:Date.now()}).catch(e=>console.warn('FB:',e?.message||e));
 }
 
 // ── WATCHLIST ──
@@ -1605,11 +1606,11 @@ function addW(){
   const i=WATCH.findIndex(w=>w.ticker===t);
   if(i>=0)WATCH[i]={ticker:t,note:n||WATCH[i].note};else WATCH.push({ticker:t,note:n});
   LS.set('st_watch',WATCH);renderWATCH();refresh('w');
-  if(FB_ACTIVE)fbWrite(userPath('watchlist'),{watchlist:WATCH,updatedAt:Date.now()}).catch(()=>{});
+  if(FB_ACTIVE)fbWrite(userPath('watchlist'),{watchlist:WATCH,updatedAt:Date.now()}).catch(e=>console.warn('FB:',e?.message||e));
 }
 function delW(i){
   WATCH.splice(i,1);LS.set('st_watch',WATCH);renderWATCH();
-  if(FB_ACTIVE)fbWrite(userPath('watchlist'),{watchlist:WATCH,updatedAt:Date.now()}).catch(()=>{});
+  if(FB_ACTIVE)fbWrite(userPath('watchlist'),{watchlist:WATCH,updatedAt:Date.now()}).catch(e=>console.warn('FB:',e?.message||e));
 }
 
 // ── PRICES ──
@@ -1849,7 +1850,7 @@ function mobAddP(){
   const i=port.positions.findIndex(p=>p.ticker===t);
   if(i>=0)port.positions[i]={ticker:t,shares:s,cost:c};else port.positions.push({ticker:t,shares:s,cost:c});
   saveLocal();renderPORT();refresh('p');
-  if(FB_ACTIVE)fbWrite(userPath('portfolios'),{portfolios:PORTFOLIOS,updatedAt:Date.now()}).catch(()=>{});
+  if(FB_ACTIVE)fbWrite(userPath('portfolios'),{portfolios:PORTFOLIOS,updatedAt:Date.now()}).catch(e=>console.warn('FB:',e?.message||e));
   document.getElementById('mob-ft').value='';document.getElementById('mob-fs').value='';document.getElementById('mob-fc').value='';
   closePortSheet();
 }
@@ -1862,7 +1863,7 @@ function mobAddW(){
   const i=WATCH.findIndex(w=>w.ticker===t);
   if(i>=0)WATCH[i]={ticker:t,note:n||WATCH[i].note};else WATCH.push({ticker:t,note:n});
   LS.set('st_watch',WATCH);renderWATCH();refresh('w');
-  if(FB_ACTIVE)fbWrite(userPath('watchlist'),{watchlist:WATCH,updatedAt:Date.now()}).catch(()=>{});
+  if(FB_ACTIVE)fbWrite(userPath('watchlist'),{watchlist:WATCH,updatedAt:Date.now()}).catch(e=>console.warn('FB:',e?.message||e));
   document.getElementById('mob-wt').value='';document.getElementById('mob-wn').value='';
   closeWatchSheet();
 }
@@ -1889,14 +1890,14 @@ function promptRenamePort(id){
   const port=PORTFOLIOS.find(p=>p.id===id);if(!port)return;
   const name=prompt('Rename portfolio:',port.name);
   if(name&&name.trim()){port.name=name.trim();saveLocal();renderPortSwitcher();renderPORT();
-    if(FB_ACTIVE)fbWrite(userPath('portfolios'),{portfolios:PORTFOLIOS,updatedAt:Date.now()}).catch(()=>{});}
+    if(FB_ACTIVE)fbWrite(userPath('portfolios'),{portfolios:PORTFOLIOS,updatedAt:Date.now()}).catch(e=>console.warn('FB:',e?.message||e));}
 }
 function deletePortfolioById(id){
   if(!confirm(`Delete this portfolio? This cannot be undone.`))return;
   PORTFOLIOS=PORTFOLIOS.filter(p=>p.id!==id);
   if(ACTIVE_PORT_ID===id)ACTIVE_PORT_ID=PORTFOLIOS[0]?.id||'';
   saveLocal();renderPortSwitcher();renderPORT();
-  if(FB_ACTIVE)fbWrite(userPath('portfolios'),{portfolios:PORTFOLIOS,updatedAt:Date.now()}).catch(()=>{});
+  if(FB_ACTIVE)fbWrite(userPath('portfolios'),{portfolios:PORTFOLIOS,updatedAt:Date.now()}).catch(e=>console.warn('FB:',e?.message||e));
 }
 
 function showPortMenu_close(){closePortMenu();}
@@ -2046,7 +2047,7 @@ function saveProfileKey(type){
     if(!val){alert('Please enter a Finnhub key.');return;}
     FK=val;LS.set('st_fk',FK);
   }
-  if(FB_ACTIVE)fbWrite(userPath('config'),{claudeKey:CK,finnhubKey:FK,updatedAt:Date.now()}).catch(()=>{});
+  if(FB_ACTIVE)fbWrite(userPath('config'),{claudeKey:CK,finnhubKey:FK,updatedAt:Date.now()}).catch(e=>console.warn('FB:',e?.message||e));
   renderProfile();alert('✓ Saved!');
 }
 
