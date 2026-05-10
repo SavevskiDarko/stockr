@@ -258,15 +258,125 @@ input,button,select{font-family:'Montserrat',sans-serif;}
 .etit{font-size:13px;font-weight:700;color:var(--t3);margin-bottom:4px;}
 .esub{font-size:11px;font-weight:500;color:var(--t4);}
 
-@media(max-width:560px){
+/* ── Sidebar overlay ── */
+.hist-btn{display:none;background:rgba(255,255,255,0.14);border:1px solid rgba(255,255,255,0.22);border-radius:20px;padding:3px 9px;font-size:9px;color:rgba(255,255,255,0.8);font-weight:600;cursor:pointer;font-family:inherit;align-items:center;gap:3px;}
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.3);z-index:9;}
+.overlay.show{display:block;}
+
+/* ── BOTTOM NAV (mobile only) ─────────────────────────────────── */
+.bnav{display:none;}
+
+@media(max-width:899px){
+  body{background:#f0f2f8;}
+  #top-tabs{display:none;}
+  .hdr{padding:10px 16px;}
+  .hdr-title{font-size:16px;letter-spacing:2px;}
+  .hdr-btn{padding:4px 10px;font-size:9px;}
+  .sync-pill{font-size:9px;padding:4px 10px;}
+
+  #ct,#pt,#wt{padding-bottom:68px;}
+
+  .bnav{
+    display:flex;position:fixed;bottom:0;left:0;right:0;
+    height:60px;padding-bottom:env(safe-area-inset-bottom,0px);
+    background:#fff;border-top:1px solid #e2e8f0;
+    box-shadow:0 -4px 20px rgba(0,0,0,0.08);z-index:100;
+  }
+  .bni{
+    flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:3px;background:none;border:none;cursor:pointer;
+    color:#94a3b8;font-family:inherit;font-size:10px;font-weight:600;
+    transition:color 0.15s;position:relative;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .bni svg{width:22px;height:22px;transition:all 0.2s;}
+  .bni.on{color:var(--p);}
+  .bni.on svg{stroke:var(--p);filter:drop-shadow(0 0 6px rgba(99,102,241,0.4));}
+  .bni.on::after{
+    content:'';position:absolute;top:-1px;left:50%;transform:translateX(-50%);
+    width:32px;height:3px;background:var(--p);border-radius:0 0 4px 4px;
+  }
+
   #sb{width:100%;position:absolute;top:0;bottom:0;left:0;z-index:10;transform:translateX(-100%);transition:transform 0.25s ease;box-shadow:4px 0 20px rgba(0,0,0,0.1);}
   #sb.open{transform:translateX(0);}
   #ct{position:relative;}
   .hist-btn{display:flex!important;}
+  .msgs{padding:14px 12px;gap:10px;}
+  .m-plain,.m-btxt{font-size:13px;line-height:1.7;}
+  .ibar{padding:10px 12px;gap:8px;}
+  .ifield{font-size:14px;padding:12px 14px;border-radius:14px;}
+  .sbtn{padding:12px 16px;border-radius:14px;}
+  .qrow{padding:8px 12px;}
+
+  .pt-left,.pt-right{display:none!important;}
+  .pt-center{width:100%!important;background:#f0f2f8;}
+  .pt-center-scr{padding:12px;}
+  .pt-center .port-switcher{padding:10px 12px;overflow-x:auto;}
+  .pt-center .pbar{padding:8px 14px;background:#fff;}
+
+  .wt-left{display:none!important;}
+  .wt-inner{display:block!important;}
+  .wt-right{padding:12px;background:#f0f2f8;}
+  .wt-right .pbar{background:#fff;margin:-12px -12px 12px;border-radius:0;}
+  .watch-grid{display:flex!important;flex-direction:column;gap:10px;}
+  .wcard{padding:14px;}
+  .wprice{font-size:20px;}
+
+  .pcrd{border-radius:14px;box-shadow:0 2px 8px rgba(0,0,0,0.06);}
+  .prow{padding:13px 14px;}
+  .pr-name{font-size:14px;}
+  .pr-pxv{font-size:14px;}
+  .fcrd{border-radius:14px;}
+  .sgrid{display:grid!important;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;}
+  .sc2{padding:12px 14px;border-radius:14px;}
+  .sval{font-size:17px;}
+  .port-tab{padding:7px 14px;font-size:11px;}
+  .abig{border-radius:14px;padding:14px;font-size:13px;}
+  .scr{padding:12px;}
 }
-.hist-btn{display:none;background:rgba(255,255,255,0.14);border:1px solid rgba(255,255,255,0.22);border-radius:20px;padding:3px 9px;font-size:9px;color:rgba(255,255,255,0.8);font-weight:600;cursor:pointer;font-family:inherit;align-items:center;gap:3px;}
-.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.3);z-index:9;}
-.overlay.show{display:block;}
+
+/* ── Floating Action Button ── */
+.mob-fab,.mob-wfab{display:none;}
+.mob-sheet-overlay,.mob-w-sheet-overlay{
+  display:none;position:fixed;inset:0;
+  background:rgba(15,23,42,0.5);z-index:200;align-items:flex-end;
+}
+.mob-sheet-overlay.open,.mob-w-sheet-overlay.open{display:flex!important;}
+.mob-sheet{
+  background:#fff;border-radius:22px 22px 0 0;width:100%;
+  padding:20px 18px calc(24px + env(safe-area-inset-bottom,0px));
+  animation:sheetUp 0.25s cubic-bezier(.32,.72,0,1);
+}
+@keyframes sheetUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.mob-sheet-handle{width:36px;height:4px;background:#e2e8f0;border-radius:4px;margin:0 auto 18px;}
+.mob-sheet-title{font-size:11px;font-weight:800;color:var(--p);letter-spacing:2px;margin-bottom:14px;}
+.mob-finp{background:#f8fafc;border:1.5px solid var(--b);color:var(--t);padding:14px 13px;font-size:15px;font-weight:600;border-radius:13px;width:100%;font-family:inherit;transition:border-color 0.2s;}
+.mob-finp:focus{border-color:var(--p);outline:none;background:#fff;}
+.mob-finp::placeholder{font-weight:400;color:#94a3b8;font-size:13px;}
+.mob-sheet-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;}
+.mob-add-btn{width:100%;background:linear-gradient(135deg,var(--p),var(--pd));border:none;color:#fff;padding:16px;border-radius:14px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;box-shadow:0 4px 14px rgba(99,102,241,0.35);}
+.mob-add-btn:active{transform:scale(0.98);}
+.mob-add-btn.green{background:linear-gradient(135deg,#11998E,#38EF7D);box-shadow:0 4px 14px rgba(17,153,142,0.35);}
+
+@media(max-width:899px){
+  .mob-fab{
+    display:flex!important;position:fixed;bottom:76px;right:16px;
+    width:52px;height:52px;background:linear-gradient(135deg,var(--p),var(--pd));
+    border:none;border-radius:50%;color:#fff;font-size:26px;
+    align-items:center;justify-content:center;
+    box-shadow:0 4px 18px rgba(99,102,241,0.5);cursor:pointer;z-index:50;
+    transition:transform 0.15s;
+  }
+  .mob-wfab{
+    display:flex!important;position:fixed;bottom:76px;right:16px;
+    width:52px;height:52px;background:linear-gradient(135deg,#11998E,#38EF7D);
+    border:none;border-radius:50%;color:#fff;font-size:26px;
+    align-items:center;justify-content:center;
+    box-shadow:0 4px 18px rgba(17,153,142,0.45);cursor:pointer;z-index:50;
+    transition:transform 0.15s;
+  }
+  .mob-fab:active,.mob-wfab:active{transform:scale(0.92);}
+}
 
 /* ── DESKTOP LAYOUT ────────────────────────────────────────────── */
 @media(min-width:900px){
@@ -475,11 +585,28 @@ input,button,select{font-family:'Montserrat',sans-serif;}
     <button class="sync-banner-close" onclick="dismissBanner()">✕</button>
   </div>
 
-  <div class="tabs">
+  <!-- Top tabs (desktop only) -->
+  <div class="tabs" id="top-tabs">
     <button class="tb on" id="tbc" onclick="ST('c')">💬 Chat</button>
     <button class="tb" id="tbp" onclick="ST('p')">💼 Portfolios</button>
     <button class="tb" id="tbw" onclick="ST('w')">⭐ Watchlist</button>
   </div>
+
+  <!-- Bottom nav (mobile only) -->
+  <nav class="bnav" id="bnav">
+    <button class="bni" id="bnip" onclick="ST('p')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+      <span>Portfolio</span>
+    </button>
+    <button class="bni" id="bniw" onclick="ST('w')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+      <span>Watchlist</span>
+    </button>
+    <button class="bni" id="bnic" onclick="ST('c')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      <span>Chat</span>
+    </button>
+  </nav>
 
   <!-- CHAT -->
   <div id="ct">
@@ -497,6 +624,37 @@ input,button,select{font-family:'Montserrat',sans-serif;}
         <input class="ifield" id="minp" type="text" placeholder="Ask about any stock or portfolio..." autocomplete="off">
         <button class="sbtn" id="sbtn" onclick="doSend()">SEND</button>
       </div>
+    </div>
+  </div>
+
+  <!-- PORTFOLIO FAB + Sheet (mobile only) -->
+  <button class="mob-fab" onclick="openPortSheet()" title="Add position">＋</button>
+  <div class="mob-sheet-overlay" id="port-sheet-overlay" onclick="if(event.target===this)closePortSheet()">
+    <div class="mob-sheet">
+      <div class="mob-sheet-handle"></div>
+      <div class="mob-sheet-title">ADD / UPDATE POSITION</div>
+      <div class="mob-sheet-grid">
+        <input class="mob-finp" id="mob-ft" placeholder="Ticker (e.g. AAPL)" style="grid-column:1/-1">
+      </div>
+      <div class="mob-sheet-grid">
+        <input class="mob-finp" id="mob-fs" placeholder="Shares" type="number" inputmode="decimal">
+        <input class="mob-finp" id="mob-fc" placeholder="Avg Cost $" type="number" inputmode="decimal">
+      </div>
+      <button class="mob-add-btn" onclick="mobAddP()">+ Add Position</button>
+    </div>
+  </div>
+
+  <!-- WATCHLIST FAB + Sheet (mobile only) -->
+  <button class="mob-wfab" style="display:none" onclick="openWatchSheet()" title="Add to watchlist">＋</button>
+  <div class="mob-w-sheet-overlay" id="watch-sheet-overlay" onclick="if(event.target===this)closeWatchSheet()">
+    <div class="mob-sheet">
+      <div class="mob-sheet-handle"></div>
+      <div class="mob-sheet-title">ADD TO WATCHLIST</div>
+      <div style="margin-bottom:12px">
+        <input class="mob-finp" id="mob-wt" placeholder="Ticker (e.g. TSLA)" style="margin-bottom:10px;display:block">
+        <input class="mob-finp" id="mob-wn" placeholder="Note (optional)" style="display:block">
+      </div>
+      <button class="mob-add-btn green" onclick="mobAddW()">+ Add to Watchlist</button>
     </div>
   </div>
 
@@ -960,7 +1118,7 @@ async function startApp(){
   }
 
   renderPortSwitcher();renderSB();renderMSGS();
-  ST('p'); // default to Portfolio tab
+  ST('p'); // default to Portfolio tab — also sets bottom nav active state
 
   // Re-render on resize so desktop↔mobile layout switches correctly
   let resizeTimer;
@@ -1565,11 +1723,49 @@ async function doSend(ov){
 }
 
 // ── TABS ──
+function openPortSheet(){document.getElementById('port-sheet-overlay').classList.add('open');setTimeout(()=>document.getElementById('mob-ft')?.focus(),300);}
+function closePortSheet(){document.getElementById('port-sheet-overlay').classList.remove('open');}
+function mobAddP(){
+  const t=(document.getElementById('mob-ft').value||'').trim().toUpperCase();
+  const s=parseFloat(document.getElementById('mob-fs').value);
+  const c=parseFloat(document.getElementById('mob-fc').value);
+  if(!t||!s||!c){alert('Please fill in all fields.');return;}
+  const port=activePort();if(!port)return;
+  const i=port.positions.findIndex(p=>p.ticker===t);
+  if(i>=0)port.positions[i]={ticker:t,shares:s,cost:c};else port.positions.push({ticker:t,shares:s,cost:c});
+  saveLocal();renderPORT();refresh('p');
+  if(FB_ACTIVE)fbWrite('st_data/portfolios',{portfolios:PORTFOLIOS,updatedAt:Date.now()}).catch(()=>{});
+  document.getElementById('mob-ft').value='';document.getElementById('mob-fs').value='';document.getElementById('mob-fc').value='';
+  closePortSheet();
+}
+function openWatchSheet(){document.getElementById('watch-sheet-overlay').classList.add('open');setTimeout(()=>document.getElementById('mob-wt')?.focus(),300);}
+function closeWatchSheet(){document.getElementById('watch-sheet-overlay').classList.remove('open');}
+function mobAddW(){
+  const t=(document.getElementById('mob-wt').value||'').trim().toUpperCase();
+  const n=(document.getElementById('mob-wn').value||'').trim();
+  if(!t)return;
+  const i=WATCH.findIndex(w=>w.ticker===t);
+  if(i>=0)WATCH[i]={ticker:t,note:n||WATCH[i].note};else WATCH.push({ticker:t,note:n});
+  LS.set('st_watch',WATCH);renderWATCH();refresh('w');
+  if(FB_ACTIVE)fbWrite('st_data/watchlist',{watchlist:WATCH,updatedAt:Date.now()}).catch(()=>{});
+  document.getElementById('mob-wt').value='';document.getElementById('mob-wn').value='';
+  closeWatchSheet();
+}
+
 function ST(t){
   ['c','p','w'].forEach(x=>{
     document.getElementById(x==='c'?'ct':x+'t').style.display=x===t?'flex':'none';
     document.getElementById('tb'+x).className='tb'+(x===t?' on':'');
   });
+  // Bottom nav active state
+  const navMap={c:'bnic',p:'bnip',w:'bniw'};
+  Object.values(navMap).forEach(id=>{const el=document.getElementById(id);if(el)el.classList.remove('on');});
+  const activeNav=document.getElementById(navMap[t]);if(activeNav)activeNav.classList.add('on');
+  // Show correct FAB
+  const fab=document.querySelector('.mob-fab');
+  const wfab=document.querySelector('.mob-wfab');
+  if(fab)fab.style.display=t==='p'?'':'none';
+  if(wfab)wfab.style.display=t==='w'?'':'none';
   if(t==='p'){renderPortSwitcher();renderPORT();if((activePort()?.positions||[]).length)refresh('p');}
   if(t==='w'){renderWATCH();if(WATCH.length)refresh('w');}
 }
