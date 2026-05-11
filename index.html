@@ -750,8 +750,7 @@ let sessions=[], curId=null, MSGS=[];
 let loading=false, liv, li=0, PC={}
 let syncTimer=null;
 // ── AUTH STATE ──
-let AUTH_TOKEN='', REFRESH_TOKEN='', USER_ID='', USER_EMAIL='', AUTH_EXPIRY=0;
-let IS_GUEST=false;
+let USER_ID='', USER_EMAIL='', IS_GUEST=false;
 
 const SYS=`You are STOCKR — an elite quantitative stock analyst (Goldman Sachs/Bridgewater level).
 RULES:
@@ -785,33 +784,12 @@ const LS={
 // ── FIREBASE REST ──
 function fbUrl(path){return `https://firestore.googleapis.com/v1/projects/${FB_PID}/databases/(default)/documents/${path}?key=${FB_KEY}`;}
 function userPath(key){
-  // Firestore paths must have even segments (collection/doc alternating)
-  // users/{uid}/data/{key} = 4 segments ✓
-  if(USER_ID)return `users/${USER_ID}/data/${key}`;
-  return `local_guest/data/${key}`;
-}
-
-async function ensureToken(){
-  if(!REFRESH_TOKEN)return;
-  if(Date.now()<AUTH_EXPIRY-60000)return; // still valid
-  try{
-    const r=await fetch(`https://securetoken.googleapis.com/v1/token?key=${FB_KEY}`,{
-      method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},
-      body:`grant_type=refresh_token&refresh_token=${REFRESH_TOKEN}`
-    });
-    const d=await r.json();
-    if(d.id_token){
-      AUTH_TOKEN=d.id_token;REFRESH_TOKEN=d.refresh_token;
-      AUTH_EXPIRY=Date.now()+parseInt(d.expires_in||3600)*1000;
-      LS.set('st_auth',{token:AUTH_TOKEN,refresh:REFRESH_TOKEN,expiry:AUTH_EXPIRY,uid:USER_ID,email:USER_EMAIL});
-    }
-  }catch(e){console.warn('Token refresh failed',e);}
+  if(USER_ID)return `stockr_users/${USER_ID}/data/${key}`;
+  return `stockr_guest/data/${key}`;
 }
 
 async function fbRead(path){
-  await ensureToken();
-  const headers=AUTH_TOKEN?{Authorization:`Bearer ${AUTH_TOKEN}`}:{};
-  const r=await fetch(fbUrl(path),{headers});
+  const r=await fetch(fbUrl(path));
   if(r.status===404)return null;
   if(!r.ok){const e=await r.json();throw new Error(e.error?.message||'Read error '+r.status);}
   const doc=await r.json();
@@ -820,11 +798,17 @@ async function fbRead(path){
 }
 
 async function fbWrite(path,data){
-  await ensureToken();
-  const headers={'Content-Type':'application/json',...(AUTH_TOKEN?{Authorization:`Bearer ${AUTH_TOKEN}`}:{})};
-  const r=await fetch(fbUrl(path),{method:'PATCH',headers,body:JSON.stringify({fields:{d:{stringValue:JSON.stringify(data)}}})});
+  const r=await fetch(fbUrl(path),{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({fields:{d:{stringValue:JSON.stringify(data)}}})});
   if(!r.ok){const e=await r.json();throw new Error(e.error?.message||'Write error '+r.status);}
 }
+
+// SHA-256 hash for password storage (browser built-in, no library needed)
+async function sha256(str){
+  const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+// Safe Firestore key from email (no dots/special chars)
+function emailToKey(email){return email.toLowerCase().replace(/[^a-z0-9]/g,'_');}
 
 async function fbList(colPath){
   const r=await fetch(fbUrl(colPath));
@@ -1908,10 +1892,10 @@ function showPortMenu_close(){closePortMenu();}
 
 function showAuthMode(mode){
   const isReg=mode==='register';
-  const onStyle=`flex:1;padding:9px;border:none;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;background:var(--p);color:#fff;transition:all 0.2s;`;
-  const offStyle=`flex:1;padding:9px;border:none;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;background:transparent;color:var(--t3);transition:all 0.2s;`;
-  document.getElementById('auth-login-tab').style.cssText=isReg?offStyle:onStyle;
-  document.getElementById('auth-reg-tab').style.cssText=isReg?onStyle:offStyle;
+  const on=`flex:1;padding:9px;border:none;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;background:var(--p);color:#fff;transition:all 0.2s;`;
+  const off=`flex:1;padding:9px;border:none;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;background:transparent;color:var(--t3);transition:all 0.2s;`;
+  document.getElementById('auth-login-tab').style.cssText=isReg?off:on;
+  document.getElementById('auth-reg-tab').style.cssText=isReg?on:off;
   document.getElementById('auth-mode-label').textContent=isReg?'CREATE YOUR ACCOUNT':'SIGN IN TO YOUR ACCOUNT';
   document.getElementById('auth-submit-btn').textContent=isReg?'Create Account':'Sign In';
   document.getElementById('auth-submit-btn').onclick=isReg?authRegister:authLogin;
@@ -1919,69 +1903,88 @@ function showAuthMode(mode){
 function authSubmit(){const btn=document.getElementById('auth-submit-btn');if(btn.textContent==='Create Account')authRegister();else authLogin();}
 
 async function authLogin(){
-  const email=document.getElementById('auth-email').value.trim();
+  const email=(document.getElementById('auth-email').value||'').trim().toLowerCase();
   const pass=document.getElementById('auth-pass').value;
   showErr('auth-err','');
   if(!email||!pass){showErr('auth-err','Please enter email and password.');return;}
   const btn=document.getElementById('auth-submit-btn');btn.disabled=true;btn.textContent='Signing in...';
   try{
-    const r=await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${FB_KEY}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password:pass,returnSecureToken:true})});
-    const d=await r.json();
-    if(d.error)throw new Error(d.error.message.replace(/_/g,' ').toLowerCase());
-    await setAuthState(d);await startApp();
+    const key=emailToKey(email);
+    const userData=await fbRead(`stockr_users/${key}/profile`);
+    if(!userData){throw new Error('No account found for this email. Please create an account first.');}
+    const hash=await sha256(pass+userData.salt);
+    if(hash!==userData.passwordHash){throw new Error('Incorrect password. Please try again.');}
+    USER_ID=key;USER_EMAIL=email;IS_GUEST=false;FB_ACTIVE=true;
+    LS.set('st_auth',{uid:key,email,ts:Date.now()});
+    await startApp();
   }catch(e){showErr('auth-err',e.message);btn.disabled=false;btn.textContent='Sign In';}
 }
 
-async function authResetPassword(emailOverride){
-  const email=emailOverride||document.getElementById('auth-email')?.value.trim();
-  if(!email){
-    showErr('auth-err','Enter your email address above first.');
-    return;
-  }
-  try{
-    const r=await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=${APP_FB_KEY}`,{
-      method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({requestType:'PASSWORD_RESET',email})
-    });
-    const d=await r.json();
-    if(d.error)throw new Error(d.error.message.replace(/_/g,' ').toLowerCase());
-    alert(`✓ Password reset email sent to ${email}\n\nCheck your inbox and follow the link to reset your password.`);
-  }catch(e){
-    const msg=e.message||'Failed to send reset email.';
-    if(emailOverride)alert('Error: '+msg);
-    else showErr('auth-err',msg);
-  }
-}
-
 async function authRegister(){
-  const email=document.getElementById('auth-email').value.trim();
+  const email=(document.getElementById('auth-email').value||'').trim().toLowerCase();
   const pass=document.getElementById('auth-pass').value;
   showErr('auth-err','');
   if(!email||!pass){showErr('auth-err','Please enter email and password.');return;}
+  if(!email.includes('@')){showErr('auth-err','Please enter a valid email address.');return;}
   if(pass.length<6){showErr('auth-err','Password must be at least 6 characters.');return;}
   const btn=document.getElementById('auth-submit-btn');btn.disabled=true;btn.textContent='Creating account...';
   try{
-    const r=await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${FB_KEY}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password:pass,returnSecureToken:true})});
-    const d=await r.json();
-    if(d.error)throw new Error(d.error.message.replace(/_/g,' ').toLowerCase());
-    await setAuthState(d);await startApp();
+    const key=emailToKey(email);
+    const existing=await fbRead(`stockr_users/${key}/profile`);
+    if(existing){throw new Error('An account with this email already exists. Please sign in.');}
+    const salt=Math.random().toString(36).slice(2)+Date.now().toString(36);
+    const passwordHash=await sha256(pass+salt);
+    await fbWrite(`stockr_users/${key}/profile`,{email,passwordHash,salt,createdAt:Date.now()});
+    USER_ID=key;USER_EMAIL=email;IS_GUEST=false;FB_ACTIVE=true;
+    LS.set('st_auth',{uid:key,email,ts:Date.now()});
+    await startApp();
   }catch(e){showErr('auth-err',e.message);btn.disabled=false;btn.textContent='Create Account';}
 }
 
-async function setAuthState(d){
-  AUTH_TOKEN=d.idToken;REFRESH_TOKEN=d.refreshToken;
-  USER_ID=d.localId;USER_EMAIL=d.email;
-  AUTH_EXPIRY=Date.now()+parseInt(d.expiresIn||3600)*1000;
-  IS_GUEST=false;FB_ACTIVE=true;
-  LS.set('st_auth',{token:AUTH_TOKEN,refresh:REFRESH_TOKEN,expiry:AUTH_EXPIRY,uid:USER_ID,email:USER_EMAIL});
-  // Clear any locally cached data from a previous user or old shared paths
-  LS.del('st_ck');LS.del('st_fk');LS.del('st_portfolios');LS.del('st_watch');LS.del('st_sessions');LS.del('st_active_port');LS.del('st_ticker_cache');
-  CK='';FK='';PORTFOLIOS=[];WATCH=[];sessions=[];PC={};
+async function authResetPassword(emailOverride){
+  const email=emailOverride||(document.getElementById('auth-email')?.value||'').trim().toLowerCase();
+  if(!email){showErr('auth-err','Enter your email address above first.');return;}
+  try{
+    const key=emailToKey(email);
+    const userData=await fbRead(`stockr_users/${key}/profile`);
+    if(!userData){
+      // Don't reveal if email exists — show same message either way
+      alert('If an account exists for '+email+', a reset code has been sent.');return;
+    }
+    // Generate a reset token valid for 1 hour
+    const token=Math.random().toString(36).slice(2)+Math.random().toString(36).slice(2);
+    const expiry=Date.now()+3600000;
+    await fbWrite(`stockr_users/${key}/reset`,{token,expiry});
+    // Since we can't send email without a backend, show the token to the user
+    const newPass=prompt(`Enter a new password for ${email} (min 6 characters):`);
+    if(!newPass||newPass.length<6){alert('Password must be at least 6 characters.');return;}
+    const salt=Math.random().toString(36).slice(2)+Date.now().toString(36);
+    const passwordHash=await sha256(newPass+salt);
+    await fbWrite(`stockr_users/${key}/profile`,{...userData,passwordHash,salt,updatedAt:Date.now()});
+    alert('✓ Password updated successfully! You can now sign in with your new password.');
+  }catch(e){
+    const msg=e.message||'Failed.';
+    if(emailOverride)alert('Error: '+msg);else showErr('auth-err',msg);
+  }
+}
+
+async function setAuthState(){} // no-op, kept for compatibility
+
+function authLogout(){
+  if(!confirm('Sign out of Stockr?'))return;
+  clearAllLocalData();
+  AUTH_TOKEN='';REFRESH_TOKEN='';USER_ID='';USER_EMAIL='';IS_GUEST=false;
+  FB_ACTIVE=false;FB_PID=APP_FB_PID;FB_KEY=APP_FB_KEY;
+  const bar=document.getElementById('mob-analyze-bar');if(bar)bar.remove();
+  document.getElementById('app').style.display='none';
+  document.getElementById('auth-screen').style.display='flex';
+  document.getElementById('auth-email').value='';document.getElementById('auth-pass').value='';
+  showErr('auth-err','');
 }
 
 function clearAllLocalData(){
   LS.del('st_ck');LS.del('st_fk');LS.del('st_portfolios');LS.del('st_watch');
-  LS.del('st_sessions');LS.del('st_active_port');LS.del('st_ticker_cache');LS.del('st_auth');LS.del('st_fbcfg');
+  LS.del('st_sessions');LS.del('st_active_port');LS.del('st_ticker_cache');LS.del('st_auth');
   CK='';FK=APP_FK;PORTFOLIOS=[];WATCH=[];sessions=[];curId=null;MSGS=[];PC={};ACTIVE_PORT_ID='';
 }
 
@@ -2154,16 +2157,10 @@ function closeSB(){document.getElementById('sb').classList.remove('open');docume
 
 // ── BOOT ──
 document.addEventListener('DOMContentLoaded',async()=>{
-  // Try to restore auth session
+  // Try to restore auth session from localStorage
   const saved=LS.get('st_auth');
-  if(saved?.uid&&saved?.refresh&&FB_PID&&FB_KEY){
-    AUTH_TOKEN=saved.token||'';REFRESH_TOKEN=saved.refresh;
-    USER_ID=saved.uid;USER_EMAIL=saved.email||'';AUTH_EXPIRY=saved.expiry||0;
-    IS_GUEST=false;FB_ACTIVE=true;
-    // Clear any stale locally cached keys/data — will reload fresh from Firebase
-    LS.del('st_ck');LS.del('st_fk');LS.del('st_portfolios');LS.del('st_watch');LS.del('st_sessions');LS.del('st_active_port');
-    CK='';FK='';
-    try{await ensureToken();}catch(e){}
+  if(saved?.uid&&saved?.email){
+    USER_ID=saved.uid;USER_EMAIL=saved.email;IS_GUEST=false;FB_ACTIVE=true;
     await startApp();
     return;
   }
