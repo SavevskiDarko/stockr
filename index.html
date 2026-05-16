@@ -1910,7 +1910,7 @@ async function authLogin(){
   const btn=document.getElementById('auth-submit-btn');btn.disabled=true;btn.textContent='Signing in...';
   try{
     const key=emailToKey(email);
-    const userData=await fbRead(`stockr_users/${key}/profile`);
+    const userData=await fbRead(`stockr_accounts/${key}`);
     if(!userData){throw new Error('No account found for this email. Please create an account first.');}
     const hash=await sha256(pass+userData.salt);
     if(hash!==userData.passwordHash){throw new Error('Incorrect password. Please try again.');}
@@ -1930,11 +1930,11 @@ async function authRegister(){
   const btn=document.getElementById('auth-submit-btn');btn.disabled=true;btn.textContent='Creating account...';
   try{
     const key=emailToKey(email);
-    const existing=await fbRead(`stockr_users/${key}/profile`);
+    const existing=await fbRead(`stockr_accounts/${key}`);
     if(existing){throw new Error('An account with this email already exists. Please sign in.');}
     const salt=Math.random().toString(36).slice(2)+Date.now().toString(36);
     const passwordHash=await sha256(pass+salt);
-    await fbWrite(`stockr_users/${key}/profile`,{email,passwordHash,salt,createdAt:Date.now()});
+    await fbWrite(`stockr_accounts/${key}`,{email,passwordHash,salt,createdAt:Date.now()});
     USER_ID=key;USER_EMAIL=email;IS_GUEST=false;FB_ACTIVE=true;
     LS.set('st_auth',{uid:key,email,ts:Date.now()});
     await startApp();
@@ -1946,7 +1946,7 @@ async function authResetPassword(emailOverride){
   if(!email){showErr('auth-err','Enter your email address above first.');return;}
   try{
     const key=emailToKey(email);
-    const userData=await fbRead(`stockr_users/${key}/profile`);
+    const userData=await fbRead(`stockr_accounts/${key}`);
     if(!userData){
       // Don't reveal if email exists — show same message either way
       alert('If an account exists for '+email+', a reset code has been sent.');return;
@@ -1954,13 +1954,13 @@ async function authResetPassword(emailOverride){
     // Generate a reset token valid for 1 hour
     const token=Math.random().toString(36).slice(2)+Math.random().toString(36).slice(2);
     const expiry=Date.now()+3600000;
-    await fbWrite(`stockr_users/${key}/reset`,{token,expiry});
+    await fbWrite(`stockr_accounts/${key}_reset`,{token,expiry});
     // Since we can't send email without a backend, show the token to the user
     const newPass=prompt(`Enter a new password for ${email} (min 6 characters):`);
     if(!newPass||newPass.length<6){alert('Password must be at least 6 characters.');return;}
     const salt=Math.random().toString(36).slice(2)+Date.now().toString(36);
     const passwordHash=await sha256(newPass+salt);
-    await fbWrite(`stockr_users/${key}/profile`,{...userData,passwordHash,salt,updatedAt:Date.now()});
+    await fbWrite(`stockr_accounts/${key}`,{...userData,passwordHash,salt,updatedAt:Date.now()});
     alert('✓ Password updated successfully! You can now sign in with your new password.');
   }catch(e){
     const msg=e.message||'Failed.';
