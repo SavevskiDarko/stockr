@@ -2158,7 +2158,8 @@ function ST(t){
   const activeNav=document.getElementById(navMap[t]);if(activeNav)activeNav.classList.add('on');
   if(t!=='p'){const b=document.getElementById('mob-analyze-bar');if(b)b.remove();}
   const histBtn=document.querySelector('.hist-btn');
-  if(histBtn)histBtn.style.display=t==='c'&&window.innerWidth<900?'flex':'none';
+  const isMobile=window.innerWidth<900;
+  if(histBtn)histBtn.style.display=t==='c'&&isMobile?'flex':'none';
   const fab=document.querySelector('.mob-fab');
   const wfab=document.querySelector('.mob-wfab');
   if(fab){fab.style.display=isMobile?(t==='p'?'flex':'none'):'none';}
