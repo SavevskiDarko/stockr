@@ -340,7 +340,7 @@ input,button,select{font-family:'Montserrat',sans-serif;}
   #sb{width:100%;position:absolute;top:0;bottom:0;left:0;z-index:10;transform:translateX(-100%);transition:transform 0.25s ease;box-shadow:4px 0 20px rgba(0,0,0,0.1);}
   #sb.open{transform:translateX(0);}
   #ct{position:relative;}
-  .hist-btn{display:flex!important;}
+  .hist-btn{display:none;}
   .msgs{padding:14px 12px;gap:10px;}
   .m-plain,.m-btxt{font-size:13px;line-height:1.7;}
   .ibar{padding:10px 12px;gap:8px;background:#fff;}
@@ -569,37 +569,7 @@ input,button,select{font-family:'Montserrat',sans-serif;}
 </div>
 
 <!-- FIREBASE MODAL -->
-<div class="modal-overlay hide" id="fb-modal">
-  <div class="modal">
-    <button class="modal-close" onclick="closeFbModal()">✕</button>
-    <h2>☁️ Firebase Sync</h2>
-    <div class="msub">Connect Firebase to sync everything across all your devices. Without it, data is saved locally only.</div>
-    <div class="fb-status inactive" id="fb-status-row">
-      <div id="fb-status-dot" style="width:8px;height:8px;border-radius:50%;background:#94a3b8;flex-shrink:0"></div>
-      <div id="fb-status-text" style="font-size:12px;font-weight:600;color:var(--t3)">Not connected — local only</div>
-    </div>
-    <div class="box" style="margin-bottom:10px">
-      <div class="box-title">PROJECT ID</div>
-      <input class="inp" id="fb-pid" placeholder="your-project-id" autocomplete="off" spellcheck="false" style="margin-bottom:0">
-    </div>
-    <div class="box" style="margin-bottom:10px">
-      <div class="box-title">WEB API KEY</div>
-      <input class="inp" id="fb-key" placeholder="AIzaSy..." autocomplete="off" spellcheck="false" style="margin-bottom:0">
-    </div>
-    <div class="hint">Get these from Firebase Console → Project Settings → General. <a href="#" onclick="closeFbModal()">See setup guide.</a></div>
-    <div id="fb-sync-info" style="display:none;background:var(--bg);border:1px solid var(--b);border-radius:10px;padding:12px;margin-bottom:12px;font-size:11px;color:var(--t2);line-height:1.7;">
-      <div style="font-size:10px;font-weight:700;color:var(--p);letter-spacing:1px;margin-bottom:8px;">SYNC OPTIONS</div>
-      <div style="margin-bottom:6px">⬇ <strong>Pull from Firebase</strong> — load data from Firebase into this device. Use this when you open the app fresh after deploying a new version.</div>
-      <div style="margin-bottom:6px">⬆ <strong>Push to Firebase</strong> — save your current local data up to Firebase. Use this to back up or share to other devices.</div>
-      <div>↑ <strong>Sync (header button)</strong> — auto-syncs both directions every 5 min.</div>
-    </div>
-    <div class="err" id="fb-err"></div>
-    <button class="btn pri" id="fb-connect-btn" onclick="connectFirebase()">Connect Firebase</button>
-    <button class="btn pri" id="fb-pull-btn" onclick="fullPullFromFirebase()" style="display:none;background:linear-gradient(135deg,#0ea5e9,#0284c7)">⬇ Pull All Data from Firebase</button>
-    <button class="btn pri" id="fb-push-btn" onclick="fullPushToFirebase()" style="display:none;background:linear-gradient(135deg,var(--g),#059669)">⬆ Push All Data to Firebase</button>
-    <button class="btn sec" id="fb-disconnect-btn" onclick="disconnectFirebase()" style="display:none">Disconnect Firebase</button>
-  </div>
-</div>
+
 
 <div class="overlay" id="overlay" onclick="closeSB()"></div>
 
@@ -622,16 +592,15 @@ input,button,select{font-family:'Montserrat',sans-serif;}
       <div class="hdr-sub" id="hdr-sub">Local storage</div>
     </div>
     <div class="hdr-right">
-      <div class="sync-pill local" id="sync-pill" onclick="openFbModal()">☁ Local</div>
+      <div class="sync-pill local" id="sync-pill">☁ Local</div>
       <button class="hdr-btn sync-action" id="sync-btn" onclick="manualSync()" title="Sync everything to Firebase">↑ Sync</button>
       <button class="hist-btn" onclick="toggleSB()">☰</button>
-      <button class="hdr-btn" onclick="openFbModal()">⚙</button>
     </div>
   </div>
 
   <div class="sync-banner hide" id="sync-banner">
     <div class="sync-banner-text">☁️ Firebase not connected — <span>data saved locally only.</span></div>
-    <button class="sync-banner-btn" onclick="openFbModal()">Set up sync →</button>
+    <button class="sync-banner-btn">Set up sync →</button>
     <button class="sync-banner-close" onclick="dismissBanner()">✕</button>
   </div>
 
@@ -1109,58 +1078,8 @@ function saveSessionsToFirebase(){
 }
 
 // ── FIREBASE CONNECT / DISCONNECT ──
-async function connectFirebase(){
-  const pid=document.getElementById('fb-pid').value.trim();
-  const key=document.getElementById('fb-key').value.trim();
-  if(!pid){showErr('fb-err','Please enter your Firebase Project ID.');return;}
-  if(!key.startsWith('AIza')){showErr('fb-err','API Key should start with AIza...');return;}
-  const btn=document.getElementById('fb-connect-btn');
-  btn.textContent='Connecting...';btn.disabled=true;
-  document.getElementById('fb-err').style.display='none';
-  FB_PID=pid;FB_KEY=key;
-  try{
-    await fbWrite(`users/${USER_ID||'ping'}/meta/ping`,{ts:Date.now(),app:'stockr'});
-    LS.set('st_fbcfg',{pid,key});
-    FB_ACTIVE=true;
-    // Push current data up then load any newer data from Firebase
-    setSyncPill('syncing','⟳ Uploading');
-    await pushAllToFirebase();
-    // Also try to pull in case another device has newer data
-    try{await pullFromFirebase();}catch(e){console.warn('Pull failed:',e.message);}
-    updateFbUI(true);
-    closeFbModal();
-    setSyncPill('cloud',t('synced'));
-    document.getElementById('sync-banner').classList.add('hide');
-    renderPortSwitcher();renderPORT();renderSB();renderMSGS();
-    startAutoSync();
-  }catch(e){
-    FB_ACTIVE=false;FB_PID='';FB_KEY='';
-    showErr('fb-err','Connection failed: '+e.message+'\n\nCheck:\n1. Project ID is correct\n2. Web API Key is correct\n3. Firestore is enabled\n4. Firestore rules allow read/write');
-    btn.textContent='Connect Firebase';btn.disabled=false;
-  }
-}
 
-function disconnectFirebase(){
-  if(!confirm('Disconnect Firebase? Your data stays saved locally.'))return;
-  FB_ACTIVE=false;FB_PID='';FB_KEY='';
-  LS.del('st_fbcfg');clearInterval(syncTimer);
-  updateFbUI(false);closeFbModal();
-  setSyncPill('local',t('local'));
-  document.getElementById('hdr-sub').textContent='Local storage';
-  if(!LS.get('st_banner_dismissed'))document.getElementById('sync-banner').classList.remove('hide');
-}
 
-function updateFbUI(active){
-  document.getElementById('fb-status-dot').style.background=active?'#10b981':'#94a3b8';
-  document.getElementById('fb-status-text').textContent=active?`✓ Connected — ${FB_PID}`:'Not connected — local only';
-  document.getElementById('fb-status-row').className='fb-status '+(active?'active':'inactive');
-  document.getElementById('fb-connect-btn').style.display=active?'none':'block';
-  document.getElementById('fb-pull-btn').style.display=active?'block':'none';
-  document.getElementById('fb-push-btn').style.display=active?'block':'none';
-  document.getElementById('fb-disconnect-btn').style.display=active?'block':'none';
-  document.getElementById('fb-sync-info').style.display=active?'block':'none';
-  if(active){document.getElementById('hdr-sub').textContent=`Firebase: ${FB_PID}`;}
-}
 
 function startAutoSync(){
   clearInterval(syncTimer);
@@ -1183,81 +1102,9 @@ function startAutoSync(){
 }
 
 // ── FULL PULL (overwrite local with Firebase) ──
-async function fullPullFromFirebase(){
-  if(!FB_ACTIVE){alert('Connect Firebase first.');return;}
-  if(!confirm('Pull ALL data from Firebase?\n\nThis will replace your current local portfolios, watchlist and chat history with the data stored in Firebase.\n\nContinue?'))return;
-  const btn=document.getElementById('fb-pull-btn');
-  btn.textContent='⬇ Pulling...';btn.disabled=true;
-  setSyncPill('syncing','⟳ Pulling');
-  try{
-    // Load config (API keys)
-    const cfg=await fbRead(userPath('config'));
-    if(cfg){
-      if(cfg.claudeKey){CK=cfg.claudeKey;LS.set('st_ck',CK);}
-      if(cfg.finnhubKey){FK=cfg.finnhubKey;LS.set('st_fk',FK);}
-    }
-    // Load portfolios
-    const portData=await fbRead(userPath('portfolios'));
-    if(portData?.portfolios?.length){
-      PORTFOLIOS=portData.portfolios;
-      if(!PORTFOLIOS.find(p=>p.id===ACTIVE_PORT_ID))ACTIVE_PORT_ID=PORTFOLIOS[0].id;
-    }
-    // Load watchlist
-    const wlData=await fbRead(userPath('watchlist'));
-    if(wlData?.watchlist)WATCH=wlData.watchlist;
-    // Load sessions
-    const sessData=await fbRead(userPath('sessions'));
-    if(sessData?.sessions?.length){
-      sessions=sessData.sessions.sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
-      if(!sessions.find(s=>s.id===curId)){curId=sessions[0].id;MSGS=sessions[0].msgs||[];}
-      else{const cur=sessions.find(s=>s.id===curId);if(cur)MSGS=cur.msgs||[];}
-    }
-    // Save all to local cache
-    saveLocal();saveLocalSessions();
-    // Re-render everything
-    renderPortSwitcher();renderPORT();renderWATCH();renderSB();renderMSGS();
-    setSyncPill('cloud',t('synced'));
-    btn.textContent='⬇ Pull All Data from Firebase';btn.disabled=false;
-    closeFbModal();
-    // Summary
-    const summary=`✅ Pull complete!\n\n📊 Portfolios: ${PORTFOLIOS.length}\n⭐ Watchlist: ${WATCH.length} stocks\n💬 Chat sessions: ${sessions.length}`;
-    alert(summary);
-  }catch(e){
-    setSyncPill('error',t('sync_error'));
-    btn.textContent='⬇ Pull All Data from Firebase';btn.disabled=false;
-    alert('Pull failed: '+e.message);
-  }
-}
 
 // ── FULL PUSH (overwrite Firebase with local) ──
-async function fullPushToFirebase(){
-  if(!FB_ACTIVE){alert('Connect Firebase first.');return;}
-  if(!confirm('Push ALL local data to Firebase?\n\nThis will overwrite the data in Firebase with your current local portfolios, watchlist and chat history.\n\nContinue?'))return;
-  const btn=document.getElementById('fb-push-btn');
-  btn.textContent='⬆ Pushing...';btn.disabled=true;
-  setSyncPill('syncing','⟳ Pushing');
-  try{
-    await pushAllToFirebase();
-    setSyncPill('cloud',t('synced'));
-    btn.textContent='⬆ Push All Data to Firebase';btn.disabled=false;
-    closeFbModal();
-    alert(`✅ Push complete!\n\n📊 Portfolios: ${PORTFOLIOS.length}\n⭐ Watchlist: ${WATCH.length} stocks\n💬 Chat sessions: ${sessions.length}`);
-  }catch(e){
-    setSyncPill('error',t('sync_error'));
-    btn.textContent='⬆ Push All Data to Firebase';btn.disabled=false;
-    alert('Push failed: '+e.message);
-  }
-}
 
-function openFbModal(){
-  if(cfg){document.getElementById('fb-pid').value=cfg.pid||'';document.getElementById('fb-key').value=cfg.key||'';}
-  document.getElementById('fb-err').style.display='none';
-  document.getElementById('fb-connect-btn').textContent='Connect Firebase';
-  document.getElementById('fb-connect-btn').disabled=false;
-  updateFbUI(FB_ACTIVE);
-  document.getElementById('fb-modal').classList.remove('hide');
-}
-function closeFbModal(){document.getElementById('fb-modal').classList.add('hide');}
 function dismissBanner(){document.getElementById('sync-banner').classList.add('hide');LS.set('st_banner_dismissed',true);}
 
 // ── SETUP ──
@@ -1320,7 +1167,7 @@ async function startApp(){
 
   // If Firebase already connected (login flow set it up)
   if(FB_ACTIVE && USER_ID){
-    updateFbUI(true);
+    // Firebase auto-connected via auth
     setSyncPill('cloud',t('synced'));
     try{
       await pullFromFirebase();
@@ -1332,7 +1179,7 @@ async function startApp(){
       setSyncPill('syncing',t('syncing'));
       try{
         await fbRead(`users/${USER_ID||'ping'}/meta/ping`);
-        FB_ACTIVE=true;updateFbUI(true);
+        FB_ACTIVE=true;// Firebase auto-connected via auth
         setSyncPill('syncing',t('syncing'));
         await pullFromFirebase();
         setSyncPill('cloud',t('synced'));
@@ -2293,7 +2140,8 @@ function ST(t){
   Object.values(navMap).forEach(id=>{const el=document.getElementById(id);if(el)el.classList.remove('on');});
   const activeNav=document.getElementById(navMap[t]);if(activeNav)activeNav.classList.add('on');
   if(t!=='p'){const b=document.getElementById('mob-analyze-bar');if(b)b.remove();}
-  const isMobile=window.innerWidth<900;
+  const histBtn=document.querySelector('.hist-btn');
+  if(histBtn)histBtn.style.display=t==='c'&&window.innerWidth<900?'flex':'none';
   const fab=document.querySelector('.mob-fab');
   const wfab=document.querySelector('.mob-wfab');
   if(fab){fab.style.display=isMobile?(t==='p'?'flex':'none'):'none';}
