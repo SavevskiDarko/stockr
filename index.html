@@ -387,6 +387,9 @@ input,button,select{font-family:'Montserrat',sans-serif;}
 @media(max-width:899px){
   #rp-sidebar{display:none;}
   #rp-mobile-selector{display:block!important;}
+  .rpt-left-spacer{display:none!important;}
+  #prt > div:first-child{display:none!important;}
+  #prt > div:last-child{padding:12px 12px 80px!important;}
   #rpt .pbar,#rpt [style*="border-bottom"]{flex-shrink:0;}
   #rp-content{padding:14px;}
   .rp-body h1{font-size:17px;}
@@ -450,7 +453,7 @@ input,button,select{font-family:'Montserrat',sans-serif;}
 
   /* ─── CONSISTENT SIDEBAR WIDTH = 260px on ALL tabs ─── */
 
-  /* Chat sidebar */
+  /* Chat sidebar — same 260px */
   #sb{width:260px;}
   .sb-hdr{padding:12px 14px;}
   .sess{padding:10px 11px;}
@@ -689,15 +692,19 @@ input,button,select{font-family:'Montserrat',sans-serif;}
     </div>
   </div>
   <!-- PROFILE -->
-  <div id="prt" style="display:none;flex-direction:column;flex:1;min-height:0;overflow-y:auto;background:#f0f2f8;padding:16px;padding-bottom:80px;">
-    <div id="profile-content"></div>
+  <div id="prt" style="display:none;flex-direction:row;flex:1;min-height:0;">
+    <div style="width:260px;flex-shrink:0;background:#fff;border-right:1px solid var(--b);"></div>
+    <div style="flex:1;overflow-y:auto;padding:20px 24px;background:#f0f2f8;padding-bottom:80px;">
+      <div id="profile-content" style="max-width:600px;"></div>
+    </div>
   </div>
 
   <!-- REPORTS -->
   <div id="rpt" style="display:none;flex-direction:column;flex:1;min-height:0;background:#f0f2f8;">
-    <!-- Header bar -->
-    <div style="background:#fff;border-bottom:1px solid var(--b);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
-      <div>
+    <!-- Header bar — 260px spacer matches other tabs -->
+    <div style="background:#fff;border-bottom:1px solid var(--b);padding:0;display:flex;align-items:stretch;flex-shrink:0;">
+      <div class="rpt-left-spacer" style="width:260px;flex-shrink:0;border-right:1px solid var(--b);"></div>
+      <div style="flex:1;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;"><div>
         <div style="font-size:11px;font-weight:700;color:var(--p);letter-spacing:2px;">WEEKLY MARKET REPORTS</div>
         <div style="font-size:11px;color:var(--t3);margin-top:2px;">Post-Mortem · Every Friday after market close</div>
       </div>
@@ -706,12 +713,13 @@ input,button,select{font-family:'Montserrat',sans-serif;}
         Generate Report
       </button>
     </div>
+      </div>
     <!-- Mobile report selector (hidden on desktop) -->
     <div id="rp-mobile-selector" style="display:none;background:#fff;border-bottom:1px solid var(--b);padding:10px 14px;flex-shrink:0;"></div>
     <!-- Report list + content -->
     <div style="display:flex;flex:1;min-height:0;overflow:hidden;">
       <!-- Sidebar: past reports -->
-      <div id="rp-sidebar" style="width:200px;flex-shrink:0;border-right:1px solid var(--b);background:#fff;overflow-y:auto;"></div>
+      <div id="rp-sidebar" style="width:260px;flex-shrink:0;border-right:1px solid var(--b);background:#fff;overflow-y:auto;"></div>
       <!-- Main content -->
       <div id="rp-content" style="flex:1;overflow-y:auto;padding:20px;"></div>
     </div>
