@@ -2270,8 +2270,11 @@ Keep the report concise, data-driven, and professional. Use bullet points. Inclu
       })
     });
     const data = await res.json();
-    const text = data.content.filter(b=>b.type==='text').map(b=>b.text).join('\n');
-    if(!text) throw new Error(data.error?.message || 'No response from Claude');
+    console.log('Report API response:', data);
+    if(!res.ok || data.error) throw new Error(data.error?.message || `API error ${res.status}`);
+    if(!data.content) throw new Error('Empty response from Claude. Check your API key in Profile.');
+    const text = (data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('\n');
+    if(!text) throw new Error('No text in response. The report may have been blocked.');
 
     const report = {
       id:'rp_'+Date.now(),
