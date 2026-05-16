@@ -789,6 +789,13 @@ const APP_FK='d7udv7pr01qnv95n8q0gd7udv7pr01qnv95n8q10';
 
 let FB_PID=APP_FB_PID, FB_KEY=APP_FB_KEY, FB_ACTIVE=false;
 let CK='', FK=APP_FK;
+let CLAUDE_MODEL='claude-sonnet-4-5';
+
+const CLAUDE_MODELS=[
+  {id:'claude-sonnet-4-5', label:'Sonnet 4.5', desc:'Fast · Best value'},
+  {id:'claude-sonnet-4-6', label:'Sonnet 4.6', desc:'Smarter · Recommended'},
+  {id:'claude-opus-4-6',   label:'Opus 4.6',   desc:'Most capable · Slower'},
+];
 let PORTFOLIOS=[];   // [{id, name, positions:[{ticker,shares,cost}]}]
 let ACTIVE_PORT_ID='';
 let WATCH=[];
@@ -1852,7 +1859,7 @@ async function doSend(ov){
     const res=await fetch('https://api.anthropic.com/v1/messages',{
       method:'POST',
       headers:{'Content-Type':'application/json','x-api-key':CK,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body:JSON.stringify({model:'claude-sonnet-4-5',max_tokens:1500,system:SYS,tools:[{type:'web_search_20250305',name:'web_search'}],messages:hist})
+      body:JSON.stringify({model:CLAUDE_MODEL,max_tokens:1500,system:SYS,tools:[{type:'web_search_20250305',name:'web_search'}],messages:hist})
     });
     const data=await res.json();
     if(data.error)throw new Error(data.error.message||'API error');
@@ -2076,6 +2083,27 @@ function renderProfile(){
     <input class="mob-finp" id="prof-ck" type="password" placeholder="sk-ant-api03-..." value="${CK||''}" style="margin-bottom:8px;display:block;">
     <div style="font-size:11px;color:var(--t4);margin-bottom:10px;line-height:1.5;">Get your key at <a href="https://console.anthropic.com/settings/keys" target="_blank" style="color:var(--p);font-weight:600;">console.anthropic.com</a>. ~$0.01–0.03 per analysis.</div>
     <button onclick="saveProfileKey('ck')" class="mob-add-btn" style="font-size:13px;padding:12px;">${ckOk?'Update Key':'Connect Claude AI'}</button>`)}
+
+  <!-- Model selector -->
+  <div style="background:#fff;border-radius:14px;overflow:hidden;margin-bottom:10px;box-shadow:0 1px 4px rgba(0,0,0,0.05);">
+    <div style="padding:14px 16px;display:flex;align-items:center;gap:12px;">
+      <div style="width:36px;height:36px;border-radius:10px;background:#f0f4ff;border:1px solid #c7d2fe;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">⚡</div>
+      <div style="flex:1;"><div style="font-size:13px;font-weight:700;color:var(--t);">Claude Model</div><div style="font-size:11px;color:#6366f1;margin-top:1px;">${CLAUDE_MODELS.find(m=>m.id===CLAUDE_MODEL)?.label||'Sonnet 4.5'}</div></div>
+    </div>
+    <div style="padding:0 16px 14px;display:flex;flex-direction:column;gap:8px;">
+      ${CLAUDE_MODELS.map(m=>`
+      <div onclick="setModel('${m.id}')" style="display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:10px;border:2px solid ${CLAUDE_MODEL===m.id?'var(--p)':'var(--b)'};background:${CLAUDE_MODEL===m.id?'var(--pl)':'#f8fafc'};cursor:pointer;transition:all 0.15s;">
+        <div style="width:16px;height:16px;border-radius:50%;border:2px solid ${CLAUDE_MODEL===m.id?'var(--p)':'#cbd5e1'};background:${CLAUDE_MODEL===m.id?'var(--p)':'transparent'};flex-shrink:0;display:flex;align-items:center;justify-content:center;">
+          ${CLAUDE_MODEL===m.id?'<div style="width:6px;height:6px;border-radius:50%;background:#fff;"></div>':''}
+        </div>
+        <div style="flex:1;">
+          <div style="font-size:13px;font-weight:700;color:${CLAUDE_MODEL===m.id?'var(--p)':'var(--t)'};">${m.label}</div>
+          <div style="font-size:11px;color:var(--t3);">${m.desc}</div>
+        </div>
+        ${CLAUDE_MODEL===m.id?'<div style="font-size:10px;font-weight:700;background:var(--p);color:#fff;padding:3px 8px;border-radius:20px;">ACTIVE</div>':''}
+      </div>`).join('')}
+    </div>
+  </div>
   <div style="background:#fff;border-radius:14px;padding:14px 16px;margin-bottom:10px;box-shadow:0 1px 4px rgba(0,0,0,0.05);display:flex;align-items:center;gap:12px;">
     <div style="width:36px;height:36px;border-radius:10px;background:#ecfdf5;border:1px solid #a7f3d0;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">📈</div>
     <div style="flex:1;"><div style="font-size:13px;font-weight:700;color:var(--t);">Real-Time Prices</div><div style="font-size:11px;color:#10b981;margin-top:1px;">Finnhub + Yahoo Finance — pre-configured ✓</div></div>
@@ -2101,6 +2129,12 @@ function serviceCard(panelId,icon,title,subtitle,on,onLabel,offLabel,panelConten
 }
 
 function toggleService(id){const el=document.getElementById(id);if(el)el.style.display=el.style.display==='none'?'block':'none';}
+
+function setModel(id){
+  CLAUDE_MODEL=id;
+  LS.set('st_model',id);
+  renderProfile();
+}
 
 function saveProfileKey(type){
   if(type==='ck'){
@@ -2263,7 +2297,7 @@ Keep the report concise, data-driven, and professional. Use bullet points. Inclu
         'anthropic-dangerous-direct-browser-access':'true'
       },
       body:JSON.stringify({
-        model:'claude-sonnet-4-20250514',
+        model:CLAUDE_MODEL,
         max_tokens:4000,
         tools:[{type:'web_search_20250305',name:'web_search'}],
         messages:[{role:'user',content:prompt}]
@@ -2397,6 +2431,8 @@ function closeSB(){document.getElementById('sb').classList.remove('open');docume
 
 // ── BOOT ──
 document.addEventListener('DOMContentLoaded',async()=>{
+  // Load saved model preference
+  CLAUDE_MODEL=LS.get('st_model')||'claude-sonnet-4-5';
   // Try to restore auth session from localStorage
   const saved=LS.get('st_auth');
   if(saved?.uid&&saved?.email){
