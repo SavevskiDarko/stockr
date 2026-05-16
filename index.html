@@ -1576,15 +1576,12 @@ function renderPORT(){
 
   // Mobile top bar: just portfolio name (add is via FAB)
   const mobileNameBar=`
-  <div style="padding:12px 14px;background:#fff;border-radius:14px;box-shadow:0 1px 4px rgba(0,0,0,0.05);margin-bottom:10px;">
-    <div style="font-size:9px;font-weight:700;color:var(--p);letter-spacing:2px;margin-bottom:5px;">PORTFOLIO NAME</div>
-    <input class="port-name-field" id="port-name-inp"
-      value="${port.name}"
-      placeholder="Portfolio name..."
-      onblur="renamePort(this.value)"
-      onkeydown="if(event.key==='Enter'){this.blur();} if(event.key==='Escape'){this.value='${port.name}';this.blur();}"
-      oninput="markUnsaved()"
-    >
+  <div style="padding:12px 14px;background:#fff;border-radius:14px;box-shadow:0 1px 4px rgba(0,0,0,0.05);margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;" onclick="mobileRenamePort()">
+    <div>
+      <div style="font-size:9px;font-weight:700;color:var(--p);letter-spacing:2px;margin-bottom:3px;">${t('portfolio_name')}</div>
+      <div style="font-size:16px;font-weight:800;color:var(--t);">${port.name}</div>
+    </div>
+    <div style="font-size:11px;color:var(--p);font-weight:600;background:var(--pl);padding:6px 10px;border-radius:8px;">✏️ ${LANG==='mk'?'Промени':'Rename'}</div>
   </div>`;
 
   const leftH = isDesktop ? desktopAddForm : mobileNameBar;
@@ -1671,6 +1668,16 @@ function renderPORT(){
   }
 
   const ft=document.getElementById('ft');if(ft)ft.addEventListener('keydown',e=>{if(e.key==='Enter')addP();});
+}
+
+function mobileRenamePort(){
+  const port=activePort();if(!port)return;
+  const name=prompt(LANG==='mk'?'Внеси ново име за портфолиото:':'Enter new portfolio name:',port.name);
+  if(name&&name.trim()&&name.trim()!==port.name){
+    port.name=name.trim();
+    saveLocal();renderPortSwitcher();renderPORT();
+    if(FB_ACTIVE)fbWrite(userPath('portfolios'),{portfolios:PORTFOLIOS,updatedAt:Date.now()}).catch(()=>{});
+  }
 }
 
 function markUnsaved(){
@@ -2209,10 +2216,11 @@ function ST(t){
   Object.values(navMap).forEach(id=>{const el=document.getElementById(id);if(el)el.classList.remove('on');});
   const activeNav=document.getElementById(navMap[t]);if(activeNav)activeNav.classList.add('on');
   if(t!=='p'){const b=document.getElementById('mob-analyze-bar');if(b)b.remove();}
+  const isMobile=window.innerWidth<900;
   const fab=document.querySelector('.mob-fab');
   const wfab=document.querySelector('.mob-wfab');
-  if(fab){fab.style.display=t==='p'?'flex':'none';}
-  if(wfab){wfab.style.display=t==='w'?'flex':'none';}
+  if(fab){fab.style.display=isMobile?(t==='p'?'flex':'none'):'none';}
+  if(wfab){wfab.style.display=isMobile?(t==='w'?'flex':'none'):'none';}
   if(t==='p'){renderPortSwitcher();renderPORT();if((activePort()?.positions||[]).length)refresh('p');}
   if(t==='w'){renderWATCH();if(WATCH.length)refresh('w');}
   if(t==='pr'){document.getElementById('prt').style.display='flex';renderProfile();}
