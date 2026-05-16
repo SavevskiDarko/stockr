@@ -545,7 +545,7 @@ input,button,select{font-family:'Montserrat',sans-serif;}
 
     <!-- Mode toggle -->
     <div style="display:flex;background:#f1f5f9;border-radius:12px;padding:4px;margin-bottom:20px;">
-      <button id="auth-login-tab" onclick="showAuthMode('login')" style="flex:1;padding:9px;border:none;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;background:var(--p);color:#fff;transition:all 0.2s;">Sign In</button>
+      <button id="auth-login-tab" onclick="showAuthMode('login')" style="flex:1;padding:9px;border:none;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;background:var(--p);color:#fff;transition:all 0.2s;" id="auth-login-tab-static">Sign In</button>
       <button id="auth-reg-tab" onclick="showAuthMode('register')" style="flex:1;padding:9px;border:none;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;background:transparent;color:var(--t3);transition:all 0.2s;">Create Account</button>
     </div>
 
@@ -556,7 +556,7 @@ input,button,select{font-family:'Montserrat',sans-serif;}
     <div class="lbl">PASSWORD</div>
     <input class="inp" id="auth-pass" type="password" placeholder="••••••••" autocomplete="current-password">
     <div style="text-align:right;margin:-6px 0 10px;">
-      <button onclick="authResetPassword()" style="background:none;border:none;color:var(--p);font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;">Forgot password?</button>
+      <button onclick="authResetPassword()" style="background:none;border:none;color:var(--p);font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;" id="auth-forgot-btn">Forgot password?</button>
     </div>
 
     <div class="err" id="auth-err"></div>
@@ -692,7 +692,7 @@ input,button,select{font-family:'Montserrat',sans-serif;}
   <div class="mob-sheet-overlay" id="port-sheet-overlay" onclick="if(event.target===this)closePortSheet()">
     <div class="mob-sheet">
       <div class="mob-sheet-handle"></div>
-      <div class="mob-sheet-title">ADD / UPDATE POSITION</div>
+      <div class="mob-sheet-title">${t('add_position')}</div>
       <div class="mob-sheet-grid">
         <input class="mob-finp" id="mob-ft" placeholder="Ticker (e.g. AAPL)" style="grid-column:1/-1">
       </div>
@@ -712,7 +712,7 @@ input,button,select{font-family:'Montserrat',sans-serif;}
       <div class="mob-sheet-title">ADD TO WATCHLIST</div>
       <div style="margin-bottom:12px">
         <input class="mob-finp" id="mob-wt" placeholder="Ticker (e.g. TSLA)" style="margin-bottom:10px;display:block">
-        <input class="mob-finp" id="mob-wn" placeholder="Note (optional)" style="display:block">
+        <input class="mob-finp" id="mob-wn" placeholder="${t('note_optional')}" style="display:block">
       </div>
       <button class="mob-add-btn green" onclick="mobAddW()">+ Add to Watchlist</button>
     </div>
@@ -727,7 +727,7 @@ input,button,select{font-family:'Montserrat',sans-serif;}
     <div class="pt-center">
       <div class="port-switcher" id="port-switcher"></div>
       <div class="pbar">
-        <div class="pbar-ts" id="p-ts">Prices not loaded</div>
+        <div class="pbar-ts" id="p-ts">${t('prices_not_loaded')}</div>
         <button class="rbtn" id="p-rb" onclick="refresh('p')"><span class="ri">↻</span> Refresh</button>
       </div>
       <div class="pt-center-scr" id="pscr"></div>
@@ -796,12 +796,165 @@ const CLAUDE_MODELS=[
   {id:'claude-sonnet-4-6', label:'Sonnet 4.6', desc:'Smarter · Recommended'},
   {id:'claude-opus-4-6',   label:'Opus 4.6',   desc:'Most capable · Slower'},
 ];
+// ══════════════════════════════════════════════════
+// ── TRANSLATIONS ──────────────────────────────────
+
+const TRANSLATIONS = {
+  en: {
+    nav_portfolio:'Portfolio', nav_watchlist:'Watchlist', nav_chat:'Chat', nav_reports:'Reports', nav_profile:'Profile',
+    synced:'☁ Synced', syncing:'⟳ Syncing', local:'☁ Local', sync_error:'⚠ Error',
+    sync_btn:'↑ Sync', sync_syncing:'⟳ Syncing...', sync_done:'↑ Synced ✓',
+    auth_signin:'Sign In', auth_register:'Create Account', auth_signin_title:'SIGN IN TO YOUR ACCOUNT',
+    auth_register_title:'CREATE YOUR ACCOUNT', auth_email:'EMAIL', auth_password:'PASSWORD',
+    auth_forgot:'Forgot password?', auth_guest:'Continue as Guest (local only)',
+    auth_err_empty:'Please enter email and password.',
+    auth_err_email:'Please enter a valid email address.',
+    auth_err_pass:'Password must be at least 6 characters.',
+    auth_err_nouser:'No account found for this email. Please create an account first.',
+    auth_err_wrongpass:'Incorrect password. Please try again.',
+    auth_err_exists:'An account with this email already exists. Please sign in.',
+    auth_signing:'Signing in...', auth_creating:'Creating account...',
+    portfolio_name:'PORTFOLIO NAME', portfolio_name_hint:'✏️ Click to rename · Enter to save',
+    add_position:'ADD / UPDATE POSITION', ticker:'Ticker', shares:'Shares', avg_cost:'Avg $ Cost', add_btn:'+ Add',
+    deposit:'DEPOSIT', tap_breakdown:'tap for breakdown ↗',
+    unrealized_pnl:'UNREALIZED P&L', positions:'POSITIONS', top_holding:'TOP HOLDING',
+    analyze_portfolio:'🔍  Analyze', no_positions:'No positions yet',
+    no_positions_sub:'Add your first stock using the + button',
+    delete_portfolio:'🗑 Delete', confirm_delete_pos:'Remove {ticker} from portfolio?',
+    confirm_delete_port:'Delete this portfolio? This cannot be undone.',
+    loading:'loading…', updated:'Updated', refresh:'↻ Refresh',
+    new_portfolio:'+ New Portfolio', portfolio_tab_default:'My Portfolio',
+    add_watchlist:'⭐ ADD TO WATCHLIST', note_optional:'Note (optional)',
+    analyze_all:'🔍  Analyze ALL Watchlist Stocks', deep_analysis:'🔍 Deep Analysis', remove:'✕ Remove',
+    watchlist_empty:'Watchlist empty', watchlist_empty_sub:'Add stocks to watch closely',
+    prices_not_loaded:'Prices not loaded',
+    chat_placeholder:'Ask about any stock or portfolio...',
+    no_key_msg:'⚠️ No Claude API key connected. Go to **Profile** → Claude AI Analysis to add your key and enable AI analysis.',
+    new_chat:'New chat', history:'History',
+    reports_title:'WEEKLY MARKET REPORTS', reports_subtitle:'Post-Mortem · Every Friday after market close',
+    generate_report:'Generate Report', generating:'Generating...',
+    week_of:'Week of', generated:'Generated',
+    report_analyzing:"Analyzing this week's market data...",
+    report_takes:'This takes 20–40 seconds',
+    report_no_key:'Add your Claude API key in Profile to generate reports',
+    generate_first:'📊 Generate First Report',
+    delete_report:'🗑 Delete',
+    profile_local:'Local only — not synced', profile_synced:'Synced with Firebase ✓',
+    reset_password:'🔑 Reset Password', sign_out:'↩ Sign out',
+    services:'SERVICES',
+    claude_ai:'Claude AI Analysis', claude_on:'Connected — AI analysis enabled', claude_off:'Add your key to enable AI analysis',
+    prices_service:'Real-Time Prices', prices_sub:'Finnhub + Yahoo Finance — pre-configured ✓',
+    firebase_service:'Firebase Sync', firebase_on:'Syncing as', firebase_off:'Sign in to enable sync',
+    claude_key_label:'ANTHROPIC API KEY', claude_key_hint:'Get your key at console.anthropic.com. ~$0.01–0.03 per analysis.',
+    update_key:'Update Key', connect_claude:'Connect Claude AI',
+    model_title:'Claude Model', sonnet45_desc:'Fast · Best value', sonnet46_desc:'Smarter · Recommended', opus46_desc:'Most capable · Slower',
+    active:'ACTIVE', language_title:'Language',
+    sign_in_to_sync:'Sign in / Create Account',
+    deposit_breakdown:'DEPOSIT BREAKDOWN',
+    on:'ON', off:'OFF', free:'FREE', cancel:'Cancel', save:'✓ Save',
+  },
+  mk: {
+    nav_portfolio:'Портфолио', nav_watchlist:'Следење', nav_chat:'Чат', nav_reports:'Извештаи', nav_profile:'Профил',
+    synced:'☁ Синхр.', syncing:'⟳ Синхр...', local:'☁ Локално', sync_error:'⚠ Грешка',
+    sync_btn:'↑ Синхр.', sync_syncing:'⟳ Синхрон...', sync_done:'↑ Синхрон. ✓',
+    auth_signin:'Најави се', auth_register:'Креирај сметка', auth_signin_title:'НАЈАВА ВО ВАШАТА СМЕТКА',
+    auth_register_title:'КРЕИРАЊЕ НА СМЕТКА', auth_email:'ЕМАИЛ', auth_password:'ЛОЗИНКА',
+    auth_forgot:'Ја заборавивте лозинката?', auth_guest:'Продолжи без сметка (локално)',
+    auth_err_empty:'Внесете емаил и лозинка.',
+    auth_err_email:'Внесете важечка емаил адреса.',
+    auth_err_pass:'Лозинката мора да има барем 6 знаци.',
+    auth_err_nouser:'Нема сметка за оваа емаил адреса. Прво креирајте сметка.',
+    auth_err_wrongpass:'Погрешна лозинка. Обидете се повторно.',
+    auth_err_exists:'Сметка со оваа емаил веќе постои. Најавете се.',
+    auth_signing:'Најавување...', auth_creating:'Креирање сметка...',
+    portfolio_name:'ИМЕ НА ПОРТФОЛИО', portfolio_name_hint:'✏️ Кликни за преименување · Enter за зачувување',
+    add_position:'ДОДАЈ / АЖУРИРАЈ ПОЗИЦИЈА', ticker:'Тикер', shares:'Акции', avg_cost:'Просечна $ Цена', add_btn:'+ Додај',
+    deposit:'ДЕПОЗИТ', tap_breakdown:'допри за преглед ↗',
+    unrealized_pnl:'НЕРЕАЛИЗИРАНА Д/З', positions:'ПОЗИЦИИ', top_holding:'ТОП АКЦИЈА',
+    analyze_portfolio:'🔍  Анализирај', no_positions:'Нема позиции',
+    no_positions_sub:'Додај акции со + копчето',
+    delete_portfolio:'🗑 Избриши', confirm_delete_pos:'Отстрани {ticker} од портфолиото?',
+    confirm_delete_port:'Да се избрише ова портфолио? Ова не може да се врати.',
+    loading:'вчитување…', updated:'Ажурирано', refresh:'↻ Освежи',
+    new_portfolio:'+ Ново Портфолио', portfolio_tab_default:'Мое Портфолио',
+    add_watchlist:'⭐ ДОДАЈ ВО СЛЕДЕЊЕ', note_optional:'Забелешка (незадолжително)',
+    analyze_all:'🔍  Анализирај ги СИТЕ акции', deep_analysis:'🔍 Детална анализа', remove:'✕ Отстрани',
+    watchlist_empty:'Листата е празна', watchlist_empty_sub:'Додај акции за следење',
+    prices_not_loaded:'Цените не се вчитани',
+    chat_placeholder:'Прашај за акција или портфолио...',
+    no_key_msg:'⚠️ Нема Claude API клуч. Одди во **Профил** → Claude AI Анализа за да го додадеш.',
+    new_chat:'Нов чат', history:'Историја',
+    reports_title:'НЕДЕЛНИ ПАЗАРНИ ИЗВЕШТАИ', reports_subtitle:'Пост-Мортем · Секој петок по затворање на пазарот',
+    generate_report:'Генерирај извештај', generating:'Генерирање...',
+    week_of:'Недела од', generated:'Генериран',
+    report_analyzing:'Анализа на неделните пазарни податоци...',
+    report_takes:'Ова трае 20–40 секунди',
+    report_no_key:'Додај Claude API клуч во Профил за да генерираш извештаи',
+    generate_first:'📊 Генерирај прв извештај',
+    delete_report:'🗑 Избриши',
+    profile_local:'Само локално — не е синхронизирано', profile_synced:'Синхрон. со Firebase ✓',
+    reset_password:'🔑 Промени лозинка', sign_out:'↩ Одјави се',
+    services:'УСЛУГИ',
+    claude_ai:'Claude AI Анализа', claude_on:'Поврзано — AI анализа овозможена', claude_off:'Додај клуч за AI анализа',
+    prices_service:'Цени во реално време', prices_sub:'Finnhub + Yahoo Finance — претходно конфигурирано ✓',
+    firebase_service:'Firebase Синхронизација', firebase_on:'Синхрон. како', firebase_off:'Најави се за синхрон.',
+    claude_key_label:'ANTHROPIC API КЛУЧ', claude_key_hint:'Земи клуч на console.anthropic.com. ~$0.01–0.03 по анализа.',
+    update_key:'Ажурирај клуч', connect_claude:'Поврзи Claude AI',
+    model_title:'Claude Модел', sonnet45_desc:'Брз · Најповолен', sonnet46_desc:'Попаметен · Препорачан', opus46_desc:'Најспособен · Побавен',
+    active:'АКТИВЕН', language_title:'Јазик',
+    sign_in_to_sync:'Најави се / Креирај сметка',
+    deposit_breakdown:'ПРЕГЛЕД НА ДЕПОЗИТ',
+    on:'ВКЛ', off:'ИСКЛ', free:'БЕСПЛАТНО', cancel:'Откажи', save:'✓ Зачувај',
+  }
+};
+
+function t(key, vars={}){
+  const str=(TRANSLATIONS[LANG]||TRANSLATIONS.en)[key]||(TRANSLATIONS.en[key]||key);
+  return str.replace(/\{(\w+)\}/g,(_,k)=>vars[k]||'');
+}
+
+function setLang(lang){
+  LANG=lang; LS.set('st_lang',lang);
+  applyLang(); renderProfile();
+}
+
+function applyLang(){
+  const navKeys={bnip:'nav_portfolio',bniw:'nav_watchlist',bnic:'nav_chat',bnirp:'nav_reports',bnipr:'nav_profile'};
+  Object.entries(navKeys).forEach(([id,key])=>{
+    const el=document.getElementById(id);
+    if(el){const span=el.querySelector('span');if(span)span.textContent=t(key);}
+  });
+  const tabKeys={tbc:'nav_chat',tbp:'nav_portfolio',tbw:'nav_watchlist',tbrp:'nav_reports',tbpr:'nav_profile'};
+  const tabIcons={tbc:'💬 ',tbp:'💼 ',tbw:'⭐ ',tbrp:'📊 ',tbpr:'👤 '};
+  Object.entries(tabKeys).forEach(([id,key])=>{
+    const el=document.getElementById(id);
+    if(el)el.textContent=(tabIcons[id]||'')+t(key);
+  });
+  const minp=document.getElementById('minp');
+  if(minp)minp.placeholder=t('chat_placeholder');
+  const elAuthMode=document.getElementById('auth-mode-label');
+  if(elAuthMode)elAuthMode.textContent=t('auth_signin_title');
+  const elSubmit=document.getElementById('auth-submit-btn');
+  if(elSubmit&&elSubmit.textContent!==t('auth_register'))elSubmit.textContent=t('auth_signin');
+  const elLoginTab=document.getElementById('auth-login-tab');
+  if(elLoginTab)elLoginTab.textContent=t('auth_signin');
+  const elRegTab=document.getElementById('auth-reg-tab');
+  if(elRegTab)elRegTab.textContent=t('auth_register');
+  const activeTab=document.querySelector('.tb.on')?.id?.replace('tb','');
+  if(activeTab==='p'){renderPortSwitcher();renderPORT();}
+  else if(activeTab==='w')renderWATCH();
+  else if(activeTab==='rp')renderReportsList();
+}
+
+
 let PORTFOLIOS=[];   // [{id, name, positions:[{ticker,shares,cost}]}]
 let ACTIVE_PORT_ID='';
 let WATCH=[];
 let sessions=[], curId=null, MSGS=[];
 let loading=false, liv, li=0, PC={}
 let syncTimer=null;
+let LANG='en';
+
 // ── AUTH STATE ──
 let USER_ID='', USER_EMAIL='', IS_GUEST=false;
 
@@ -889,15 +1042,15 @@ async function manualSync(){
   if(!FB_ACTIVE){openFbModal();return;}
   const btn=document.getElementById('sync-btn');
   btn.disabled=true;btn.textContent='⟳ Syncing...';
-  setSyncPill('syncing','⟳ Syncing');
+  setSyncPill('syncing',t('syncing'));
   try{
     await pullFromFirebase();
-    setSyncPill('cloud','☁ Synced');
-    btn.textContent='↑ Synced ✓';
-    setTimeout(()=>{btn.textContent='↑ Sync';btn.disabled=false;},2000);
+    setSyncPill('cloud',t('synced'));
+    btn.textContent=t('sync_done');
+    setTimeout(()=>{btn.textContent=t('sync_btn');btn.disabled=false;},2000);
   }catch(e){
-    setSyncPill('error','⚠ Error');
-    btn.textContent='↑ Sync';btn.disabled=false;
+    setSyncPill('error',t('sync_error'));
+    btn.textContent=t('sync_btn');btn.disabled=false;
     alert('Sync failed: '+e.message);
   }
 }
@@ -976,7 +1129,7 @@ async function connectFirebase(){
     try{await pullFromFirebase();}catch(e){console.warn('Pull failed:',e.message);}
     updateFbUI(true);
     closeFbModal();
-    setSyncPill('cloud','☁ Synced');
+    setSyncPill('cloud',t('synced'));
     document.getElementById('sync-banner').classList.add('hide');
     renderPortSwitcher();renderPORT();renderSB();renderMSGS();
     startAutoSync();
@@ -992,7 +1145,7 @@ function disconnectFirebase(){
   FB_ACTIVE=false;FB_PID='';FB_KEY='';
   LS.del('st_fbcfg');clearInterval(syncTimer);
   updateFbUI(false);closeFbModal();
-  setSyncPill('local','☁ Local');
+  setSyncPill('local',t('local'));
   document.getElementById('hdr-sub').textContent='Local storage';
   if(!LS.get('st_banner_dismissed'))document.getElementById('sync-banner').classList.remove('hide');
 }
@@ -1021,7 +1174,7 @@ function startAutoSync(){
       renderPortSwitcher();renderPORT();renderWATCH();renderSB();
       const cur=sessions.find(s=>s.id===curId);
       if(cur&&document.getElementById('ct').style.display!=='none'){MSGS=cur.msgs||MSGS;renderMSGS();}
-      setSyncPill('cloud','☁ Synced');
+      setSyncPill('cloud',t('synced'));
       // Show subtle timestamp
       const ts=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
       document.getElementById('hdr-sub').textContent=`Firebase · Last sync ${ts}`;
@@ -1063,14 +1216,14 @@ async function fullPullFromFirebase(){
     saveLocal();saveLocalSessions();
     // Re-render everything
     renderPortSwitcher();renderPORT();renderWATCH();renderSB();renderMSGS();
-    setSyncPill('cloud','☁ Synced');
+    setSyncPill('cloud',t('synced'));
     btn.textContent='⬇ Pull All Data from Firebase';btn.disabled=false;
     closeFbModal();
     // Summary
     const summary=`✅ Pull complete!\n\n📊 Portfolios: ${PORTFOLIOS.length}\n⭐ Watchlist: ${WATCH.length} stocks\n💬 Chat sessions: ${sessions.length}`;
     alert(summary);
   }catch(e){
-    setSyncPill('error','⚠ Error');
+    setSyncPill('error',t('sync_error'));
     btn.textContent='⬇ Pull All Data from Firebase';btn.disabled=false;
     alert('Pull failed: '+e.message);
   }
@@ -1085,12 +1238,12 @@ async function fullPushToFirebase(){
   setSyncPill('syncing','⟳ Pushing');
   try{
     await pushAllToFirebase();
-    setSyncPill('cloud','☁ Synced');
+    setSyncPill('cloud',t('synced'));
     btn.textContent='⬆ Push All Data to Firebase';btn.disabled=false;
     closeFbModal();
     alert(`✅ Push complete!\n\n📊 Portfolios: ${PORTFOLIOS.length}\n⭐ Watchlist: ${WATCH.length} stocks\n💬 Chat sessions: ${sessions.length}`);
   }catch(e){
-    setSyncPill('error','⚠ Error');
+    setSyncPill('error',t('sync_error'));
     btn.textContent='⬆ Push All Data to Firebase';btn.disabled=false;
     alert('Push failed: '+e.message);
   }
@@ -1168,7 +1321,7 @@ async function startApp(){
   // If Firebase already connected (login flow set it up)
   if(FB_ACTIVE && USER_ID){
     updateFbUI(true);
-    setSyncPill('cloud','☁ Synced');
+    setSyncPill('cloud',t('synced'));
     try{
       await pullFromFirebase();
       startAutoSync();
@@ -1176,16 +1329,16 @@ async function startApp(){
   } else if(!IS_GUEST){
     if(fbcfg?.pid&&fbcfg?.key){
       FB_PID=fbcfg.pid;FB_KEY=fbcfg.key;
-      setSyncPill('syncing','⟳ Connecting');
+      setSyncPill('syncing',t('syncing'));
       try{
         await fbRead(`users/${USER_ID||'ping'}/meta/ping`);
         FB_ACTIVE=true;updateFbUI(true);
-        setSyncPill('syncing','⟳ Loading');
+        setSyncPill('syncing',t('syncing'));
         await pullFromFirebase();
-        setSyncPill('cloud','☁ Synced');
+        setSyncPill('cloud',t('synced'));
         startAutoSync();
       }catch(e){
-        FB_ACTIVE=false;setSyncPill('local','☁ Local');
+        FB_ACTIVE=false;setSyncPill('local',t('local'));
         console.warn('Firebase unavailable:',e.message);
       }
     }
@@ -1404,7 +1557,7 @@ function renderPORT(){
   // ── Left panel (desktop only): name + add form ──
   const desktopAddForm=`
   <div class="fcrd" style="padding:12px 14px;">
-    <div style="font-size:9px;font-weight:700;color:var(--p);letter-spacing:2px;margin-bottom:6px;">PORTFOLIO NAME</div>
+    <div style="font-size:9px;font-weight:700;color:var(--p);letter-spacing:2px;margin-bottom:6px;">${t('portfolio_name')}</div>
     <input class="port-name-field" id="port-name-inp"
       value="${port.name}"
       placeholder="Portfolio name..."
@@ -1418,7 +1571,7 @@ function renderPORT(){
     <input class="finp" id="ft" placeholder="Ticker" style="width:85px">
     <input class="finp" id="fs" placeholder="Shares" type="number" style="width:68px">
     <input class="finp" id="fc" placeholder="Avg $ Cost" type="number" style="width:88px">
-    <button class="abtn" onclick="addP()">+ Add</button>
+    <button class="abtn" onclick="addP()">${t('add_btn')}</button>
   </div></div>`;
 
   // Mobile top bar: just portfolio name (add is via FAB)
@@ -1450,8 +1603,8 @@ function renderPORT(){
   </div>`:'';
   // Desktop: analyze + delete inside right panel. Mobile: sticky bar + ⋯ menu
   const rightH=summaryCards+(isDesktop&&pos.length?`
-  <button class="abig" onclick="anzAll()">🔍  Analyze ${port.name}</button>
-  ${PORTFOLIOS.length>1?`<button class="del-port-btn" onclick="deletePortfolio()">🗑 Delete "${port.name}"</button>`:''}`:``);
+  <button class="abig" onclick="anzAll()">${t('analyze_portfolio')} ${port.name}</button>
+  ${PORTFOLIOS.length>1?`<button class="del-port-btn" onclick="deletePortfolio()">${t('delete_portfolio')} "${port.name}"</button>`:''}`:``);
 
   // Mobile sticky analyze bar
   const existingBar=document.getElementById('mob-analyze-bar');
@@ -1476,7 +1629,7 @@ function renderPORT(){
           <div class="pr-inf"><div class="pr-name">${p.ticker}</div><div class="pr-sub">${p.shares}sh · avg $${p.cost}</div></div>
           ${q?`<div class="pr-pnl"><div class="pr-pv ${pv>=0?'up':'dn'}">${pv>=0?'+':'-'}$${Math.abs(pv).toLocaleString('en',{maximumFractionDigits:0})}</div><div class="pr-pp ${pp>=0?'up':'dn'}">${fpct(pp)}</div></div>
           <div class="pr-px"><div class="pr-pxv">${currSym(q)}${f2(q.c)}</div><div class="pr-pxc ${up?'up':'dn'}">${fchg(q.d)} (${fpct(q.dp)})</div></div>`
-          :`<div class="pr-px"><div class="ldg">loading…</div></div>`}
+          :`<div class="pr-px"><div class="ldg">${t('loading')}</div></div>`}
           <div class="pr-edit-icon">✏️</div>
           <button class="pr-del" onclick="event.stopPropagation();delP(${i})">✕</button>
         </div>
@@ -1503,7 +1656,7 @@ function renderPORT(){
     });
     centerH+=`</div>`;
   }else{
-    centerH=`<div class="empty"><div class="eico">📊</div><div class="etit">No positions yet</div><div class="esub">Add your first stock in the panel on the left</div></div>`;
+    centerH=`<div class="empty"><div class="eico">📊</div><div class="etit">No positions yet</div><div class="esub">${t('no_positions_sub')}</div></div>`;
   }
 
   if(isDesktop){
@@ -1530,7 +1683,7 @@ function renamePort(name){
   const p=activePort();if(!p)return;
   if(p.name===name.trim()){
     const hint=document.getElementById('port-name-hint');
-    if(hint)hint.textContent='✏️ Click to rename · Enter to save';
+    if(hint)hint.textContent=t('portfolio_name_hint');
     return;
   }
   p.name=name.trim();
@@ -1600,12 +1753,12 @@ function deletePortfolio(){
 function renderWATCH(){
   const isDesktop=window.innerWidth>=900;
 
-  const addFormH=`<div class="fcrd"><div class="flbl">⭐ ADD TO WATCHLIST</div><div class="frow">
+  const addFormH=`<div class="fcrd"><div class="flbl">${t('add_watchlist')}</div><div class="frow">
     <input class="finp" id="wt-tk" placeholder="Ticker" style="width:100px">
     <input class="finp" id="wt-nt" placeholder="Note (optional)" style="flex:1;min-width:100px">
     <button class="abtn" onclick="addW()">+ Add</button>
   </div></div>
-  ${WATCH.length?`<button class="bigbtn" onclick="anzWatchAll()">🔍  Analyze ALL Watchlist Stocks</button>`:''}`;
+  ${WATCH.length?`<button class="bigbtn" onclick="anzWatchAll()">${t('analyze_all')}</button>`:''}`;
 
   let cardsH='';
   if(WATCH.length){
@@ -1619,8 +1772,8 @@ function renderWATCH(){
           :`<span style="font-size:11px;color:var(--t4);font-style:italic">Loading...</span>`}
         </div>
         <div class="wacts">
-          <button class="wab" onclick="anzOne('${w.ticker}')">🔍 Deep Analysis</button>
-          <button class="wdel" onclick="delW(${i})">✕ Remove</button>
+          <button class="wab" onclick="anzOne('${w.ticker}')">${t('deep_analysis')}</button>
+          <button class="wdel" onclick="delW(${i})">${t('remove')}</button>
         </div>
       </div>`;
     });
@@ -1840,7 +1993,7 @@ async function doSend(ov){
   if(!curId)await newSess();
   updateTitle(msg);
   if(!CK||!CK.startsWith('sk-ant')){
-    MSGS.push({r:'u',c:msg});MSGS.push({r:'a',c:'⚠️ No Claude API key connected. Go to **Profile** → Claude AI Analysis to add your key and enable AI analysis.'});
+    MSGS.push({r:'u',c:msg});MSGS.push({r:'a',c:t('no_key_msg')});
     renderMSGS();
     const si=sessions.findIndex(s=>s.id===curId);
     const upd={id:curId,title:sessions[si]?.title||'Chat',date:new Date().toLocaleDateString(),msgs:MSGS,updatedAt:Date.now()};
@@ -1961,39 +2114,39 @@ async function authLogin(){
   const email=(document.getElementById('auth-email').value||'').trim().toLowerCase();
   const pass=document.getElementById('auth-pass').value;
   showErr('auth-err','');
-  if(!email||!pass){showErr('auth-err','Please enter email and password.');return;}
-  const btn=document.getElementById('auth-submit-btn');btn.disabled=true;btn.textContent='Signing in...';
+  if(!email||!pass){showErr('auth-err',t('auth_err_empty'));return;}
+  const btn=document.getElementById('auth-submit-btn');btn.disabled=true;btn.textContent=t('auth_signing');
   try{
     const key=emailToKey(email);
     const userData=await fbRead(`stockr_accounts/${key}`);
-    if(!userData){throw new Error('No account found for this email. Please create an account first.');}
+    if(!userData){throw new Error(t('auth_err_nouser'));}
     const hash=await sha256(pass+userData.salt);
-    if(hash!==userData.passwordHash){throw new Error('Incorrect password. Please try again.');}
+    if(hash!==userData.passwordHash){throw new Error(t('auth_err_wrongpass'));}
     USER_ID=key;USER_EMAIL=email;IS_GUEST=false;FB_ACTIVE=true;
     LS.set('st_auth',{uid:key,email,ts:Date.now()});
     await startApp();
-  }catch(e){showErr('auth-err',e.message);btn.disabled=false;btn.textContent='Sign In';}
+  }catch(e){showErr('auth-err',e.message);btn.disabled=false;btn.textContent=t('auth_signin');}
 }
 
 async function authRegister(){
   const email=(document.getElementById('auth-email').value||'').trim().toLowerCase();
   const pass=document.getElementById('auth-pass').value;
   showErr('auth-err','');
-  if(!email||!pass){showErr('auth-err','Please enter email and password.');return;}
-  if(!email.includes('@')){showErr('auth-err','Please enter a valid email address.');return;}
-  if(pass.length<6){showErr('auth-err','Password must be at least 6 characters.');return;}
-  const btn=document.getElementById('auth-submit-btn');btn.disabled=true;btn.textContent='Creating account...';
+  if(!email||!pass){showErr('auth-err',t('auth_err_empty'));return;}
+  if(!email.includes('@')){showErr('auth-err',t('auth_err_email'));return;}
+  if(pass.length<6){showErr('auth-err',t('auth_err_pass'));return;}
+  const btn=document.getElementById('auth-submit-btn');btn.disabled=true;btn.textContent=t('auth_creating');
   try{
     const key=emailToKey(email);
     const existing=await fbRead(`stockr_accounts/${key}`);
-    if(existing){throw new Error('An account with this email already exists. Please sign in.');}
+    if(existing){throw new Error(t('auth_err_exists'));}
     const salt=Math.random().toString(36).slice(2)+Date.now().toString(36);
     const passwordHash=await sha256(pass+salt);
     await fbWrite(`stockr_accounts/${key}`,{email,passwordHash,salt,createdAt:Date.now()});
     USER_ID=key;USER_EMAIL=email;IS_GUEST=false;FB_ACTIVE=true;
     LS.set('st_auth',{uid:key,email,ts:Date.now()});
     await startApp();
-  }catch(e){showErr('auth-err',e.message);btn.disabled=false;btn.textContent='Create Account';}
+  }catch(e){showErr('auth-err',e.message);btn.disabled=false;btn.textContent=t('auth_register');}
 }
 
 async function authResetPassword(emailOverride){
@@ -2039,7 +2192,7 @@ function authLogout(){
   const bar=document.getElementById('mob-analyze-bar');if(bar)bar.remove();
   // Re-enable and reset the login form
   const btn=document.getElementById('auth-submit-btn');
-  if(btn){btn.disabled=false;btn.textContent='Sign In';}
+  if(btn){btn.disabled=false;btn.textContent=t('auth_signin');}
   const email=document.getElementById('auth-email');
   const pass=document.getElementById('auth-pass');
   if(email){email.disabled=false;email.value='';}
@@ -2077,12 +2230,32 @@ function renderProfile(){
       <button onclick="authLogout()" style="flex:1;background:#fee2e2;border:none;color:var(--r);font-size:12px;font-weight:700;padding:10px;border-radius:10px;cursor:pointer;font-family:inherit;">↩ Sign out</button>
     </div>`:''}
   </div>
-  <div style="font-size:10px;font-weight:700;color:var(--t3);letter-spacing:2px;margin:0 2px 8px;">SERVICES</div>
+  <div style="font-size:10px;font-weight:700;color:var(--t3);letter-spacing:2px;margin:0 2px 8px;">${t('services')}</div>
   ${serviceCard('ck-panel','🤖','Claude AI Analysis',ckOk?'Connected — AI analysis enabled':'Add your key to enable AI analysis',ckOk,'ON','OFF',`
     <div style="font-size:10px;font-weight:700;color:var(--p);letter-spacing:2px;margin-bottom:6px;">ANTHROPIC API KEY</div>
     <input class="mob-finp" id="prof-ck" type="password" placeholder="sk-ant-api03-..." value="${CK||''}" style="margin-bottom:8px;display:block;">
     <div style="font-size:11px;color:var(--t4);margin-bottom:10px;line-height:1.5;">Get your key at <a href="https://console.anthropic.com/settings/keys" target="_blank" style="color:var(--p);font-weight:600;">console.anthropic.com</a>. ~$0.01–0.03 per analysis.</div>
     <button onclick="saveProfileKey('ck')" class="mob-add-btn" style="font-size:13px;padding:12px;">${ckOk?'Update Key':'Connect Claude AI'}</button>`)}
+
+  <!-- Language selector -->
+  <div style="background:#fff;border-radius:14px;overflow:hidden;margin-bottom:10px;box-shadow:0 1px 4px rgba(0,0,0,0.05);">
+    <div style="padding:14px 16px;display:flex;align-items:center;gap:12px;">
+      <div style="width:36px;height:36px;border-radius:10px;background:#f0fdf4;border:1px solid #bbf7d0;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">🌐</div>
+      <div style="flex:1;"><div style="font-size:13px;font-weight:700;color:var(--t);">${t('language_title')}</div><div style="font-size:11px;color:#10b981;margin-top:1px;">${LANG==='mk'?'Македонски':'English'}</div></div>
+    </div>
+    <div style="padding:0 16px 14px;display:flex;gap:10px;">
+      <div onclick="setLang('en')" style="flex:1;padding:12px;border-radius:10px;border:2px solid ${LANG==='en'?'var(--p)':'var(--b)'};background:${LANG==='en'?'var(--pl)':'#f8fafc'};cursor:pointer;text-align:center;transition:all 0.15s;">
+        <div style="font-size:20px;margin-bottom:4px;">🇬🇧</div>
+        <div style="font-size:12px;font-weight:700;color:${LANG==='en'?'var(--p)':'var(--t)'};">English</div>
+        ${LANG==='en'?'<div style="font-size:10px;font-weight:700;color:var(--p);margin-top:3px;">✓ ACTIVE</div>':''}
+      </div>
+      <div onclick="setLang('mk')" style="flex:1;padding:12px;border-radius:10px;border:2px solid ${LANG==='mk'?'var(--p)':'var(--b)'};background:${LANG==='mk'?'var(--pl)':'#f8fafc'};cursor:pointer;text-align:center;transition:all 0.15s;">
+        <div style="font-size:20px;margin-bottom:4px;">🇲🇰</div>
+        <div style="font-size:12px;font-weight:700;color:${LANG==='mk'?'var(--p)':'var(--t)'};">Македонски</div>
+        ${LANG==='mk'?'<div style="font-size:10px;font-weight:700;color:var(--p);margin-top:3px;">✓ АКТИВЕН</div>':''}
+      </div>
+    </div>
+  </div>
 
   <!-- Model selector -->
   <div style="background:#fff;border-radius:14px;overflow:hidden;margin-bottom:10px;box-shadow:0 1px 4px rgba(0,0,0,0.05);">
@@ -2150,297 +2323,22 @@ function saveProfileKey(type){
   renderProfile();alert('✓ Saved!');
 }
 
-// ══════════════════════════════════════════════════
-// ── WEEKLY MARKET REPORTS ─────────────────────────
-
-let weeklyReports = [];
-
-function loadReports(){
-  weeklyReports = LS.get('st_reports') || [];
-}
-function saveReports(){
-  LS.set('st_reports', weeklyReports.slice(0,20));
-  if(FB_ACTIVE && USER_ID) fbWrite(userPath('reports'),{reports:weeklyReports.slice(0,20),updatedAt:Date.now()}).catch(()=>{});
-}
-
-function renderReportsList(){
-  loadReports();
-  const sidebar = document.getElementById('rp-sidebar');
-  const content = document.getElementById('rp-content');
-  if(!sidebar || !content) return;
-
-  if(!weeklyReports.length){
-    sidebar.innerHTML = '<div style="padding:16px;font-size:11px;color:#94a3b8;line-height:1.6;">No reports yet.<br><br>Generate your first report after US market close on Friday.</div>';
-    content.innerHTML = `
-      <div style="max-width:560px;margin:40px auto;text-align:center;">
-        <div style="font-size:48px;margin-bottom:16px;">📊</div>
-        <div style="font-size:20px;font-weight:800;color:var(--t);margin-bottom:8px;">Weekly Market Post-Mortem</div>
-        <div style="font-size:13px;color:var(--t3);line-height:1.7;margin-bottom:24px;">Get a professional weekly analysis of the market — including your portfolio health check, top movers, macro events, and the week ahead outlook.<br><br>Best used every Friday after 4:00 PM EST.</div>
-        ${CK?`<button onclick="generateWeeklyReport()" style="background:linear-gradient(135deg,var(--p),var(--pd));border:none;color:#fff;padding:14px 28px;border-radius:14px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;box-shadow:0 4px 14px rgba(99,102,241,0.35);">📊 Generate First Report</button>`
-        :`<div style="background:#f0f4ff;border-radius:12px;padding:14px 18px;font-size:12px;color:#6366f1;font-weight:600;">Add your Claude API key in Profile to generate reports</div>`}
-      </div>`;
-    return;
-  }
-
-  // Sidebar
-  sidebar.innerHTML = weeklyReports.map((r,i)=>`
-    <div onclick="showReport(${i})" style="padding:12px 14px;border-bottom:1px solid #f1f5f9;cursor:pointer;background:${i===0?'var(--pl)':'#fff'};transition:background 0.15s;" onmouseover="this.style.background='var(--pl)'" onmouseout="this.style.background='${i===0?'var(--pl)':'#fff'}'">
-      <div style="font-size:11px;font-weight:700;color:var(--t);">Week of ${r.weekOf}</div>
-      <div style="font-size:10px;color:var(--t3);margin-top:2px;">${r.date}</div>
-    </div>`).join('');
-
-  showReport(0);
-}
-
-function showReport(idx){
-  const r = weeklyReports[idx];
-  if(!r) return;
-  const content = document.getElementById('rp-content');
-  if(!content) return;
-
-  content.innerHTML = `
-    <div style="max-width:820px;margin:0 auto;">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px;">
-        <div>
-          <div style="font-size:20px;font-weight:800;color:var(--t);">📊 Weekly Market Post-Mortem</div>
-          <div style="font-size:12px;color:var(--t3);margin-top:4px;">Week of ${r.weekOf} · Generated ${r.date}</div>
-        </div>
-        <button onclick="deleteReport(${idx})" style="background:#fee2e2;border:none;color:var(--r);font-size:11px;font-weight:700;padding:7px 12px;border-radius:9px;cursor:pointer;font-family:inherit;">🗑 Delete</button>
-      </div>
-      <div class="rp-body">${parseMarkdown(r.content)}</div>
-    </div>`;
-
-  // Highlight sidebar selection
-  document.querySelectorAll('#rp-sidebar > div').forEach((el,i)=>{
-    el.style.background = i===idx ? 'var(--pl)' : '#fff';
-  });
-}
-
-function deleteReport(idx){
-  if(!confirm('Delete this report?')) return;
-  weeklyReports.splice(idx,1);
-  saveReports();
-  renderReportsList();
-}
-
-async function generateWeeklyReport(){
-  if(!CK||!CK.startsWith('sk-ant')){
-    alert('Claude API key required. Add it in Profile → Claude AI Analysis.');
-    return;
-  }
-  const btn = document.getElementById('gen-report-btn');
-  btn.disabled = true;
-  btn.innerHTML = `<span style="display:inline-block;animation:spin 1s linear infinite">⟳</span> Generating...`;
-
-  const content = document.getElementById('rp-content');
-  if(content) content.innerHTML = `
-    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:300px;gap:16px;">
-      <div style="width:48px;height:48px;border-radius:50%;border:3px solid var(--pl);border-top-color:var(--p);animation:spin 0.8s linear infinite"></div>
-      <div style="font-size:13px;font-weight:600;color:var(--t3);">Analyzing this week's market data...</div>
-      <div style="font-size:11px;color:var(--t4);">This takes 20–40 seconds</div>
-    </div>`;
-
-  // Build portfolio context
-  const portTickers = PORTFOLIOS.flatMap(p=>p.positions.map(x=>x.ticker));
-  const portContext = PORTFOLIOS.map(p=>`${p.name}: ${p.positions.map(x=>`${x.ticker}(${x.shares}sh@$${x.cost})`).join(', ')}`).join(' | ');
-  const watchContext = WATCH.map(w=>w.ticker).join(', ');
-  const today = new Date();
-  const weekOf = today.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
-
-  const prompt = `You are a Senior Quantitative Analyst and Market Strategist. Generate a comprehensive 'Weekly Market Post-Mortem' report for the week ending ${weekOf}.
-
-User's Portfolio Holdings: ${portContext || 'No positions yet'}
-Watchlist Tickers: ${watchContext || 'None'}
-All Portfolio Tickers: ${portTickers.join(', ') || 'None'}
-
-Use web search to get current, accurate data for this week. Structure your report EXACTLY as follows using Markdown:
-
-# 📈 Weekly Market Post-Mortem — Week of ${weekOf}
-
-## 1. Market Pulse
-- High-level summary of this week's price action
-- Dominant narrative (e.g., "Tech-led rally", "Inflation fears", "Rate uncertainty")
-- S&P 500, Nasdaq, Dow Jones, Russell 2000 weekly performance (% change)
-- Best and worst performing GICS sectors this week
-
-## 2. 🏆 Top Performers
-- 3–4 high-performing stocks from the broader US market this week
-- Why each moved (earnings beat, product launch, upgrade, M&A, etc.)
-
-## 3. 💼 Portfolio Health Check
-${portTickers.length ? `Analyze each of these tickers: ${portTickers.join(', ')}
-- Weekly performance vs their sector
-- Any notable news, technical signals (RSI, MA crossovers), or analyst actions
-- Flag any concerns or standout performers` : '- No portfolio positions to analyze yet'}
-
-## 4. 🔭 The Week Ahead
-- Key upcoming catalysts (earnings, economic data, Fed speakers, geopolitical)
-- **Bullish scenario** for S&P 500 and what would trigger it
-- **Bearish scenario** for S&P 500 and what would trigger it
-
-## 5. 📐 Key Technical Levels
-- 2–3 critical price levels for S&P 500 and/or Nasdaq to watch next week
-- What each level means for trend direction
-
----
-*Report generated by Stockr AI · ${weekOf}*
-
-Keep the report concise, data-driven, and professional. Use bullet points. Include specific numbers and percentages wherever possible.`;
-
-  try{
-    const res = await fetch('https://api.anthropic.com/v1/messages',{
-      method:'POST',
-      headers:{
-        'Content-Type':'application/json',
-        'x-api-key':CK,
-        'anthropic-version':'2023-06-01',
-        'anthropic-dangerous-direct-browser-access':'true'
-      },
-      body:JSON.stringify({
-        model:CLAUDE_MODEL,
-        max_tokens:4000,
-        tools:[{type:'web_search_20250305',name:'web_search'}],
-        messages:[{role:'user',content:prompt}]
-      })
-    });
-    const data = await res.json();
-    console.log('Report API response:', data);
-    if(!res.ok || data.error) throw new Error(data.error?.message || `API error ${res.status}`);
-    if(!data.content) throw new Error('Empty response from Claude. Check your API key in Profile.');
-    const text = (data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('\n');
-    if(!text) throw new Error('No text in response. The report may have been blocked.');
-
-    const report = {
-      id:'rp_'+Date.now(),
-      weekOf,
-      date: today.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}),
-      content: text
-    };
-    loadReports();
-    weeklyReports.unshift(report);
-    saveReports();
-    renderReportsList();
-  }catch(e){
-    if(content) content.innerHTML=`<div style="padding:20px;background:#fef2f2;border-radius:12px;color:var(--r);font-weight:600;">Error generating report: ${e.message}</div>`;
-  }finally{
-    btn.disabled=false;
-    btn.innerHTML=`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg> Generate Report`;
-  }
-}
-
-// Simple markdown parser for report display
-function parseMarkdown(md){
-  return md
-    .replace(/^# (.+)$/gm,'<h1 style="font-size:22px;font-weight:800;color:var(--t);margin:0 0 16px;padding-bottom:10px;border-bottom:2px solid var(--pl);">$1</h1>')
-    .replace(/^## (.+)$/gm,'<h2 style="font-size:16px;font-weight:800;color:var(--p);margin:24px 0 10px;">$1</h2>')
-    .replace(/^### (.+)$/gm,'<h3 style="font-size:14px;font-weight:700;color:var(--t);margin:16px 0 8px;">$1</h3>')
-    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
-    .replace(/\*(.+?)\*/g,'<em>$1</em>')
-    .replace(/^---$/gm,'<hr style="border:none;border-top:1px solid var(--b);margin:20px 0;">')
-    .replace(/^\* (.+)$/gm,'<li style="margin-bottom:5px;line-height:1.6;">$1</li>')
-    .replace(/^- (.+)$/gm,'<li style="margin-bottom:5px;line-height:1.6;">$1</li>')
-    .replace(/(<li[^>]*>.*<\/li>\n?)+/g,'<ul style="margin:8px 0 12px 18px;">$&</ul>')
-    .replace(/\n\n/g,'</p><p style="margin-bottom:10px;line-height:1.7;">')
-    .replace(/^(?!<[h|u|l|h|p|<])/gm,'')
-    .trim();
-}
 
 function showErr(id,msg){const e=document.getElementById(id);if(!e)return;e.style.display=msg?'block':'none';e.textContent=msg||'';}
-
-function ST(t){
-  ['c','p','w','rp','pr'].forEach(x=>{
-    const el=document.getElementById(x==='c'?'ct':x==='pr'?'prt':x==='rp'?'rpt':x+'t');
-    if(el)el.style.display=x===t?'flex':'none';
-    const tb=document.getElementById('tb'+x);if(tb)tb.className='tb'+(x===t?' on':'');
-  });
-  const navMap={c:'bnic',p:'bnip',w:'bniw',rp:'bnirp',pr:'bnipr'};
-  Object.values(navMap).forEach(id=>{const el=document.getElementById(id);if(el)el.classList.remove('on');});
-  const activeNav=document.getElementById(navMap[t]);if(activeNav)activeNav.classList.add('on');
-  if(t!=='p'){const b=document.getElementById('mob-analyze-bar');if(b)b.remove();}
-  const fab=document.querySelector('.mob-fab');
-  const wfab=document.querySelector('.mob-wfab');
-  if(fab){fab.style.display=t==='p'?'flex':'none';}
-  if(wfab){wfab.style.display=t==='w'?'flex':'none';}
-  if(t==='p'){renderPortSwitcher();renderPORT();if((activePort()?.positions||[]).length)refresh('p');}
-  if(t==='w'){renderWATCH();if(WATCH.length)refresh('w');}
-  if(t==='pr'){document.getElementById('prt').style.display='flex';renderProfile();}
-  if(t==='rp'){document.getElementById('rpt').style.display='flex';renderReportsList();}
-}
-
-// ── HELPERS ──
-function showDepositBreakdown(){
-  const port=activePort();
-  if(!port)return;
-  const pos=port.positions||[];
-  const total=pos.reduce((s,p)=>s+p.shares*p.cost,0);
-  if(!pos.length)return;
-  // Sort largest deposit first
-  const sorted=[...pos].sort((a,b)=>b.shares*b.cost-a.shares*a.cost);
-  let rows='';
-  sorted.forEach((p,i)=>{
-    const dep=p.shares*p.cost;
-    const pct=total>0?(dep/total*100).toFixed(1):0;
-    const col=COLS[i%COLS.length];
-    const barW=total>0?Math.max(4,(dep/total*100)):0;
-    rows+=`<div style="display:flex;flex-direction:column;gap:4px;padding:10px 0;border-bottom:1px solid #f1f5f9">
-      <div style="display:flex;align-items:center;justify-content:space-between">
-        <div style="display:flex;align-items:center;gap:8px">
-          <div style="width:10px;height:10px;border-radius:50%;background:${col};flex-shrink:0"></div>
-          <div style="font-weight:700;font-size:13px;color:#1e293b">${p.ticker}</div>
-          <div style="font-size:10px;color:#94a3b8">${p.shares} sh @ $${p.cost}</div>
-        </div>
-        <div style="text-align:right">
-          <div style="font-weight:700;font-size:13px;color:#4f46e5">$${dep.toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
-          <div style="font-size:10px;color:#94a3b8">${pct}%</div>
-        </div>
-      </div>
-      <div style="height:4px;background:#eef2ff;border-radius:4px;overflow:hidden">
-        <div style="height:100%;width:${barW}%;background:${col};border-radius:4px;transition:width 0.4s ease"></div>
-      </div>
-    </div>`;
-  });
-  const modal=document.createElement('div');
-  modal.style.cssText='position:fixed;inset:0;background:rgba(15,23,42,0.55);z-index:9999;display:flex;align-items:flex-end;justify-content:center';
-  modal.innerHTML=`
-    <div style="background:#fff;border-radius:20px 20px 0 0;width:100%;max-width:480px;max-height:80vh;display:flex;flex-direction:column;padding:0 0 env(safe-area-inset-bottom,0)">
-      <div style="padding:18px 18px 10px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between">
-        <div>
-          <div style="font-size:11px;font-weight:700;color:#6366f1;letter-spacing:2px">DEPOSIT BREAKDOWN</div>
-          <div style="font-size:18px;font-weight:800;color:#1e293b;margin-top:2px">$${total.toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
-          <div style="font-size:10px;color:#94a3b8;margin-top:1px">${port.name} · ${pos.length} position${pos.length!==1?'s':''}</div>
-        </div>
-        <button onclick="this.closest('[style*=fixed]').remove()" style="background:#f1f5f9;border:none;border-radius:50%;width:32px;height:32px;font-size:16px;cursor:pointer;color:#64748b">✕</button>
-      </div>
-      <div style="overflow-y:auto;padding:0 18px 18px">${rows}</div>
-    </div>`;
-  modal.addEventListener('click',e=>{if(e.target===modal)modal.remove();});
-  document.body.appendChild(modal);
-}
-
-function anzAll(){
-  const p=activePort();if(!p)return;
-  ST('c');setTimeout(()=>doSend(`Analyze my "${p.name}" portfolio — CURRENT prices. Score each position 1-10, hold/trim/add recs, suggest 1-2 new stocks.`),150);
-}
-function anzOne(t){ST('c');setTimeout(()=>doSend(`Deep analysis on ${t} — current price, news, fundamentals, analyst targets. BUY/HOLD/SELL with confidence %.`),150);}
-function anzWatchAll(){
-  if(!WATCH.length)return;
-  ST('c');setTimeout(()=>doSend(`Analyze watchlist: ${WATCH.map(w=>w.ticker).join(', ')}. Current prices & news. BUY/HOLD/SELL each, then BEST OPPORTUNITY.`),150);
-}
 function toggleSB(){document.getElementById('sb').classList.toggle('open');document.getElementById('overlay').classList.toggle('show');}
 function closeSB(){document.getElementById('sb').classList.remove('open');document.getElementById('overlay').classList.remove('show');}
 
 // ── BOOT ──
 document.addEventListener('DOMContentLoaded',async()=>{
-  // Load saved model preference
   CLAUDE_MODEL=LS.get('st_model')||'claude-sonnet-4-5';
-  // Try to restore auth session from localStorage
+  LANG=LS.get('st_lang')||'en';
+  applyLang();
   const saved=LS.get('st_auth');
   if(saved?.uid&&saved?.email){
     USER_ID=saved.uid;USER_EMAIL=saved.email;IS_GUEST=false;FB_ACTIVE=true;
     await startApp();
     return;
   }
-  // No saved session — show login screen
   document.getElementById('auth-screen').style.display='flex';
 });
 </script>
