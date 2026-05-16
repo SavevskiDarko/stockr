@@ -386,6 +386,7 @@ input,button,select{font-family:'Montserrat',sans-serif;}
 
 @media(max-width:899px){
   #rp-sidebar{display:none;}
+  #rp-mobile-selector{display:block!important;}
   #rpt .pbar,#rpt [style*="border-bottom"]{flex-shrink:0;}
   #rp-content{padding:14px;}
   .rp-body h1{font-size:17px;}
@@ -735,6 +736,8 @@ input,button,select{font-family:'Montserrat',sans-serif;}
         Generate Report
       </button>
     </div>
+    <!-- Mobile report selector (hidden on desktop) -->
+    <div id="rp-mobile-selector" style="display:none;background:#fff;border-bottom:1px solid var(--b);padding:10px 14px;flex-shrink:0;"></div>
     <!-- Report list + content -->
     <div style="display:flex;flex:1;min-height:0;overflow:hidden;">
       <!-- Sidebar: past reports -->
@@ -1978,6 +1981,20 @@ function renderReportsList(){
       <div style="font-size:11px;font-weight:700;color:var(--t);">${t('week_of')} ${r.weekOf}</div>
       <div style="font-size:10px;color:var(--t3);margin-top:2px;">${r.date}</div>
     </div>`).join('');
+
+  // Mobile selector — dropdown to switch between reports
+  const mobileSel=document.getElementById('rp-mobile-selector');
+  if(mobileSel&&weeklyReports.length>1){
+    mobileSel.innerHTML=`<div style="display:flex;align-items:center;gap:8px;">
+      <div style="font-size:10px;font-weight:700;color:var(--t3);letter-spacing:1px;white-space:nowrap;">${t('week_of').toUpperCase()}</div>
+      <select onchange="showReport(parseInt(this.value))" style="flex:1;background:#f8fafc;border:1.5px solid var(--b);color:var(--t);padding:8px 10px;font-size:12px;font-weight:600;border-radius:10px;font-family:inherit;cursor:pointer;">
+        ${weeklyReports.map((r,i)=>`<option value="${i}">${r.weekOf}</option>`).join('')}
+      </select>
+    </div>`;
+  }else if(mobileSel){
+    mobileSel.innerHTML='';
+  }
+
   showReport(0);
 }
 
