@@ -1673,15 +1673,20 @@ const YAHOO_SUFFIXES=['.L','.AS','.PA','.DE','.MI','.MC','.ST','.OL','.SW','.HE'
 
 // Try Yahoo Finance URL directly, then via CORS proxies
 async function yahooFetch(symbol){
-  const url=`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=1d`;
-  const proxies=[
-    u=>u,
-    u=>`https://corsproxy.io/?${encodeURIComponent(u)}`,
-    u=>`https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+  const enc=encodeURIComponent(symbol);
+  // Multiple Yahoo endpoints + CORS proxies that work from Cloudflare origins
+  const attempts=[
+    // Direct (works on some networks)
+    `https://query1.finance.yahoo.com/v8/finance/chart/${enc}?interval=1d&range=1d`,
+    `https://query2.finance.yahoo.com/v8/finance/chart/${enc}?interval=1d&range=1d`,
+    // Working CORS proxies
+    `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${enc}?interval=1d&range=1d`)}`,
+    `https://thingproxy.freeboard.io/fetch/https://query1.finance.yahoo.com/v8/finance/chart/${enc}?interval=1d&range=1d`,
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://query2.finance.yahoo.com/v8/finance/chart/${enc}?interval=1d&range=1d`)}`,
   ];
-  for(const wrap of proxies){
+  for(const url of attempts){
     try{
-      const r=await fetch(wrap(url),{signal:AbortSignal.timeout(7000)});
+      const r=await fetch(url,{signal:AbortSignal.timeout(8000)});
       if(!r.ok)continue;
       const d=await r.json();
       if(d?.chart?.result?.[0]?.meta?.regularMarketPrice)return d;
