@@ -1278,7 +1278,8 @@ async function startApp(){
   window.addEventListener('resize',()=>{
     clearTimeout(resizeTimer);
     resizeTimer=setTimeout(()=>{
-      // Don't re-render portfolio if user is editing a position (mobile keyboard resize)
+      // Skip re-render if keyboard opened due to a focused input in a sheet or edit panel
+      if(document.body.hasAttribute('data-sheet-open'))return;
       const isEditing=document.getElementById('pscr')?.hasAttribute('data-editing');
       const t=document.querySelector('.tb.on')?.id?.replace('tb','');
       if(t==='p'&&!isEditing){renderPortSwitcher();renderPORT();}
@@ -2007,8 +2008,15 @@ async function doSend(ov){
 }
 
 // ── TABS ──
-function openPortSheet(){document.getElementById('port-sheet-overlay').classList.add('open');setTimeout(()=>document.getElementById('mob-ft')?.focus(),300);}
-function closePortSheet(){document.getElementById('port-sheet-overlay').classList.remove('open');}
+function openPortSheet(){
+  document.getElementById('port-sheet-overlay').classList.add('open');
+  document.body.setAttribute('data-sheet-open','port');
+  setTimeout(()=>document.getElementById('mob-ft')?.focus(),400);
+}
+function closePortSheet(){
+  document.getElementById('port-sheet-overlay').classList.remove('open');
+  document.body.removeAttribute('data-sheet-open');
+}
 function mobAddP(){
   const t=(document.getElementById('mob-ft').value||'').trim().toUpperCase();
   const s=parseFloat(document.getElementById('mob-fs').value);
@@ -2022,8 +2030,15 @@ function mobAddP(){
   document.getElementById('mob-ft').value='';document.getElementById('mob-fs').value='';document.getElementById('mob-fc').value='';
   closePortSheet();
 }
-function openWatchSheet(){document.getElementById('watch-sheet-overlay').classList.add('open');setTimeout(()=>document.getElementById('mob-wt')?.focus(),300);}
-function closeWatchSheet(){document.getElementById('watch-sheet-overlay').classList.remove('open');}
+function openWatchSheet(){
+  document.getElementById('watch-sheet-overlay').classList.add('open');
+  document.body.setAttribute('data-sheet-open','watch');
+  setTimeout(()=>document.getElementById('mob-wt')?.focus(),400);
+}
+function closeWatchSheet(){
+  document.getElementById('watch-sheet-overlay').classList.remove('open');
+  document.body.removeAttribute('data-sheet-open');
+}
 function mobAddW(){
   const t=(document.getElementById('mob-wt').value||'').trim().toUpperCase();
   const n=(document.getElementById('mob-wn').value||'').trim();
