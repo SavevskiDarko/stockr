@@ -2252,22 +2252,37 @@ Key reason for bias in one sentence.
     if(!text)throw new Error('No response from Claude.');
 
     // Parse key trading values from the report
-    const biasMatch=text.match(/Trading Bias[:\s*]+\**\s*(BULLISH|BEARISH|NEUTRAL)/i);
-    const entryMatch=text.match(/Entry Zone[:\s]+\$?([\d.]+)\s*[–-]\s*\$?([\d.]+)/i);
-    const stopMatch=text.match(/Stop Loss[:\s]+\$?([\d.]+)/i);
-    const target1Match=text.match(/Target 1[:\s]+\$?([\d.]+)/i);
-    const actionMatch=text.match(/\*\*Action[:\*\s]+([A-Z]+)/);
+    // Flexible parsing — Claude uses various formats like **Entry Zone:** $X–$Y or Entry Zone: $X - $Y
+    const biasMatch=text.match(/(?:Trading\s+Bias|Bias)[^\n]*?(BULLISH|BEARISH|NEUTRAL)/i);
+    const entryMatch=text.match(/Entry\s+Zone[^$\d]*\$?([\d,.]+)\s*[–—\-–]+\s*\$?([\d,.]+)/i)
+      || text.match(/Entry[^$\d]*\$?([\d,.]+)\s*[–—\-–]+\s*\$?([\d,.]+)/i);
+    const stopMatch=text.match(/Stop\s+Loss[^$\d]*\$?([\d,.]+)/i)
+      || text.match(/Hard\s+[Ss]top[^$\d]*\$?([\d,.]+)/i);
+    const target1Match=text.match(/Target\s+1[^$\d]*\$?([\d,.]+)/i)
+      || text.match(/Target\s+1[^:]*:\s*\$?([\d,.]+)/i);
+    const actionMatch=text.match(/\*\*Action[*:\s]+([A-Z]+)/i)
+      || text.match(/\bAction\b[:\s*]+([A-Z]+)/i)
+      || text.match(/(?:^|\n)\*\*([A-Z]+)\*\*\s*(?:—|-|:)/m);
     
+    const cleanNum=s=>s?.replace(/,/g,'')||'';
+    const bias=biasMatch?(biasMatch[1].toUpperCase().includes('BULL')?'BUY':biasMatch[1].toUpperCase().includes('BEAR')?'SELL':'NEUTRAL')
+      :(text.match(/\bBULLISH\b/i)?'BUY':text.match(/\bBEARISH\b/i)?'SELL':'NEUTRAL');
+    // Determine action from multiple sources
+    let action='HOLD';
+    if(actionMatch)action=actionMatch[1].toUpperCase();
+    else if(text.match(/\bVerdict[^A-Z]*(BUY|SELL|HOLD|AVOID)\b/i))action=text.match(/\bVerdict[^A-Z]*(BUY|SELL|HOLD|AVOID)\b/i)[1].toUpperCase();
+    else action=bias==='BUY'?'BUY':bias==='SELL'?'SELL':'HOLD';
+
     const prediction={
       id:'dt_'+Date.now(),
       ticker,
       date:new Date().toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'}),
       dateKey:new Date().toDateString(),
-      bias:biasMatch?biasMatch[1].includes('BULL')?'BUY':biasMatch[1].includes('BEAR')?'SELL':'NEUTRAL':'NEUTRAL',
-      entryZone:entryMatch?`$${entryMatch[1]}–$${entryMatch[2]}`:'—',
-      stopLoss:stopMatch?`$${stopMatch[1]}`:'—',
-      target:target1Match?`$${target1Match[1]}`:'—',
-      action:actionMatch?actionMatch[1]:'HOLD',
+      bias,
+      entryZone:entryMatch?`$${cleanNum(entryMatch[1])}–$${cleanNum(entryMatch[2])}`:'—',
+      stopLoss:stopMatch?`$${cleanNum(stopMatch[1])}`:'—',
+      target:target1Match?`$${cleanNum(target1Match[1])}`:'—',
+      action,
       priceAtAnalysis:priceData?.c||null,
       content:text,
       verified:false,
