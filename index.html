@@ -1245,7 +1245,6 @@ async function launch(){
 
   // Save any manually-entered keys right away
   if(ck){CK=ck;LS.set('st_ck',CK);}
-  if(fk){FK=fk;LS.set('st_fk',FK);}
 
   // --- Firebase first: connect and pull ALL data (including saved API keys) ---
   if(fbpid&&fbkey){
@@ -1272,9 +1271,6 @@ async function launch(){
     showErr('setup-err','Claude key must start with sk-ant-api03-… If you have Firebase set up, your key may already be stored there — just enter your Firebase credentials and leave the API key blank.');
     btn.disabled=false;btn.textContent='🚀 Launch Stockr';
     return;
-  }
-  if(!FK||FK.length<10){
-
   }
 
   document.getElementById('setup').classList.add('hide');
@@ -2140,31 +2136,36 @@ function saveTCache(){localStorage.setItem('st_ticker_cache',JSON.stringify(TICK
 const YAHOO_SUFFIXES=['.L','.AS','.PA','.DE','.MI','.MC','.ST','.OL','.SW','.HE','.CO','.BR','.LS','.VI','.F','.BE','.SG'];
 
 // Try Yahoo Finance URL directly, then via CORS proxies
+// Set this to your Cloudflare Worker URL after deploying yahoo-proxy-worker.js
+// Example: 'https://yahoo-proxy.YOUR-SUBDOMAIN.workers.dev'
+const YAHOO_PROXY = '';
+
 async function yahooFetch(symbol){
   const enc=encodeURIComponent(symbol);
   const base1=`https://query1.finance.yahoo.com/v8/finance/chart/${enc}?interval=1d&range=1d`;
   const base2=`https://query2.finance.yahoo.com/v8/finance/chart/${enc}?interval=1d&range=1d`;
 
   const isHttps=location.protocol==='https:';
-  const attempts=isHttps?[
-    // Proxy 1: codetabs (reliable, no rate limit issues)
-    `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(base1)}`,
-    // Proxy 2: allorigins with query2
-    `https://api.allorigins.win/raw?url=${encodeURIComponent(base2)}`,
-    // Proxy 3: corsproxy.org (different from corsproxy.io)
-    `https://corsproxy.org/?url=${encodeURIComponent(base1)}`,
-    // Proxy 4: htmldriven
-    `https://proxy.cors.sh/${base1}`,
-  ]:[
-    base1,
-    base2,
-    `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(base1)}`,
-    `https://api.allorigins.win/raw?url=${encodeURIComponent(base2)}`,
-  ];
+  const attempts=[];
+
+  // Your own Cloudflare Worker proxy — fastest, no CORS issues, always works
+  if(YAHOO_PROXY) attempts.push(`${YAHOO_PROXY}?t=${enc}`);
+
+  if(isHttps){
+    // Public proxies as fallback (may fail occasionally)
+    attempts.push(
+      `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(base1)}`,
+      `https://api.allorigins.win/raw?url=${encodeURIComponent(base2)}`,
+      `https://api.allorigins.win/raw?url=${encodeURIComponent(base1)}`,
+    );
+  } else {
+    // localhost — try direct first
+    attempts.unshift(base1, base2);
+  }
 
   for(const url of attempts){
     try{
-      const r=await fetch(url,{signal:AbortSignal.timeout(8000)});
+      const r=await fetch(url,{signal:AbortSignal.timeout(9000)});
       if(!r.ok)continue;
       const d=await r.json();
       if(d?.chart?.result?.[0]?.meta?.regularMarketPrice)return d;
@@ -3160,7 +3161,7 @@ function renderProfile(){
   const el=document.getElementById('profile-content');if(!el)return;
   const avatar=USER_EMAIL?USER_EMAIL[0].toUpperCase():'G';
   const ckOk=CK&&CK.startsWith('sk-ant');
-  const fkOk=FK&&FK.length>8;
+  const fkOk=false; // Finnhub removed — Yahoo Finance used automatically
   const fbOk=FB_ACTIVE;
   el.innerHTML=`
   <div style="background:#fff;border-radius:16px;padding:18px;margin-bottom:12px;box-shadow:0 1px 4px rgba(0,0,0,0.06);">
