@@ -304,7 +304,7 @@ input,button,select{font-family:'Montserrat',sans-serif;}
 
   /* Sticky analyze bar above bottom nav */
   .mob-analyze-bar{
-    display:flex;position:fixed;
+    display:none;position:fixed;
     bottom:calc(60px + env(safe-area-inset-bottom,0px));
     left:0;right:0;
     padding:8px 14px;
@@ -313,6 +313,7 @@ input,button,select{font-family:'Montserrat',sans-serif;}
     border-top:1px solid #e2e8f0;
     z-index:49;gap:8px;
   }
+  .mob-analyze-bar.visible{display:flex;}
   .mob-analyze-bar .abig{margin:0;flex:1;padding:11px;font-size:12px;border-radius:12px;box-shadow:none;}
   /* ⋯ tab options menu */
   .tab-menu-overlay{position:fixed;inset:0;z-index:150;}
@@ -837,10 +838,9 @@ input,button,select{font-family:'Montserrat',sans-serif;}
 // ── PRE-CONFIGURED CREDENTIALS (shared for all users) ──
 const APP_FB_PID='stockr-app-65c0e';
 const APP_FB_KEY='AIzaSyBOgX2B9euy64XMO7gBfHWvWctN74Wt2Tc';
-const APP_FK='d7udv7pr01qnv95n8q0gd7udv7pr01qnv95n8q10';
 
 let FB_PID=APP_FB_PID, FB_KEY=APP_FB_KEY, FB_ACTIVE=false;
-let CK='', FK=APP_FK;
+let CK='';
 let CLAUDE_MODEL='claude-sonnet-4-5';
 
 const CLAUDE_MODELS=[
@@ -896,7 +896,7 @@ const TRANSLATIONS = {
     reset_password:'🔑 Reset Password', sign_out:'↩ Sign out',
     services:'SERVICES',
     claude_ai:'Claude AI Analysis', claude_on:'Connected — AI analysis enabled', claude_off:'Add your key to enable AI analysis',
-    prices_service:'Real-Time Prices', prices_sub:'Finnhub + Yahoo Finance — pre-configured ✓',
+    prices_service:'Real-Time Prices', prices_sub:'Yahoo Finance — free real-time prices ✓',
     firebase_service:'Firebase Sync', firebase_on:'Syncing as', firebase_off:'Sign in to enable sync',
     claude_key_label:'ANTHROPIC API KEY', claude_key_hint:'Get your key at console.anthropic.com. ~$0.01–0.03 per analysis.',
     update_key:'Update Key', connect_claude:'Connect Claude AI',
@@ -1150,7 +1150,7 @@ async function manualSync(){
 
 async function pushAllToFirebase(){
   const p=userPath;
-  await fbWrite(p('config'),{claudeKey:CK,finnhubKey:FK,updatedAt:Date.now()});
+  await fbWrite(p('config'),{claudeKey:CK,updatedAt:Date.now()});
   await fbWrite(p('portfolios'),{portfolios:PORTFOLIOS,updatedAt:Date.now()});
   await fbWrite(p('watchlist'),{watchlist:WATCH,updatedAt:Date.now()});
   const toSave=sessions.slice(0,30).map(s=>({...s,msgs:(s.msgs||[]).slice(-60)}));
@@ -1162,7 +1162,6 @@ async function pullFromFirebase(){
   const cfg=await fbRead(p('config'));
   if(cfg){
     if(cfg.claudeKey&&!CK){CK=cfg.claudeKey;LS.set('st_ck',CK);}
-    if(cfg.finnhubKey&&!FK){FK=cfg.finnhubKey;LS.set('st_fk',FK);}
   }
   const portData=await fbRead(p('portfolios'));
   if(portData?.portfolios?.length){
@@ -1275,9 +1274,7 @@ async function launch(){
     return;
   }
   if(!FK||FK.length<10){
-    showErr('setup-err','Finnhub API key is required. Get a free key at finnhub.io/register');
-    btn.disabled=false;btn.textContent='🚀 Launch Stockr';
-    return;
+
   }
 
   document.getElementById('setup').classList.add('hide');
@@ -1647,7 +1644,7 @@ function renderPORT(){
   if(existingBar)existingBar.remove();
   if(!isDesktop&&pos.length){
     const bar=document.createElement('div');
-    bar.id='mob-analyze-bar';bar.className='mob-analyze-bar';
+    bar.id='mob-analyze-bar';bar.className='mob-analyze-bar visible';
     bar.innerHTML=`<button class="abig" onclick="anzAll()" style="margin:0;flex:1;padding:11px;font-size:12px;border-radius:12px;box-shadow:none;">🔍 Analyze ${port.name}</button>`;
     document.body.appendChild(bar);
   }
@@ -2185,32 +2182,21 @@ async function fetchPrice(t){
   if(resolved&&resolved!==t){
     const r=await fetchYahoo(resolved);
     if(r)return r;
-    delete TICKER_CACHE[t];saveTCache(); // stale cache, re-probe
+    delete TICKER_CACHE[t];saveTCache();
   }
 
-  // Ticker already has exchange suffix → Yahoo only
+  // Ticker already has exchange suffix → go straight to Yahoo
   if(t.includes('.')){
     const r=await fetchYahoo(t);
     if(r){TICKER_CACHE[t]=t;saveTCache();}
     return r;
   }
 
-  // Try Finnhub first — fast, no CORS issues, great for all US stocks (only if key is set)
-  if(FK&&FK.length>8){
-    try{
-      const r=await fetch(`https://finnhub.io/api/v1/quote?symbol=${t}&token=${FK}`,{signal:AbortSignal.timeout(7000)});
-      if(r.ok){
-        const d=await r.json();
-        if(d.c&&d.c>0){TICKER_CACHE[t]=t;saveTCache();return{c:d.c,d:d.d,dp:d.dp,h:d.h,l:d.l,pc:d.pc,src:'finnhub',currency:'USD'};}
-      }
-    }catch{}
-  }
-
-  // Finnhub returned nothing → try Yahoo as-is (META, SPY etc. work here too)
+  // Try Yahoo as-is first (US stocks: AAPL, META, SPY etc.)
   const direct=await fetchYahoo(t);
   if(direct){TICKER_CACHE[t]=t;saveTCache();return direct;}
 
-  // Try exchange suffixes (VUAA → VUAA.L, etc.)
+  // Try exchange suffixes for European stocks (VUAA → VUAA.L etc.)
   for(const sfx of YAHOO_SUFFIXES){
     const r=await fetchYahoo(t+sfx);
     if(r){TICKER_CACHE[t]=t+sfx;saveTCache();return r;}
@@ -2570,72 +2556,85 @@ async function generateDailyReport(){
   const portCtx=portPos?`In portfolio: ${portPos.shares} shares @ avg $${portPos.cost}`:'Not in portfolio';
 
   const today=new Date().toLocaleDateString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
-  const prompt=`You are an expert day trader and technical analyst. Generate a comprehensive DAILY TRADING PREP report for ${ticker} for ${today}.
+  // Build learning context from past predictions for this ticker
+  loadDailyPredictions();
+  const pastForTicker=dailyPredictions.filter(p=>p.ticker===ticker).slice(0,10);
+  const verifiedPast=pastForTicker.filter(p=>p.verified);
+  const accuracy=verifiedPast.length>0?Math.round(verifiedPast.filter(p=>p.correct).length/verifiedPast.length*100):null;
 
-Market Data Context: ${priceCtx}
+  const learningCtx=pastForTicker.length>0?`
+PAST ANALYSES FOR ${ticker} (${pastForTicker.length} total, ${verifiedPast.length} verified):
+${pastForTicker.map((p,i)=>`[${i+1}] ${p.date} | Bias:${p.bias} Action:${p.action} Entry:${p.entryZone} Stop:${p.stopLoss} Target:${p.target}
+  ${p.verified?`OUTCOME:${p.correct?'✓ CORRECT':'✗ WRONG'} close:$${p.actualClose?.toFixed(2)||'?'}`:'OUTCOME:Not verified'}
+  Excerpt:${(p.content||'').replace(/[#*`]/g,'').slice(0,200)}...`).join('\n')}
+${accuracy!==null?`YOUR ACCURACY ON ${ticker}: ${accuracy}% (${verifiedPast.filter(p=>p.correct).length}/${verifiedPast.length} correct)`:''}
+`:`No previous analyses for ${ticker} — establishing baseline.`;
+
+  const prompt=`You are an Adaptive Day Trading AI with memory. You learn from your past predictions and improve accuracy over time.
+
+TODAY: ${today} | TICKER: ${ticker}
+Market Data: ${priceCtx}
 Portfolio Context: ${portCtx}
 
-Use web search to get:
-- Latest price, pre-market data if available
-- Recent news and catalysts (last 24-48 hours)
-- Current technical indicators
-- Analyst sentiment
+${learningCtx}
 
-Generate this EXACT report structure:
+INSTRUCTIONS: Use web search for current price, news, and technicals. ${pastForTicker.length>0?'CRITICAL: Start with learning from your past — what worked, what failed, what to adjust today.':''}
 
 # ⚡ Daily Trading Prep: ${ticker} — ${today}
 
-## 📊 Market Snapshot
-- Current/Last price, pre-market change if available
-- Today's opening range context
-- Volume analysis (above/below average?)
-- 52-week range context: where is price sitting?
+${pastForTicker.length>0?`## 🔁 Learning From Past Analyses
+- Your accuracy on ${ticker}: ${accuracy!==null?accuracy+'%':'unverified so far'}
+- What patterns have worked/failed for ${ticker} specifically based on the history above?
+- What was wrong in the last prediction and why?
+- **Today's adjusted approach based on history:**
+
+`:''}## 📊 Market Snapshot
+- Current price, pre-market change if available
+- Volume vs average
+- 52-week range position
 
 ## 🎯 Trading Bias: [BULLISH / BEARISH / NEUTRAL]
-State your clear directional bias for TODAY with confidence level (High/Medium/Low).
-Key reason for bias in one sentence.
+Confidence: High/Medium/Low — one sentence reason.
 
 ## 📐 Key Price Levels
-| Level | Price | Significance |
-|-------|-------|-------------|
-| Strong Resistance | $X.XX | [why] |
-| Near Resistance | $X.XX | [why] |
+| Level | Price | Why It Matters |
+|-------|-------|---------------|
+| Strong Resistance | $X.XX | [reason] |
+| Near Resistance | $X.XX | [reason] |
 | Current Price | $X.XX | — |
-| Near Support | $X.XX | [why] |
-| Strong Support | $X.XX | [why] |
+| Near Support | $X.XX | [reason] |
+| Strong Support | $X.XX | [reason] |
 
 ## ⚡ Trade Setup
 **Direction:** BUY / SELL / HOLD
-**Entry Zone:** $X.XX – $X.XX (be specific)
-**Stop Loss:** $X.XX (hard stop — exit if breached)
-**Target 1:** $X.XX (conservative — ${Math.round(Math.random()*3+2)}% move)
-**Target 2:** $X.XX (extended — ${Math.round(Math.random()*5+4)}% move)
-**Risk/Reward Ratio:** X:1
-**Position Sizing Suggestion:** [e.g., "Risk max 1-2% of portfolio on this trade"]
+**Entry Zone:** $X.XX – $X.XX
+**Stop Loss:** $X.XX
+**Target 1:** $X.XX (conservative)
+**Target 2:** $X.XX (extended)
+**Risk/Reward:** X:1
 
-## 📰 Catalysts & News
-- List 2-3 key recent news items or catalysts affecting ${ticker} today
-- Flag any upcoming events (earnings, FDA decisions, Fed speakers, economic data) this week
+## 📰 Key Catalysts Today
+- News last 24-48h affecting ${ticker}
+- Upcoming events this week
 
 ## 📈 Technical Analysis
-- RSI (14): [value] — [overbought/oversold/neutral]
-- Moving Averages: Is price above/below 20MA, 50MA, 200MA?
-- MACD: Bullish/Bearish crossover? Momentum direction?
-- Key pattern forming? (breakout, flag, wedge, double top/bottom, etc.)
+- RSI(14): [value] — overbought/oversold/neutral
+- vs 20MA, 50MA, 200MA
+- MACD direction, key pattern
 
 ## ⚠️ Risk Factors
-- 2-3 specific risks that could invalidate this setup today
-- What would make you AVOID this trade?
+- What invalidates this setup?
+- ${pastForTicker.length>0?'Any recurring mistake from your history on this ticker?':'Main downside scenario?'}
 
-## 🏁 Today's Verdict
-**Action:** [BUY / SELL / HOLD / AVOID]
-**Confidence:** [High / Medium / Low]
-**Best entry time:** [e.g., "Wait for market open + 15 min", "Pre-market pullback to $X"]
-**One-line summary:** [Your single most important insight about ${ticker} today]
+## 🏁 Verdict
+**Action:** BUY / SELL / HOLD / AVOID
+**Confidence:** High / Medium / Low
+**Best entry:** [specific timing or trigger]
+**One-line summary:** [single most important insight for today]
 
 ---
-*Stockr Daily Prep · ${today} · ${ticker}*
-*⚠️ This is AI analysis for educational purposes. Always do your own research. Past performance does not guarantee future results.*`;
+*Stockr Adaptive Daily · ${today} · ${ticker} · ${pastForTicker.length} past analyses · ${accuracy!==null?accuracy+'% accuracy on this ticker':'no verified data yet'}*
+*⚠️ Educational only — not financial advice.*`;
 
   try{
     const res=await fetch('https://api.anthropic.com/v1/messages',{
@@ -2996,7 +2995,8 @@ function ST(t){
   const navMap={c:'bnic',p:'bnip',w:'bniw',rp:'bnirp',dt:'bnidt',pr:'bnipr'};
   Object.values(navMap).forEach(id=>{const el=document.getElementById(id);if(el)el.classList.remove('on');});
   const activeNav=document.getElementById(navMap[t]);if(activeNav)activeNav.classList.add('on');
-  if(t!=='p'){const b=document.getElementById('mob-analyze-bar');if(b)b.remove();}
+  if(t!=='p'){const b=document.getElementById('mob-analyze-bar');if(b)b.classList.remove('visible');}
+  if(t==='p'){const b=document.getElementById('mob-analyze-bar');if(b)b.classList.add('visible');}
   const histBtn=document.querySelector('.hist-btn');
   const isMobile=window.innerWidth<900;
   if(histBtn)histBtn.style.display=t==='c'&&isMobile?'flex':'none';
@@ -3115,9 +3115,9 @@ async function authResetPassword(emailOverride){
 async function setAuthState(){} // no-op, kept for compatibility
 
 function clearAllLocalData(){
-  LS.del('st_ck');LS.del('st_fk');LS.del('st_portfolios');LS.del('st_watch');
+  LS.del('st_ck');LS.del('st_portfolios');LS.del('st_watch');
   LS.del('st_sessions');LS.del('st_active_port');LS.del('st_ticker_cache');LS.del('st_auth');
-  CK='';FK=APP_FK;PORTFOLIOS=[];WATCH=[];sessions=[];curId=null;MSGS=[];PC={};ACTIVE_PORT_ID='';
+  CK='';PORTFOLIOS=[];WATCH=[];sessions=[];curId=null;MSGS=[];PC={};ACTIVE_PORT_ID='';
 }
 
 function authLogout(){
@@ -3246,7 +3246,7 @@ function renderProfile(){
   </div>
   <div style="background:#fff;border-radius:14px;padding:14px 16px;margin-bottom:10px;box-shadow:0 1px 4px rgba(0,0,0,0.05);display:flex;align-items:center;gap:12px;">
     <div style="width:36px;height:36px;border-radius:10px;background:#ecfdf5;border:1px solid #a7f3d0;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">📈</div>
-    <div style="flex:1;"><div style="font-size:13px;font-weight:700;color:var(--t);">Real-Time Prices</div><div style="font-size:11px;color:#10b981;margin-top:1px;">Finnhub + Yahoo Finance — pre-configured ✓</div></div>
+    <div style="flex:1;"><div style="font-size:13px;font-weight:700;color:var(--t);">Real-Time Prices</div><div style="font-size:11px;color:#10b981;margin-top:1px;">Yahoo Finance — free real-time prices ✓</div></div>
     <div style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;background:#dcfce7;color:#047857;">ON</div>
   </div>
   <div style="background:#fff;border-radius:14px;padding:14px 16px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,0.05);display:flex;align-items:center;gap:12px;">
@@ -3281,12 +3281,8 @@ function saveProfileKey(type){
     const val=(document.getElementById('prof-ck').value||'').trim();
     if(!val.startsWith('sk-ant')){toastError('Claude key must start with sk-ant-...');return;}
     CK=val;LS.set('st_ck',CK);
-  }else{
-    const val=(document.getElementById('prof-fk').value||'').trim();
-    if(!val){toastError('Please enter a Finnhub key.');return;}
-    FK=val;LS.set('st_fk',FK);
   }
-  if(FB_ACTIVE)fbWrite(userPath('config'),{claudeKey:CK,finnhubKey:FK,updatedAt:Date.now()}).catch(e=>console.warn('FB:',e?.message||e));
+  if(FB_ACTIVE)fbWrite(userPath('config'),{claudeKey:CK,updatedAt:Date.now()}).catch(e=>console.warn('FB:',e?.message||e));
   renderProfile();toastSuccess('Saved!');
 }
 
