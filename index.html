@@ -2145,16 +2145,18 @@ async function yahooFetch(symbol){
   const base1=`https://query1.finance.yahoo.com/v8/finance/chart/${enc}?interval=1d&range=1d`;
   const base2=`https://query2.finance.yahoo.com/v8/finance/chart/${enc}?interval=1d&range=1d`;
 
-  // On HTTPS deployments (Cloudflare, Netlify) direct Yahoo is blocked by CORS
-  // Go straight to proxies — they relay the request server-side
   const isHttps=location.protocol==='https:';
   const attempts=isHttps?[
+    // Proxy 1: codetabs (reliable, no rate limit issues)
     `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(base1)}`,
+    // Proxy 2: allorigins with query2
     `https://api.allorigins.win/raw?url=${encodeURIComponent(base2)}`,
-    `https://thingproxy.freeboard.io/fetch/${base1}`,
-    `https://corsproxy.io/?${encodeURIComponent(base2)}`,
+    // Proxy 3: corsproxy.org (different from corsproxy.io)
+    `https://corsproxy.org/?url=${encodeURIComponent(base1)}`,
+    // Proxy 4: htmldriven
+    `https://proxy.cors.sh/${base1}`,
   ]:[
-    base1, // direct works on localhost/file://
+    base1,
     base2,
     `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(base1)}`,
     `https://api.allorigins.win/raw?url=${encodeURIComponent(base2)}`,
