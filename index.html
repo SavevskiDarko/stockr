@@ -732,7 +732,10 @@ input,button,select{font-family:'Montserrat',sans-serif;}
       <div class="port-switcher" id="port-switcher"></div>
       <div class="pbar">
         <div class="pbar-ts" id="p-ts">${t('prices_not_loaded')}</div>
-        <button class="rbtn" id="p-rb" onclick="refresh('p')"><span class="ri">↻</span> Refresh</button>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <button onclick="exportPortfolioCSV()" class="rbtn" style="background:none;border:1px solid var(--b);color:var(--t3);font-size:10px;" title="Export CSV">⬇ CSV</button>
+          <button class="rbtn" id="p-rb" onclick="refresh('p')"><span class="ri">↻</span> Refresh</button>
+        </div>
       </div>
       <div class="pt-center-scr" id="pscr"></div>
     </div>
@@ -1703,6 +1706,12 @@ function renderPORT(){
     document.getElementById('pscr-right').innerHTML='';
   }
 
+
+  // Render portfolio chart after DOM paint
+  setTimeout(()=>{
+    PORTFOLIOS.forEach(p=>renderPortfolioMiniChart(p.id,`port-chart-${p.id}`));
+  },50);
+
   // Restore edit panel if one was open before re-render
   const editingIdx=document.getElementById('pscr')?.getAttribute('data-editing');
   if(editingIdx!==null&&editingIdx!==''){
@@ -2091,6 +2100,7 @@ function renderWATCH(){
         </div>
         <div class="wacts">
           <button class="wab" onclick="anzOne('${w.ticker}')">${t('deep_analysis')}</button>
+          <button class="wab" onclick="showAlertsModal('${w.ticker}')" style="background:#fffbeb;color:#b45309;border-color:#fde68a;">🔔 Alert</button>
           <button class="wdel" onclick="delW(${i})">${t('remove')}</button>
         </div>
       </div>`;
@@ -3012,8 +3022,13 @@ function showAuthMode(mode){
   document.getElementById('auth-login-tab').style.cssText=isReg?off:on;
   document.getElementById('auth-reg-tab').style.cssText=isReg?on:off;
   document.getElementById('auth-mode-label').textContent=isReg?'CREATE YOUR ACCOUNT':'SIGN IN TO YOUR ACCOUNT';
-  document.getElementById('auth-submit-btn').textContent=isReg?'Create Account':'Sign In';
+  document.getElementById('auth-submit-btn').textContent=isReg?t('auth_register'):t('auth_signin');
   document.getElementById('auth-submit-btn').onclick=isReg?authRegister:authLogin;
+  // Show/hide confirm password field
+  const cl=document.getElementById('auth-confirm-lbl');
+  const cf=document.getElementById('auth-confirm');
+  if(cl)cl.style.display=isReg?'block':'none';
+  if(cf){cf.style.display=isReg?'block':'none';cf.value='';}
 }
 function authSubmit(){const btn=document.getElementById('auth-submit-btn');if(btn.textContent==='Create Account')authRegister();else authLogin();}
 
@@ -3294,7 +3309,25 @@ document.addEventListener('DOMContentLoaded',async()=>{
     await startApp();
     return;
   }
+  // Show login screen
   document.getElementById('auth-screen').style.display='flex';
+  // Auto-trigger biometric if registered
+  const bio=LS.get('st_biometric');
+  if(bio?.credId&&window.PublicKeyCredential){
+    const bioBtn=document.createElement('button');
+    bioBtn.id='bio-auto-btn';
+    bioBtn.style.cssText='width:100%;background:linear-gradient(135deg,#1e293b,#334155);border:none;color:#fff;padding:15px;border-radius:14px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:10px;display:flex;align-items:center;justify-content:center;gap:10px;';
+    bioBtn.innerHTML='🔐 Sign in with Face ID / Fingerprint';
+    bioBtn.onclick=async()=>{
+      bioBtn.disabled=true;
+      bioBtn.innerHTML='<span style="display:inline-block;animation:spin 0.8s linear infinite">⟳</span> Verifying...';
+      const ok=await loginWithBiometric();
+      if(!ok){bioBtn.disabled=false;bioBtn.innerHTML='🔐 Sign in with Face ID / Fingerprint';}
+    };
+    document.querySelector('#auth-screen .sc')?.appendChild(bioBtn);
+    // Auto-trigger after short delay so UI renders first
+    setTimeout(()=>bioBtn.click(),700);
+  }
 });
 </script>
 <div id="toast-container"></div>
