@@ -843,6 +843,7 @@ const APP_FK='d7udv7pr01qnv95n8q0gd7udv7pr01qnv95n8q10';
 
 let FB_PID=APP_FB_PID, FB_KEY=APP_FB_KEY, FB_ACTIVE=false;
 let CK='', FK=APP_FK;
+let T212_KEY=LS.get('st_t212')||'';
 let CLAUDE_MODEL='claude-sonnet-4-5';
 
 const CLAUDE_MODELS=[
@@ -1975,6 +1976,133 @@ function showDailyHistorySheet(){
   </div>`;
   modal.addEventListener('click',e=>{if(e.target===modal)modal.remove();});
   document.body.appendChild(modal);
+}
+
+
+// ══════════════════════════════════════════════════
+// ── TRADING 212 INTEGRATION ───────────────────────
+
+let T212_KEY = '';
+
+function t212Ticker(raw){
+  // Convert "AAPL_US_EQ" → "AAPL", "VUAA_EQ" → "VUAA", "AIR_PA_EQ" → "AIR.PA"
+  if(!raw) return raw;
+  let t = raw.replace(/_EQ$/, '').replace(/_US$/, '');
+  // Exchange suffix handling: _PA → .PA, _AS → .AS, _L → .L, etc.
+  const exchMap = {_PA:'.PA',_AS:'.AS',_DE:'.DE',_MI:'.MI',_MC:'.MC',_L:'.L',
+                   _ST:'.ST',_OL:'.OL',_SW:'.SW',_HE:'.HE',_CO:'.CO',_BR:'.BR'};
+  for(const [k,v] of Object.entries(exchMap)){
+    if(t.endsWith(k)){return t.slice(0,-k.length)+v;}
+  }
+  return t;
+}
+
+async function fetchT212Positions(){
+  if(!T212_KEY){toastError('Add your Trading 212 API key in Profile first.');return null;}
+  const base = 'https://live.trading212.com';
+  try{
+    const r = await fetch(`${base}/api/v0/equity/positions`,{
+      headers:{'Authorization': T212_KEY},
+      signal: AbortSignal.timeout(12000)
+    });
+    if(r.status===401){toastError('Trading 212: Invalid API key.');return null;}
+    if(r.status===429){toastError('Trading 212: Rate limit hit. Try again in a moment.');return null;}
+    if(!r.ok){toastError('Trading 212 error: '+r.status);return null;}
+    return await r.json();
+  }catch(e){
+    if(e.message.includes('CORS')||e.message.includes('Failed to fetch')){
+      toastError('Trading 212 API blocked by CORS. Try the Cloudflare Worker solution.');
+    } else {
+      toastError('Trading 212 connection failed: '+e.message);
+    }
+    return null;
+  }
+}
+
+async function importFromT212(){
+  const btn=document.getElementById('t212-import-btn');
+  if(btn){btn.disabled=true;btn.textContent='⟳ Importing...';}
+  const positions = await fetchT212Positions();
+  if(btn){btn.disabled=false;btn.textContent='⬇ Import Positions';}
+  if(!positions||!positions.length){
+    if(positions&&!positions.length) toastWarning('Trading 212: No open positions found.');
+    return;
+  }
+
+  // Map T212 positions to Stockr format
+  const mapped = positions.map(p=>({
+    ticker: t212Ticker(p.ticker || p.instrument?.ticker),
+    shares: parseFloat((p.quantity||0).toFixed(6)),
+    cost: parseFloat((p.averagePricePaid||0).toFixed(4)),
+  })).filter(p=>p.ticker&&p.shares>0&&p.cost>0);
+
+  // Also update price cache from T212's live prices
+  positions.forEach(p=>{
+    const tk = t212Ticker(p.ticker || p.instrument?.ticker);
+    if(p.currentPrice&&p.currentPrice>0){
+      const c=p.currentPrice, pc=p.averagePricePaid||c;
+      PC[tk]={c,d:c-pc,dp:pc>0?((c-pc)/pc)*100:0,h:c,l:c,pc,src:'t212',
+              currency:p.instrument?.currency||'USD'};
+    }
+  });
+
+  // Ask user: create new portfolio or update existing?
+  const port = activePort();
+  const choice = confirm(
+    `Trading 212: Found ${mapped.length} positions.\n\n` +
+    `• OK = Import into "${port?.name||'current portfolio'}"\n` +
+    `• Cancel = Create a new "Trading 212" portfolio`
+  );
+
+  if(choice && port){
+    // Merge into current portfolio
+    mapped.forEach(p=>{
+      const existing = port.positions.findIndex(x=>x.ticker===p.ticker);
+      if(existing>=0) port.positions[existing]={...p};
+      else port.positions.push(p);
+    });
+    toastSuccess(`✓ Updated ${mapped.length} positions in "${port.name}"`);
+  } else {
+    // Create new portfolio
+    const newPort={id:'p_t212_'+Date.now(),name:'Trading 212',positions:mapped};
+    PORTFOLIOS.push(newPort);
+    ACTIVE_PORT_ID=newPort.id;
+    toastSuccess(`✓ Created "Trading 212" portfolio with ${mapped.length} positions`);
+  }
+
+  saveLocal();
+  if(FB_ACTIVE) fbWrite(userPath('portfolios'),{portfolios:PORTFOLIOS,updatedAt:Date.now()}).catch(()=>{});
+  renderPortSwitcher();
+  renderPORT();
+  ST('p');
+}
+
+async function syncT212Prices(){
+  if(!T212_KEY) return;
+  const positions = await fetchT212Positions();
+  if(!positions) return;
+  let updated=0;
+  positions.forEach(p=>{
+    const tk=t212Ticker(p.ticker||p.instrument?.ticker);
+    if(p.currentPrice&&p.currentPrice>0){
+      const c=p.currentPrice,pc=p.averagePricePaid||c;
+      PC[tk]={c,d:c-pc,dp:pc>0?((c-pc)/pc)*100:0,h:c,l:c,pc,src:'t212',
+              currency:p.instrument?.currency||'USD'};
+      updated++;
+    }
+  });
+  if(updated>0){renderPORT();renderWATCH();toastSuccess(`✓ Prices updated from Trading 212 (${updated} stocks)`);}
+}
+
+function saveT212Key(){
+  const val=(document.getElementById('prof-t212')?.value||'').trim();
+  if(!val){toastError('Please enter your Trading 212 API key.');return;}
+  T212_KEY=val;LS.set('st_t212',T212_KEY);
+  renderProfile();toastSuccess('Trading 212 connected!');
+}
+function removeT212Key(){
+  T212_KEY='';LS.del('st_t212');
+  renderProfile();toastSuccess('Trading 212 disconnected.');
 }
 
 function mobileRenamePort(){
@@ -3140,7 +3268,7 @@ async function setAuthState(){} // no-op, kept for compatibility
 function clearAllLocalData(){
   LS.del('st_ck');LS.del('st_portfolios');LS.del('st_watch');
   LS.del('st_sessions');LS.del('st_active_port');LS.del('st_ticker_cache');LS.del('st_auth');
-  CK='';FK=APP_FK;PORTFOLIOS=[];WATCH=[];sessions=[];curId=null;MSGS=[];PC={};ACTIVE_PORT_ID='';
+  CK='';FK=APP_FK;T212_KEY='';PORTFOLIOS=[];WATCH=[];sessions=[];curId=null;MSGS=[];PC={};ACTIVE_PORT_ID='';
 }
 
 function authLogout(){
@@ -3277,7 +3405,22 @@ function renderProfile(){
     <div style="flex:1;"><div style="font-size:13px;font-weight:700;color:var(--t);">Firebase Sync</div><div style="font-size:11px;color:${fbOk?'#10b981':'#94a3b8'};margin-top:1px;">${fbOk?`Syncing as ${USER_EMAIL}`:'Sign in to enable sync'}</div></div>
     <div style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;background:${fbOk?'#dcfce7':'#f1f5f9'};color:${fbOk?'#047857':'#94a3b8'};">${fbOk?'ON':'OFF'}</div>
   </div>
-  ${IS_GUEST?`<button onclick="document.getElementById('app').style.display='none';document.getElementById('auth-screen').style.display='flex';" style="width:100%;background:linear-gradient(135deg,var(--p),var(--pd));border:none;color:#fff;padding:14px;border-radius:14px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;box-shadow:0 4px 14px rgba(99,102,241,0.35);">Sign in / Create Account</button>`:''}`;
+  ${IS_GUEST?`<button onclick="document.getElementById('app').style.display='none';document.getElementById('auth-screen').style.display='flex';" style="width:100%;background:linear-gradient(135deg,var(--p),var(--pd));border:none;color:#fff;padding:14px;border-radius:14px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;box-shadow:0 4px 14px rgba(99,102,241,0.35);">Sign in / Create Account</button>`:''}
+
+  <div style="font-size:10px;font-weight:700;color:var(--t3);letter-spacing:2px;margin:14px 2px 8px;">BROKER INTEGRATION</div>
+  ${serviceCard('t212-panel','📱','Trading 212',T212_KEY?'Connected — import & sync enabled':'Connect to import your real portfolio',!!T212_KEY,'ON','OFF',\`
+    <div style="font-size:10px;font-weight:700;color:var(--p);letter-spacing:2px;margin-bottom:6px;">API KEY</div>
+    <input class="mob-finp" id="prof-t212" type="password" placeholder="Your Trading 212 API key..." value="${T212_KEY||''}" style="margin-bottom:8px;display:block;">
+    <div style="font-size:11px;color:var(--t4);margin-bottom:12px;line-height:1.6;">Get your key: <strong>Trading 212 app → Settings → API (Beta) → Generate API key</strong><br>Enable Portfolio and Account data permissions.</div>
+    <div style="display:flex;gap:8px;margin-bottom:8px;">
+      <button onclick="saveT212Key()" class="mob-add-btn" style="font-size:12px;padding:11px;flex:1;">${T212_KEY?'Update Key':'Connect T212'}</button>
+      ${T212_KEY?\`<button onclick="removeT212Key()" style="background:#fee2e2;border:none;color:var(--r);font-size:12px;font-weight:700;padding:11px 14px;border-radius:12px;cursor:pointer;font-family:inherit;">Remove</button>\`:''}
+    </div>
+    ${T212_KEY?\`<div style="display:flex;gap:8px;">
+      <button id="t212-import-btn" onclick="importFromT212()" style="flex:1;background:linear-gradient(135deg,#10b981,#059669);border:none;color:#fff;font-size:12px;font-weight:700;padding:11px;border-radius:12px;cursor:pointer;font-family:inherit;">⬇ Import Positions</button>
+      <button onclick="syncT212Prices()" style="flex:1;background:#f0f4ff;border:none;color:var(--p);font-size:12px;font-weight:700;padding:11px;border-radius:12px;cursor:pointer;font-family:inherit;">🔄 Sync Prices</button>
+    </div>\`:''}
+  \`)}`;
 }
 
 function serviceCard(panelId,icon,title,subtitle,on,onLabel,offLabel,panelContent){
@@ -3317,6 +3460,7 @@ function closeSB(){document.getElementById('sb').classList.remove('open');docume
 // ── BOOT ──
 document.addEventListener('DOMContentLoaded',async()=>{
   CLAUDE_MODEL=LS.get('st_model')||'claude-sonnet-4-5';
+  T212_KEY=LS.get('st_t212')||'';
   BASE_CURRENCY=LS.get('st_currency')||'USD';
   const savedDark=LS.get('st_dark');if(savedDark)applyDarkMode(true);
   await fetchFXRates();
