@@ -839,8 +839,10 @@ input,button,select{font-family:'Montserrat',sans-serif;}
 const APP_FB_PID='stockr-app-65c0e';
 const APP_FB_KEY='AIzaSyBOgX2B9euy64XMO7gBfHWvWctN74Wt2Tc';
 
+const APP_FK='d7udv7pr01qnv95n8q0gd7udv7pr01qnv95n8q10';
+
 let FB_PID=APP_FB_PID, FB_KEY=APP_FB_KEY, FB_ACTIVE=false;
-let CK='';
+let CK='', FK=APP_FK;
 let CLAUDE_MODEL='claude-sonnet-4-5';
 
 const CLAUDE_MODELS=[
@@ -1150,7 +1152,7 @@ async function manualSync(){
 
 async function pushAllToFirebase(){
   const p=userPath;
-  await fbWrite(p('config'),{claudeKey:CK,updatedAt:Date.now()});
+  await fbWrite(p('config'),{claudeKey:CK,finnhubKey:FK,updatedAt:Date.now()});
   await fbWrite(p('portfolios'),{portfolios:PORTFOLIOS,updatedAt:Date.now()});
   await fbWrite(p('watchlist'),{watchlist:WATCH,updatedAt:Date.now()});
   const toSave=sessions.slice(0,30).map(s=>({...s,msgs:(s.msgs||[]).slice(-60)}));
@@ -1162,6 +1164,7 @@ async function pullFromFirebase(){
   const cfg=await fbRead(p('config'));
   if(cfg){
     if(cfg.claudeKey&&!CK){CK=cfg.claudeKey;LS.set('st_ck',CK);}
+    if(cfg.finnhubKey&&cfg.finnhubKey!==FK){FK=cfg.finnhubKey;}
   }
   const portData=await fbRead(p('portfolios'));
   if(portData?.portfolios?.length){
@@ -2196,14 +2199,23 @@ async function fetchPrice(t){
     delete TICKER_CACHE[t];saveTCache();
   }
 
-  // Ticker already has exchange suffix → go straight to Yahoo
+  // Ticker already has exchange suffix → Yahoo only
   if(t.includes('.')){
     const r=await fetchYahoo(t);
     if(r){TICKER_CACHE[t]=t;saveTCache();}
     return r;
   }
 
-  // Try Yahoo as-is first (US stocks: AAPL, META, SPY etc.)
+  // Try Finnhub first — fast, reliable for US stocks
+  try{
+    const r=await fetch(`https://finnhub.io/api/v1/quote?symbol=${t}&token=${FK}`,{signal:AbortSignal.timeout(7000)});
+    if(r.ok){
+      const d=await r.json();
+      if(d.c&&d.c>0){TICKER_CACHE[t]=t;saveTCache();return{c:d.c,d:d.d,dp:d.dp,h:d.h,l:d.l,pc:d.pc,src:'finnhub',currency:'USD'};}
+    }
+  }catch{}
+
+  // Finnhub returned nothing → try Yahoo as-is
   const direct=await fetchYahoo(t);
   if(direct){TICKER_CACHE[t]=t;saveTCache();return direct;}
 
@@ -3128,7 +3140,7 @@ async function setAuthState(){} // no-op, kept for compatibility
 function clearAllLocalData(){
   LS.del('st_ck');LS.del('st_portfolios');LS.del('st_watch');
   LS.del('st_sessions');LS.del('st_active_port');LS.del('st_ticker_cache');LS.del('st_auth');
-  CK='';PORTFOLIOS=[];WATCH=[];sessions=[];curId=null;MSGS=[];PC={};ACTIVE_PORT_ID='';
+  CK='';FK=APP_FK;PORTFOLIOS=[];WATCH=[];sessions=[];curId=null;MSGS=[];PC={};ACTIVE_PORT_ID='';
 }
 
 function authLogout(){
@@ -3161,7 +3173,7 @@ function renderProfile(){
   const el=document.getElementById('profile-content');if(!el)return;
   const avatar=USER_EMAIL?USER_EMAIL[0].toUpperCase():'G';
   const ckOk=CK&&CK.startsWith('sk-ant');
-  const fkOk=false; // Finnhub removed — Yahoo Finance used automatically
+  const fkOk=FK&&FK.length>8;
   const fbOk=FB_ACTIVE;
   el.innerHTML=`
   <div style="background:#fff;border-radius:16px;padding:18px;margin-bottom:12px;box-shadow:0 1px 4px rgba(0,0,0,0.06);">
@@ -3293,7 +3305,7 @@ function saveProfileKey(type){
     if(!val.startsWith('sk-ant')){toastError('Claude key must start with sk-ant-...');return;}
     CK=val;LS.set('st_ck',CK);
   }
-  if(FB_ACTIVE)fbWrite(userPath('config'),{claudeKey:CK,updatedAt:Date.now()}).catch(e=>console.warn('FB:',e?.message||e));
+  if(FB_ACTIVE)fbWrite(userPath('config'),{claudeKey:CK,finnhubKey:FK,updatedAt:Date.now()}).catch(e=>console.warn('FB:',e?.message||e));
   renderProfile();toastSuccess('Saved!');
 }
 
