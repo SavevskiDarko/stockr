@@ -551,7 +551,9 @@ input,button,select{font-family:'Montserrat',sans-serif;}
 [data-theme="dark"] .qbtn{background:#1e293b;border-color:#334155;color:#94a3b8;}
 </style>
 </head>
+
 <body>
+
 
 <!-- SETUP -->
 <div id="auth-screen">
@@ -1982,7 +1984,6 @@ function showDailyHistorySheet(){
 // ══════════════════════════════════════════════════
 // ── TRADING 212 INTEGRATION ───────────────────────
 
-let T212_KEY = '';
 
 function t212Ticker(raw){
   // Convert "AAPL_US_EQ" → "AAPL", "VUAA_EQ" → "VUAA", "AIR_PA_EQ" → "AIR.PA"
@@ -2717,7 +2718,7 @@ async function generateDailyReport(){
 PAST ANALYSES FOR ${ticker} (${pastForTicker.length} total, ${verifiedPast.length} verified):
 ${pastForTicker.map((p,i)=>`[${i+1}] ${p.date} | Bias:${p.bias} Action:${p.action} Entry:${p.entryZone} Stop:${p.stopLoss} Target:${p.target}
   ${p.verified?`OUTCOME:${p.correct?'✓ CORRECT':'✗ WRONG'} close:$${p.actualClose?.toFixed(2)||'?'}`:'OUTCOME:Not verified'}
-  Excerpt:${(p.content||'').replace(/[#*`]/g,'').slice(0,200)}...`).join('\n')}
+  Excerpt:${(p.content||'').replace(/[#*\x60]/g,'').slice(0,200)}...`).join('\n')}
 ${accuracy!==null?`YOUR ACCURACY ON ${ticker}: ${accuracy}% (${verifiedPast.filter(p=>p.correct).length}/${verifiedPast.length} correct)`:''}
 `:`No previous analyses for ${ticker} — establishing baseline.`;
 
@@ -3301,7 +3302,6 @@ function renderProfile(){
   const el=document.getElementById('profile-content');if(!el)return;
   const avatar=USER_EMAIL?USER_EMAIL[0].toUpperCase():'G';
   const ckOk=CK&&CK.startsWith('sk-ant');
-  const fkOk=FK&&FK.length>8;
   const fbOk=FB_ACTIVE;
   el.innerHTML=`
   <div style="background:#fff;border-radius:16px;padding:18px;margin-bottom:12px;box-shadow:0 1px 4px rgba(0,0,0,0.06);">
