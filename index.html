@@ -16,7 +16,7 @@
 
 <link rel="manifest" href="manifest.json">
 <script>
-if('serviceWorker' in navigator){
+if('serviceWorker' in navigator && !location.hostname.includes('claudeusercontent')){
   window.addEventListener('load',()=>{
     navigator.serviceWorker.register('./sw.js').then(reg=>{
       // Check for updates every time the app gets focus
@@ -2022,60 +2022,48 @@ async function fetchT212Positions(){
 
 async function importFromT212(){
   const btn=document.getElementById('t212-import-btn');
-  if(btn){btn.disabled=true;btn.textContent='⟳ Importing...';}
-  const positions = await fetchT212Positions();
+  if(btn){btn.disabled=true;btn.textContent='⟳ Fetching...';}
+  const positions=await fetchT212Positions();
   if(btn){btn.disabled=false;btn.textContent='⬇ Import Positions';}
-  if(!positions||!positions.length){
-    if(positions&&!positions.length) toastWarning('Trading 212: No open positions found.');
-    return;
-  }
+  if(!positions)return;
+  if(!positions.length){toastWarning('Trading 212: No open positions found.');return;}
 
-  // Map T212 positions to Stockr format
-  const mapped = positions.map(p=>({
-    ticker: t212Ticker(p.ticker || p.instrument?.ticker),
-    shares: parseFloat((p.quantity||0).toFixed(6)),
-    cost: parseFloat((p.averagePricePaid||0).toFixed(4)),
+  const mapped=positions.map(p=>({
+    ticker:t212Ticker(p.ticker||p.instrument?.ticker||''),
+    shares:parseFloat((p.quantity||0).toFixed(6)),
+    cost:parseFloat((p.averagePricePaid||0).toFixed(4)),
   })).filter(p=>p.ticker&&p.shares>0&&p.cost>0);
 
-  // Also update price cache from T212's live prices
+  if(!mapped.length){toastWarning('No valid positions found to import.');return;}
+
+  let pricesUpdated=0;
   positions.forEach(p=>{
-    const tk = t212Ticker(p.ticker || p.instrument?.ticker);
+    const tk=t212Ticker(p.ticker||p.instrument?.ticker||'');
     if(p.currentPrice&&p.currentPrice>0){
-      const c=p.currentPrice, pc=p.averagePricePaid||c;
-      PC[tk]={c,d:c-pc,dp:pc>0?((c-pc)/pc)*100:0,h:c,l:c,pc,src:'t212',
-              currency:p.instrument?.currency||'USD'};
+      const c=p.currentPrice,pc=p.averagePricePaid||c;
+      PC[tk]={c,d:c-pc,dp:pc>0?((c-pc)/pc)*100:0,h:c,l:c,pc,src:'t212',currency:p.instrument?.currency||'USD'};
+      pricesUpdated++;
     }
   });
 
-  // Ask user: create new portfolio or update existing?
-  const port = activePort();
-  const choice = confirm(
-    `Trading 212: Found ${mapped.length} positions.\n\n` +
-    `• OK = Import into "${port?.name||'current portfolio'}"\n` +
-    `• Cancel = Create a new "Trading 212" portfolio`
-  );
+  const port=activePort();
+  const choice=confirm('Trading 212: Found '+mapped.length+' positions.\n\n• OK = Import into "'+( port?.name||'current portfolio')+'"\n• Cancel = Create new "Trading 212" portfolio');
 
-  if(choice && port){
-    // Merge into current portfolio
+  if(choice&&port){
     mapped.forEach(p=>{
-      const existing = port.positions.findIndex(x=>x.ticker===p.ticker);
-      if(existing>=0) port.positions[existing]={...p};
-      else port.positions.push(p);
+      const idx=port.positions.findIndex(x=>x.ticker===p.ticker);
+      if(idx>=0)port.positions[idx]={...p};else port.positions.push(p);
     });
-    toastSuccess(`✓ Updated ${mapped.length} positions in "${port.name}"`);
-  } else {
-    // Create new portfolio
+    toastSuccess('✓ Imported '+mapped.length+' positions ('+pricesUpdated+' prices updated)');
+  }else{
     const newPort={id:'p_t212_'+Date.now(),name:'Trading 212',positions:mapped};
-    PORTFOLIOS.push(newPort);
-    ACTIVE_PORT_ID=newPort.id;
-    toastSuccess(`✓ Created "Trading 212" portfolio with ${mapped.length} positions`);
+    PORTFOLIOS.push(newPort);ACTIVE_PORT_ID=newPort.id;
+    toastSuccess('✓ Created "Trading 212" portfolio with '+mapped.length+' positions');
   }
 
   saveLocal();
-  if(FB_ACTIVE) fbWrite(userPath('portfolios'),{portfolios:PORTFOLIOS,updatedAt:Date.now()}).catch(()=>{});
-  renderPortSwitcher();
-  renderPORT();
-  ST('p');
+  if(FB_ACTIVE)fbWrite(userPath('portfolios'),{portfolios:PORTFOLIOS,updatedAt:Date.now()}).catch(()=>{});
+  renderPortSwitcher();renderPORT();ST('p');
 }
 
 async function syncT212Prices(){
@@ -2098,8 +2086,21 @@ async function syncT212Prices(){
 function saveT212Key(){
   const val=(document.getElementById('prof-t212')?.value||'').trim();
   if(!val){toastError('Please enter your Trading 212 API key.');return;}
+  const isNew=!T212_KEY;
   T212_KEY=val;LS.set('st_t212',T212_KEY);
-  renderProfile();toastSuccess('Trading 212 connected!');
+  renderProfile();
+  // Re-open the panel after re-render
+  setTimeout(()=>{
+    const panel=document.getElementById('t212-panel');
+    if(panel)panel.style.display='block';
+    if(isNew){
+      // First time connecting — auto-trigger import
+      toastSuccess('Trading 212 connected! Importing your positions...');
+      importFromT212();
+    } else {
+      toastSuccess('Trading 212 key updated.');
+    }
+  },100);
 }
 function removeT212Key(){
   T212_KEY='';LS.del('st_t212');
