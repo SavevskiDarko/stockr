@@ -845,7 +845,7 @@ const APP_FK='d7udv7pr01qnv95n8q0gd7udv7pr01qnv95n8q10';
 
 let FB_PID=APP_FB_PID, FB_KEY=APP_FB_KEY, FB_ACTIVE=false;
 let CK='', FK=APP_FK;
-let T212_KEY=LS.get('st_t212')||'';
+let T212_KEY='';
 let CLAUDE_MODEL='claude-sonnet-4-5';
 
 const CLAUDE_MODELS=[
@@ -3303,124 +3303,135 @@ function renderProfile(){
   const avatar=USER_EMAIL?USER_EMAIL[0].toUpperCase():'G';
   const ckOk=CK&&CK.startsWith('sk-ant');
   const fbOk=FB_ACTIVE;
-  el.innerHTML=`
-  <div style="background:#fff;border-radius:16px;padding:18px;margin-bottom:12px;box-shadow:0 1px 4px rgba(0,0,0,0.06);">
+
+  // ── User card ──
+  let html='';
+  html+=`<div style="background:#fff;border-radius:16px;padding:18px;margin-bottom:12px;box-shadow:0 1px 4px rgba(0,0,0,0.06);">
     <div style="display:flex;align-items:center;gap:14px;margin-bottom:${IS_GUEST?'0':'14px'};">
       <div style="width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,var(--p),var(--pd));display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;color:#fff;flex-shrink:0;">${avatar}</div>
       <div style="flex:1;min-width:0;">
         <div style="font-size:14px;font-weight:800;color:var(--t);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${USER_EMAIL||'Guest'}</div>
         <div style="font-size:11px;color:var(--t3);margin-top:2px;">${IS_GUEST?'Local only — not synced':'Synced with Firebase ✓'}</div>
       </div>
-    </div>
-    ${!IS_GUEST?`<div style="display:flex;gap:8px;">
+    </div>`;
+  if(!IS_GUEST){
+    html+=`<div style="display:flex;gap:8px;">
       <button onclick="authResetPassword('${USER_EMAIL}')" style="flex:1;background:#f0f4ff;border:none;color:var(--p);font-size:12px;font-weight:700;padding:10px;border-radius:10px;cursor:pointer;font-family:inherit;">🔑 Reset Password</button>
       <button onclick="authLogout()" style="flex:1;background:#fee2e2;border:none;color:var(--r);font-size:12px;font-weight:700;padding:10px;border-radius:10px;cursor:pointer;font-family:inherit;">↩ Sign out</button>
-    </div>`:''}
-  </div>
-  <div style="font-size:10px;font-weight:700;color:var(--t3);letter-spacing:2px;margin:0 2px 8px;">${t('services')}</div>
-  ${serviceCard('ck-panel','🤖','Claude AI Analysis',ckOk?'Connected — AI analysis enabled':'Add your key to enable AI analysis',ckOk,'ON','OFF',`
-    <div style="font-size:10px;font-weight:700;color:var(--p);letter-spacing:2px;margin-bottom:6px;">ANTHROPIC API KEY</div>
+    </div>`;
+  }
+  html+='</div>';
+
+  // ── Services header ──
+  html+=`<div style="font-size:10px;font-weight:700;color:var(--t3);letter-spacing:2px;margin:0 2px 8px;">SERVICES</div>`;
+
+  // ── Claude AI ──
+  html+=serviceCard('ck-panel','🤖','Claude AI Analysis',
+    ckOk?'Connected — AI analysis enabled':'Add your key to enable AI analysis',
+    ckOk,'ON','OFF',
+    `<div style="font-size:10px;font-weight:700;color:var(--p);letter-spacing:2px;margin-bottom:6px;">ANTHROPIC API KEY</div>
     <input class="mob-finp" id="prof-ck" type="password" placeholder="sk-ant-api03-..." value="${CK||''}" style="margin-bottom:8px;display:block;">
     <div style="font-size:11px;color:var(--t4);margin-bottom:10px;line-height:1.5;">Get your key at <a href="https://console.anthropic.com/settings/keys" target="_blank" style="color:var(--p);font-weight:600;">console.anthropic.com</a>. ~$0.01–0.03 per analysis.</div>
-    <button onclick="saveProfileKey('ck')" class="mob-add-btn" style="font-size:13px;padding:12px;">${ckOk?'Update Key':'Connect Claude AI'}</button>`)}
+    <button onclick="saveProfileKey('ck')" class="mob-add-btn" style="font-size:13px;padding:12px;">${ckOk?'Update Key':'Connect Claude AI'}</button>`
+  );
 
-  <!-- Language selector -->
-  <div style="background:#fff;border-radius:14px;overflow:hidden;margin-bottom:10px;box-shadow:0 1px 4px rgba(0,0,0,0.05);">
+  // ── Real-time prices ──
+  html+=`<div style="background:#fff;border-radius:14px;padding:14px 16px;margin-bottom:10px;box-shadow:0 1px 4px rgba(0,0,0,0.05);display:flex;align-items:center;gap:12px;">
+    <div style="width:36px;height:36px;border-radius:10px;background:#ecfdf5;border:1px solid #a7f3d0;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">📈</div>
+    <div style="flex:1;"><div style="font-size:13px;font-weight:700;color:var(--t);">Real-Time Prices</div><div style="font-size:11px;color:#10b981;margin-top:1px;">Yahoo Finance — free real-time prices ✓</div></div>
+    <div style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;background:#dcfce7;color:#047857;">ON</div>
+  </div>`;
+
+  // ── Firebase Sync ──
+  html+=`<div style="background:#fff;border-radius:14px;padding:14px 16px;margin-bottom:10px;box-shadow:0 1px 4px rgba(0,0,0,0.05);display:flex;align-items:center;gap:12px;">
+    <div style="width:36px;height:36px;border-radius:10px;background:${fbOk?'#ecfdf5':'#f8fafc'};border:1px solid ${fbOk?'#a7f3d0':'#e2e8f0'};display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">☁️</div>
+    <div style="flex:1;"><div style="font-size:13px;font-weight:700;color:var(--t);">Firebase Sync</div><div style="font-size:11px;color:${fbOk?'#10b981':'#94a3b8'};margin-top:1px;">${fbOk?'Syncing as '+USER_EMAIL:'Sign in to enable sync'}</div></div>
+    <div style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;background:${fbOk?'#dcfce7':'#f1f5f9'};color:${fbOk?'#047857':'#94a3b8'};">${fbOk?'ON':'OFF'}</div>
+  </div>`;
+
+  // ── Language ──
+  html+=`<div style="background:#fff;border-radius:14px;overflow:hidden;margin-bottom:10px;box-shadow:0 1px 4px rgba(0,0,0,0.05);">
     <div style="padding:14px 16px;display:flex;align-items:center;gap:12px;">
       <div style="width:36px;height:36px;border-radius:10px;background:#f0fdf4;border:1px solid #bbf7d0;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">🌐</div>
-      <div style="flex:1;"><div style="font-size:13px;font-weight:700;color:var(--t);">${t('language_title')}</div><div style="font-size:11px;color:#10b981;margin-top:1px;">${LANG==='mk'?'Македонски':'English'}</div></div>
+      <div style="flex:1;"><div style="font-size:13px;font-weight:700;color:var(--t);">Language</div><div style="font-size:11px;color:#10b981;margin-top:1px;">${LANG==='mk'?'Македонски':'English'}</div></div>
     </div>
     <div style="padding:0 16px 14px;display:flex;gap:10px;">
-      <div onclick="setLang('en')" style="flex:1;padding:12px;border-radius:10px;border:2px solid ${LANG==='en'?'var(--p)':'var(--b)'};background:${LANG==='en'?'var(--pl)':'#f8fafc'};cursor:pointer;text-align:center;transition:all 0.15s;">
+      <div onclick="setLang('en')" style="flex:1;padding:12px;border-radius:10px;border:2px solid ${LANG==='en'?'var(--p)':'var(--b)'};background:${LANG==='en'?'var(--pl)':'#f8fafc'};cursor:pointer;text-align:center;">
         <div style="font-size:20px;margin-bottom:4px;">🇬🇧</div>
         <div style="font-size:12px;font-weight:700;color:${LANG==='en'?'var(--p)':'var(--t)'};">English</div>
         ${LANG==='en'?'<div style="font-size:10px;font-weight:700;color:var(--p);margin-top:3px;">✓ ACTIVE</div>':''}
       </div>
-      <div onclick="setLang('mk')" style="flex:1;padding:12px;border-radius:10px;border:2px solid ${LANG==='mk'?'var(--p)':'var(--b)'};background:${LANG==='mk'?'var(--pl)':'#f8fafc'};cursor:pointer;text-align:center;transition:all 0.15s;">
+      <div onclick="setLang('mk')" style="flex:1;padding:12px;border-radius:10px;border:2px solid ${LANG==='mk'?'var(--p)':'var(--b)'};background:${LANG==='mk'?'var(--pl)':'#f8fafc'};cursor:pointer;text-align:center;">
         <div style="font-size:20px;margin-bottom:4px;">🇲🇰</div>
         <div style="font-size:12px;font-weight:700;color:${LANG==='mk'?'var(--p)':'var(--t)'};">Македонски</div>
         ${LANG==='mk'?'<div style="font-size:10px;font-weight:700;color:var(--p);margin-top:3px;">✓ АКТИВЕН</div>':''}
       </div>
     </div>
-  </div>
+  </div>`;
 
-  <!-- Dark mode toggle -->
-  <div style="background:#fff;border-radius:14px;padding:14px 16px;margin-bottom:10px;box-shadow:0 1px 4px rgba(0,0,0,0.05);display:flex;align-items:center;justify-content:space-between;gap:12px;">
+  // ── Dark mode ──
+  html+=`<div style="background:#fff;border-radius:14px;padding:14px 16px;margin-bottom:10px;box-shadow:0 1px 4px rgba(0,0,0,0.05);display:flex;align-items:center;justify-content:space-between;gap:12px;">
     <div style="display:flex;align-items:center;gap:12px;">
       <div style="width:36px;height:36px;border-radius:10px;background:#1e293b;border:1px solid #334155;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">${DARK_MODE?'☀️':'🌙'}</div>
-      <div><div style="font-size:13px;font-weight:700;color:var(--t);">Dark Mode</div><div style="font-size:11px;color:var(--t3);margin-top:1px;">${DARK_MODE?'On — Dark theme':'Off — Light theme'}</div></div>
+      <div><div style="font-size:13px;font-weight:700;color:var(--t);">Dark Mode</div><div style="font-size:11px;color:var(--t3);margin-top:1px;">${DARK_MODE?'On':'Off'}</div></div>
     </div>
     <div onclick="applyDarkMode(!DARK_MODE);renderProfile();" style="width:44px;height:24px;border-radius:12px;background:${DARK_MODE?'var(--p)':'#e2e8f0'};cursor:pointer;position:relative;flex-shrink:0;transition:background 0.2s;">
       <div style="position:absolute;top:2px;${DARK_MODE?'right:2px':'left:2px'};width:20px;height:20px;border-radius:50%;background:#fff;transition:all 0.2s;box-shadow:0 1px 4px rgba(0,0,0,0.2);"></div>
     </div>
-  </div>
+  </div>`;
 
-  <!-- Currency selector -->
-  <div style="background:#fff;border-radius:14px;overflow:hidden;margin-bottom:10px;box-shadow:0 1px 4px rgba(0,0,0,0.05);">
-    <div style="padding:14px 16px;display:flex;align-items:center;gap:12px;cursor:pointer;" onclick="toggleService('currency-panel')">
-      <div style="width:36px;height:36px;border-radius:10px;background:#f0fdf4;border:1px solid #bbf7d0;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">💱</div>
-      <div style="flex:1;"><div style="font-size:13px;font-weight:700;color:var(--t);">Base Currency</div><div style="font-size:11px;color:#10b981;margin-top:1px;">${BASE_CURRENCY} — ${CURRENCIES[BASE_CURRENCY]||'$'}</div></div>
-    </div>
-    <div id="currency-panel" style="display:none;padding:0 16px 14px;">
-      <div style="display:flex;flex-wrap:wrap;gap:8px;">
-        ${Object.keys(CURRENCIES).map(c=>`<button onclick="setCurrency('${c}')" style="padding:7px 14px;border-radius:20px;border:1.5px solid ${BASE_CURRENCY===c?'var(--p)':'var(--b)'};background:${BASE_CURRENCY===c?'var(--pl)':'#f8fafc'};color:${BASE_CURRENCY===c?'var(--p)':'var(--t)'};font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;">${c} ${CURRENCIES[c]}</button>`).join('')}
+  // ── Currency ──
+  const currencyPanel=Object.keys(CURRENCIES).map(c=>`<button onclick="setCurrency('${c}')" style="padding:7px 14px;border-radius:20px;border:1.5px solid ${BASE_CURRENCY===c?'var(--p)':'var(--b)'};background:${BASE_CURRENCY===c?'var(--pl)':'#f8fafc'};color:${BASE_CURRENCY===c?'var(--p)':'var(--t)'};font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;">${c} ${CURRENCIES[c]}</button>`).join('');
+  html+=serviceCard('currency-panel','💱','Base Currency',BASE_CURRENCY+' — '+(CURRENCIES[BASE_CURRENCY]||'$'),true,'ON','ON',
+    `<div style="display:flex;flex-wrap:wrap;gap:8px;">${currencyPanel}</div>`);
+
+  // ── Claude model ──
+  const modelBtns=CLAUDE_MODELS.map(m=>`
+    <div onclick="setModel('${m.id}')" style="display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:10px;border:2px solid ${CLAUDE_MODEL===m.id?'var(--p)':'var(--b)'};background:${CLAUDE_MODEL===m.id?'var(--pl)':'#f8fafc'};cursor:pointer;margin-bottom:8px;">
+      <div style="width:16px;height:16px;border-radius:50%;border:2px solid ${CLAUDE_MODEL===m.id?'var(--p)':'#cbd5e1'};background:${CLAUDE_MODEL===m.id?'var(--p)':'transparent'};flex-shrink:0;display:flex;align-items:center;justify-content:center;">
+        ${CLAUDE_MODEL===m.id?'<div style="width:6px;height:6px;border-radius:50%;background:#fff;"></div>':''}
       </div>
-    </div>
-  </div>
+      <div style="flex:1;"><div style="font-size:13px;font-weight:700;color:${CLAUDE_MODEL===m.id?'var(--p)':'var(--t)'};">${m.label}</div><div style="font-size:11px;color:var(--t3);">${m.desc}</div></div>
+      ${CLAUDE_MODEL===m.id?'<div style="font-size:10px;font-weight:700;background:var(--p);color:#fff;padding:3px 8px;border-radius:20px;">ACTIVE</div>':''}
+    </div>`).join('');
+  html+=serviceCard('model-panel','⚡','Claude Model',CLAUDE_MODELS.find(m=>m.id===CLAUDE_MODEL)?.label||'Sonnet 4.5',true,'','',modelBtns);
 
-  <!-- Biometric login -->
-  ${window.PublicKeyCredential?`<div style="background:#fff;border-radius:14px;padding:14px 16px;margin-bottom:10px;box-shadow:0 1px 4px rgba(0,0,0,0.05);display:flex;align-items:center;gap:12px;">
-    <div style="width:36px;height:36px;border-radius:10px;background:${LS.get('st_biometric')?'#ecfdf5':'#f8fafc'};border:1px solid ${LS.get('st_biometric')?'#a7f3d0':'#e2e8f0'};display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">🔐</div>
-    <div style="flex:1;"><div style="font-size:13px;font-weight:700;color:var(--t);">Biometric Login</div><div style="font-size:11px;color:${LS.get('st_biometric')?'#10b981':'#94a3b8'};margin-top:1px;">${LS.get('st_biometric')?'Face ID / Fingerprint enabled':'Quick login with fingerprint or face'}</div></div>
-    <button onclick="${LS.get('st_biometric')?'removeBiometric()':'registerBiometric()'}" style="background:${LS.get('st_biometric')?'#fee2e2':'#f0f4ff'};border:none;color:${LS.get('st_biometric')?'var(--r)':'var(--p)'};font-size:11px;font-weight:700;padding:7px 12px;border-radius:9px;cursor:pointer;font-family:inherit;flex-shrink:0;">${LS.get('st_biometric')?'Remove':'Enable'}</button>
-  </div>`:''}
+  // ── Biometric ──
+  if(window.PublicKeyCredential){
+    const hasBio=!!LS.get('st_biometric');
+    html+=`<div style="background:#fff;border-radius:14px;padding:14px 16px;margin-bottom:10px;box-shadow:0 1px 4px rgba(0,0,0,0.05);display:flex;align-items:center;gap:12px;">
+      <div style="width:36px;height:36px;border-radius:10px;background:${hasBio?'#ecfdf5':'#f8fafc'};border:1px solid ${hasBio?'#a7f3d0':'#e2e8f0'};display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">🔐</div>
+      <div style="flex:1;"><div style="font-size:13px;font-weight:700;color:var(--t);">Biometric Login</div><div style="font-size:11px;color:${hasBio?'#10b981':'#94a3b8'};margin-top:1px;">${hasBio?'Face ID / Fingerprint enabled':'Quick login with fingerprint or face'}</div></div>
+      <button onclick="${hasBio?'removeBiometric()':'registerBiometric()'}" style="background:${hasBio?'#fee2e2':'#f0f4ff'};border:none;color:${hasBio?'var(--r)':'var(--p)'};font-size:11px;font-weight:700;padding:7px 12px;border-radius:9px;cursor:pointer;font-family:inherit;flex-shrink:0;">${hasBio?'Remove':'Enable'}</button>
+    </div>`;
+  }
 
-  <!-- Model selector -->
-  <div style="background:#fff;border-radius:14px;overflow:hidden;margin-bottom:10px;box-shadow:0 1px 4px rgba(0,0,0,0.05);">
-    <div style="padding:14px 16px;display:flex;align-items:center;gap:12px;">
-      <div style="width:36px;height:36px;border-radius:10px;background:#f0f4ff;border:1px solid #c7d2fe;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">⚡</div>
-      <div style="flex:1;"><div style="font-size:13px;font-weight:700;color:var(--t);">Claude Model</div><div style="font-size:11px;color:#6366f1;margin-top:1px;">${CLAUDE_MODELS.find(m=>m.id===CLAUDE_MODEL)?.label||'Sonnet 4.5'}</div></div>
+  // ── Trading 212 ──
+  html+=`<div style="font-size:10px;font-weight:700;color:var(--t3);letter-spacing:2px;margin:14px 2px 8px;">BROKER INTEGRATION</div>`;
+  html+=`<div style="background:#fff;border-radius:14px;overflow:hidden;margin-bottom:10px;box-shadow:0 1px 4px rgba(0,0,0,0.05);">
+    <div style="padding:14px 16px;display:flex;align-items:center;gap:12px;cursor:pointer;" onclick="toggleService('t212-panel')">
+      <div style="width:36px;height:36px;border-radius:10px;background:${T212_KEY?'#ecfdf5':'#f8fafc'};border:1px solid ${T212_KEY?'#a7f3d0':'#e2e8f0'};display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">📱</div>
+      <div style="flex:1;"><div style="font-size:13px;font-weight:700;color:var(--t);">Trading 212</div><div style="font-size:11px;color:${T212_KEY?'#10b981':'#94a3b8'};margin-top:1px;">${T212_KEY?'Connected — import & sync enabled':'Connect to import your real portfolio'}</div></div>
+      <div style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;background:${T212_KEY?'#dcfce7':'#f1f5f9'};color:${T212_KEY?'#047857':'#94a3b8'};">${T212_KEY?'ON':'OFF'}</div>
     </div>
-    <div style="padding:0 16px 14px;display:flex;flex-direction:column;gap:8px;">
-      ${CLAUDE_MODELS.map(m=>`
-      <div onclick="setModel('${m.id}')" style="display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:10px;border:2px solid ${CLAUDE_MODEL===m.id?'var(--p)':'var(--b)'};background:${CLAUDE_MODEL===m.id?'var(--pl)':'#f8fafc'};cursor:pointer;transition:all 0.15s;">
-        <div style="width:16px;height:16px;border-radius:50%;border:2px solid ${CLAUDE_MODEL===m.id?'var(--p)':'#cbd5e1'};background:${CLAUDE_MODEL===m.id?'var(--p)':'transparent'};flex-shrink:0;display:flex;align-items:center;justify-content:center;">
-          ${CLAUDE_MODEL===m.id?'<div style="width:6px;height:6px;border-radius:50%;background:#fff;"></div>':''}
-        </div>
-        <div style="flex:1;">
-          <div style="font-size:13px;font-weight:700;color:${CLAUDE_MODEL===m.id?'var(--p)':'var(--t)'};">${m.label}</div>
-          <div style="font-size:11px;color:var(--t3);">${m.desc}</div>
-        </div>
-        ${CLAUDE_MODEL===m.id?'<div style="font-size:10px;font-weight:700;background:var(--p);color:#fff;padding:3px 8px;border-radius:20px;">ACTIVE</div>':''}
-      </div>`).join('')}
+    <div id="t212-panel" style="display:none;padding:0 16px 14px;">
+      <div style="font-size:10px;font-weight:700;color:var(--p);letter-spacing:2px;margin-bottom:6px;">API KEY</div>
+      <input class="mob-finp" id="prof-t212" type="password" placeholder="Your Trading 212 API key..." value="${T212_KEY||''}" style="margin-bottom:8px;display:block;">
+      <div style="font-size:11px;color:var(--t4);margin-bottom:12px;line-height:1.6;">Get your key: <b>Trading 212 app → Settings → API (Beta) → Generate API key</b></div>
+      <div style="display:flex;gap:8px;margin-bottom:8px;">
+        <button onclick="saveT212Key()" class="mob-add-btn" style="font-size:12px;padding:11px;flex:1;">${T212_KEY?'Update Key':'Connect T212'}</button>
+        ${T212_KEY?'<button onclick="removeT212Key()" style="background:#fee2e2;border:none;color:#b91c1c;font-size:12px;font-weight:700;padding:11px 14px;border-radius:12px;cursor:pointer;font-family:inherit;">Remove</button>':''}
+      </div>
+      ${T212_KEY?'<div style="display:flex;gap:8px;"><button id=\"t212-import-btn\" onclick="importFromT212()" style="flex:1;background:linear-gradient(135deg,#10b981,#059669);border:none;color:#fff;font-size:12px;font-weight:700;padding:11px;border-radius:12px;cursor:pointer;font-family:inherit;">⬇ Import Positions</button><button onclick="syncT212Prices()" style="flex:1;background:#f0f4ff;border:none;color:#6366f1;font-size:12px;font-weight:700;padding:11px;border-radius:12px;cursor:pointer;font-family:inherit;">🔄 Sync Prices</button></div>':''}
     </div>
-  </div>
-  <div style="background:#fff;border-radius:14px;padding:14px 16px;margin-bottom:10px;box-shadow:0 1px 4px rgba(0,0,0,0.05);display:flex;align-items:center;gap:12px;">
-    <div style="width:36px;height:36px;border-radius:10px;background:#ecfdf5;border:1px solid #a7f3d0;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">📈</div>
-    <div style="flex:1;"><div style="font-size:13px;font-weight:700;color:var(--t);">Real-Time Prices</div><div style="font-size:11px;color:#10b981;margin-top:1px;">Yahoo Finance — free real-time prices ✓</div></div>
-    <div style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;background:#dcfce7;color:#047857;">ON</div>
-  </div>
-  <div style="background:#fff;border-radius:14px;padding:14px 16px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,0.05);display:flex;align-items:center;gap:12px;">
-    <div style="width:36px;height:36px;border-radius:10px;background:${fbOk?'#ecfdf5':'#f8fafc'};border:1px solid ${fbOk?'#a7f3d0':'#e2e8f0'};display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">☁️</div>
-    <div style="flex:1;"><div style="font-size:13px;font-weight:700;color:var(--t);">Firebase Sync</div><div style="font-size:11px;color:${fbOk?'#10b981':'#94a3b8'};margin-top:1px;">${fbOk?`Syncing as ${USER_EMAIL}`:'Sign in to enable sync'}</div></div>
-    <div style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;background:${fbOk?'#dcfce7':'#f1f5f9'};color:${fbOk?'#047857':'#94a3b8'};">${fbOk?'ON':'OFF'}</div>
-  </div>
-  ${IS_GUEST?`<button onclick="document.getElementById('app').style.display='none';document.getElementById('auth-screen').style.display='flex';" style="width:100%;background:linear-gradient(135deg,var(--p),var(--pd));border:none;color:#fff;padding:14px;border-radius:14px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;box-shadow:0 4px 14px rgba(99,102,241,0.35);">Sign in / Create Account</button>`:''}
+  </div>`;
 
-  <div style="font-size:10px;font-weight:700;color:var(--t3);letter-spacing:2px;margin:14px 2px 8px;">BROKER INTEGRATION</div>
-  ${serviceCard('t212-panel','📱','Trading 212',T212_KEY?'Connected — import & sync enabled':'Connect to import your real portfolio',!!T212_KEY,'ON','OFF',\`
-    <div style="font-size:10px;font-weight:700;color:var(--p);letter-spacing:2px;margin-bottom:6px;">API KEY</div>
-    <input class="mob-finp" id="prof-t212" type="password" placeholder="Your Trading 212 API key..." value="${T212_KEY||''}" style="margin-bottom:8px;display:block;">
-    <div style="font-size:11px;color:var(--t4);margin-bottom:12px;line-height:1.6;">Get your key: <strong>Trading 212 app → Settings → API (Beta) → Generate API key</strong><br>Enable Portfolio and Account data permissions.</div>
-    <div style="display:flex;gap:8px;margin-bottom:8px;">
-      <button onclick="saveT212Key()" class="mob-add-btn" style="font-size:12px;padding:11px;flex:1;">${T212_KEY?'Update Key':'Connect T212'}</button>
-      ${T212_KEY?\`<button onclick="removeT212Key()" style="background:#fee2e2;border:none;color:var(--r);font-size:12px;font-weight:700;padding:11px 14px;border-radius:12px;cursor:pointer;font-family:inherit;">Remove</button>\`:''}
-    </div>
-    ${T212_KEY?\`<div style="display:flex;gap:8px;">
-      <button id="t212-import-btn" onclick="importFromT212()" style="flex:1;background:linear-gradient(135deg,#10b981,#059669);border:none;color:#fff;font-size:12px;font-weight:700;padding:11px;border-radius:12px;cursor:pointer;font-family:inherit;">⬇ Import Positions</button>
-      <button onclick="syncT212Prices()" style="flex:1;background:#f0f4ff;border:none;color:var(--p);font-size:12px;font-weight:700;padding:11px;border-radius:12px;cursor:pointer;font-family:inherit;">🔄 Sync Prices</button>
-    </div>\`:''}
-  \`)}`;
+  // ── Sign in button for guests ──
+  if(IS_GUEST){
+    html+='<button onclick="document.getElementById(\'app\').style.display=\'none\';document.getElementById(\'auth-screen\').style.display=\'flex\';" style="width:100%;background:linear-gradient(135deg,var(--p),var(--pd));border:none;color:#fff;padding:14px;border-radius:14px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;box-shadow:0 4px 14px rgba(99,102,241,0.35);">Sign in / Create Account</button>';
+  }
+
+  el.innerHTML=html;
 }
 
 function serviceCard(panelId,icon,title,subtitle,on,onLabel,offLabel,panelContent){
