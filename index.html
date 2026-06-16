@@ -1266,6 +1266,8 @@ async function pullFromFirebase(){
   if(rpData?.reports?.length){weeklyReports=rpData.reports;LS.set('st_reports',weeklyReports);}
   const dtData=await fbRead(p('daily'));
   if(dtData?.predictions?.length){dailyPredictions=dtData.predictions;LS.set('st_daily',dailyPredictions);}
+  const snapData=await fbRead(p('snapshots'));
+  if(snapData?.snapshots){LS.set('st_snapshots',snapData.snapshots);}
   if(document.getElementById('app')?.style.display!=='none'){
     renderPortSwitcher();renderPORT();renderWATCH();renderSB();renderMSGS();
   }
@@ -1383,13 +1385,17 @@ function recordPortfolioSnapshot(){
     let total=0;
     pos.forEach(x=>{const q=PC[x.ticker];total+=x.shares*(q?q.c:x.cost);});
     const deposit=pos.reduce((s,x)=>s+x.shares*x.cost,0);
-    // Only record once per day
+    // Record/update today's snapshot (update if price changed during the day)
     const existing=snapshots[id].find(s=>s.d===dateKey);
-    if(!existing&&total>0)snapshots[id].push({d:dateKey,v:parseFloat(total.toFixed(2)),dep:parseFloat(deposit.toFixed(2))});
-    // Keep last 90 days
-    snapshots[id]=snapshots[id].slice(-90);
+    if(total>0){
+      if(existing){existing.v=parseFloat(total.toFixed(2));existing.dep=parseFloat(deposit.toFixed(2));}
+      else snapshots[id].push({d:dateKey,v:parseFloat(total.toFixed(2)),dep:parseFloat(deposit.toFixed(2))});
+    }
+    // Keep last 5 years (~1825 days)
+    snapshots[id]=snapshots[id].slice(-1825);
   });
   LS.set('st_snapshots',snapshots);
+  if(FB_ACTIVE)fbWrite(userPath('snapshots'),{snapshots,updatedAt:Date.now()}).catch(()=>{});
 }
 
 function getPortfolioChartData(portId){
@@ -1397,35 +1403,127 @@ function getPortfolioChartData(portId){
   return (snapshots[portId]||[]).sort((a,b)=>a.d.localeCompare(b.d));
 }
 
-function renderPortfolioMiniChart(portId,canvasId){
-  const data=getPortfolioChartData(portId);
-  if(data.length<2)return;
-  const canvas=document.getElementById(canvasId);if(!canvas)return;
-  const ctx=canvas.getContext('2d');
-  const w=canvas.width=canvas.offsetWidth||300;
-  const h=canvas.height=80;
-  ctx.clearRect(0,0,w,h);
+// Filter snapshot data by time range
+function filterChartRange(data,range){
+  if(!data.length)return data;
+  const now=new Date();
+  const cutoffs={'1d':1,'1w':7,'1m':30,'3m':90,'ytd':null,'1y':365,'5y':1825,'max':99999};
+  if(range==='ytd'){
+    const jan1=new Date(now.getFullYear(),0,1).toISOString().split('T')[0];
+    return data.filter(d=>d.d>=jan1);
+  }
+  const days=cutoffs[range]||99999;
+  const cutoff=new Date(now.getTime()-days*86400000).toISOString().split('T')[0];
+  return data.filter(d=>d.d>=cutoff);
+}
+
+let _activeChartRange={};
+function setChartRange(portId,range){
+  _activeChartRange[portId]=range;
+  renderFullChart(portId);
+}
+
+function renderFullChart(portId){
+  const allData=getPortfolioChartData(portId);
+  const range=_activeChartRange[portId]||'1m';
+  const data=filterChartRange(allData,range);
+  const canvas=document.getElementById(`pchart-canvas-${portId}`);
+  const valEl=document.getElementById(`pchart-val-${portId}`);
+  const chgEl=document.getElementById(`pchart-chg-${portId}`);
+  if(!canvas)return;
+
+  // Update range tab active states
+  document.querySelectorAll(`[data-chart-range="${portId}"] button`).forEach(b=>{
+    const on=b.dataset.range===range;
+    b.style.background=on?'var(--p)':'transparent';
+    b.style.color=on?'#fff':'var(--t3)';
+  });
+
+  if(data.length<2){
+    const ctx=canvas.getContext('2d');
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    canvas.height=140;
+    ctx.fillStyle='#94a3b8';ctx.font='12px Plus Jakarta Sans,sans-serif';ctx.textAlign='center';
+    ctx.fillText('Not enough data yet for this range',canvas.offsetWidth/2,70);
+    if(valEl)valEl.textContent=formatCurrency(allData.length?allData[allData.length-1].v:0);
+    if(chgEl)chgEl.innerHTML='';
+    return;
+  }
+
   const values=data.map(d=>d.v);
+  const first=values[0],last=values[values.length-1];
+  const change=last-first;
+  const changePct=first>0?(change/first*100):0;
+  const isUp=change>=0;
+  const col=isUp?'#16b981':'#f24d6a';
+
+  // Update header value + change
+  if(valEl)valEl.textContent=formatCurrency(last);
+  if(chgEl)chgEl.innerHTML=`<span style="color:${col};font-weight:700;font-size:13px;">${isUp?'↗':'↘'} ${isUp?'+':''}${formatCurrency(change).replace(/^[^0-9.-]*/,m=>m)}${''} (${isUp?'+':''}${changePct.toFixed(2)}%)</span> <span style="color:var(--t4);font-size:11px;">${range.toUpperCase()}</span>`;
+
+  // Draw chart
+  const ctx=canvas.getContext('2d');
+  const dpr=window.devicePixelRatio||1;
+  const w=canvas.offsetWidth||320;
+  const ht=160;
+  canvas.width=w*dpr;canvas.height=ht*dpr;
+  canvas.style.height=ht+'px';
+  ctx.scale(dpr,dpr);
+  ctx.clearRect(0,0,w,ht);
+
   const mn=Math.min(...values),mx=Math.max(...values);
-  const range=mx-mn||1;
-  const pad=8;
+  const range_v=mx-mn||1;
+  const padX=4,padTop=10,padBot=20;
   const pts=data.map((d,i)=>({
-    x:pad+(i/(data.length-1))*(w-pad*2),
-    y:h-pad-((d.v-mn)/range)*(h-pad*2)
+    x:padX+(i/(data.length-1))*(w-padX*2),
+    y:padTop+(1-(d.v-mn)/range_v)*(ht-padTop-padBot),
+    v:d.v,d:d.d
   }));
-  // Gradient fill
-  const grad=ctx.createLinearGradient(0,0,0,h);
-  const isUp=values[values.length-1]>=values[0];
-  grad.addColorStop(0,isUp?'rgba(16,185,129,0.3)':'rgba(239,68,68,0.3)');
+
+  // Gradient fill under line
+  const grad=ctx.createLinearGradient(0,0,0,ht);
+  grad.addColorStop(0,isUp?'rgba(22,185,129,0.22)':'rgba(242,77,106,0.22)');
   grad.addColorStop(1,'rgba(255,255,255,0)');
-  ctx.beginPath();ctx.moveTo(pts[0].x,h);
+  ctx.beginPath();ctx.moveTo(pts[0].x,ht-padBot);
   pts.forEach(p=>ctx.lineTo(p.x,p.y));
-  ctx.lineTo(pts[pts.length-1].x,h);ctx.closePath();
+  ctx.lineTo(pts[pts.length-1].x,ht-padBot);ctx.closePath();
   ctx.fillStyle=grad;ctx.fill();
+
   // Line
   ctx.beginPath();ctx.moveTo(pts[0].x,pts[0].y);
-  pts.forEach(p=>ctx.lineTo(p.x,p.y));
-  ctx.strokeStyle=isUp?'#10b981':'#ef4444';ctx.lineWidth=2;ctx.stroke();
+  for(let i=1;i<pts.length;i++){
+    const xc=(pts[i].x+pts[i-1].x)/2,yc=(pts[i].y+pts[i-1].y)/2;
+    ctx.quadraticCurveTo(pts[i-1].x,pts[i-1].y,xc,yc);
+  }
+  ctx.lineTo(pts[pts.length-1].x,pts[pts.length-1].y);
+  ctx.strokeStyle=col;ctx.lineWidth=2.5;ctx.lineJoin='round';ctx.lineCap='round';ctx.stroke();
+
+  // End dot
+  const lp=pts[pts.length-1];
+  ctx.beginPath();ctx.arc(lp.x,lp.y,4,0,Math.PI*2);ctx.fillStyle=col;ctx.fill();
+  ctx.beginPath();ctx.arc(lp.x,lp.y,4,0,Math.PI*2);ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.stroke();
+}
+
+// Build the full chart card HTML
+function portfolioChartCard(portId){
+  const ranges=['1d','1w','1m','3m','ytd','1y','5y','max'];
+  return `<div style="background:var(--card);border:1px solid var(--b);border-radius:var(--rad);padding:16px;margin-bottom:12px;box-shadow:var(--sh-sm);">
+    <div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:2px;">
+      <div style="font-size:9px;font-weight:700;color:var(--t3);letter-spacing:2px;">PORTFOLIO VALUE</div>
+    </div>
+    <div id="pchart-val-${portId}" style="font-size:24px;font-weight:800;color:var(--t);letter-spacing:-0.5px;">—</div>
+    <div id="pchart-chg-${portId}" style="margin-bottom:10px;min-height:18px;"></div>
+    <canvas id="pchart-canvas-${portId}" style="width:100%;height:160px;display:block;"></canvas>
+    <div data-chart-range="${portId}" style="display:flex;gap:2px;margin-top:10px;background:var(--bg);border-radius:10px;padding:3px;">
+      ${ranges.map(r=>`<button data-range="${r}" onclick="setChartRange('${portId}','${r}')" style="flex:1;border:none;background:transparent;color:var(--t3);font-size:10px;font-weight:700;padding:7px 2px;border-radius:8px;cursor:pointer;font-family:inherit;transition:all 0.15s;">${r.toUpperCase()}</button>`).join('')}
+    </div>
+  </div>`;
+}
+
+// Legacy mini chart kept for compatibility (no-op wrapper → full chart)
+function renderPortfolioMiniChart(portId,canvasId){
+  if(!_activeChartRange[portId])_activeChartRange[portId]='1m';
+  renderFullChart(portId);
 }
 
 async function startApp(){
@@ -1721,12 +1819,8 @@ function renderPORT(){
     <div class="sc2" style="background:#fffbeb;border-color:#fde68a"><div class="slbl" style="color:#f59e0b">TOP HOLDING</div><div class="sval" style="color:#b45309">${top?.ticker||'—'}</div></div>
   </div>`:'';
   // Desktop: analyze + delete inside right panel. Mobile: sticky bar + ⋯ menu
-  const chartSection=isDesktop&&getPortfolioChartData(port.id).length>=2?`
-  <div style="background:#fff;border-radius:12px;padding:12px 14px;margin-bottom:12px;">
-    <div style="font-size:9px;font-weight:700;color:var(--t3);letter-spacing:2px;margin-bottom:6px;">PORTFOLIO VALUE (90d)</div>
-    <canvas id="port-chart-${port.id}" style="width:100%;height:80px;display:block;"></canvas>
-  </div>`:'';
-  const rightH=summaryCards+(isDesktop&&pos.length?chartSection+`
+  const chartSection=pos.length&&getPortfolioChartData(port.id).length>=2?portfolioChartCard(port.id):'';
+  const rightH=summaryCards+(isDesktop&&pos.length?`
   <button class="abig" onclick="anzAll()">${t('analyze_portfolio')} ${port.name}</button>
   ${PORTFOLIOS.length>1?`<button class="del-port-btn" onclick="deletePortfolio()">${t('delete_portfolio')} "${port.name}"</button>`:''}`:``);
 
@@ -1743,6 +1837,7 @@ function renderPORT(){
   // ── Center / main: position rows ──
   let centerH='';
   if(pos.length){
+    centerH+=chartSection;
     centerH+=`<div class="pcrd">`;
     pos.forEach((p,i)=>{
       const col=COLS[i%COLS.length],q=PC[p.ticker],up=q?q.d>=0:true;
@@ -1797,7 +1892,7 @@ function renderPORT(){
 
   // Render portfolio chart after DOM paint
   setTimeout(()=>{
-    PORTFOLIOS.forEach(p=>renderPortfolioMiniChart(p.id,`port-chart-${p.id}`));
+    PORTFOLIOS.forEach(p=>{if(!_activeChartRange[p.id])_activeChartRange[p.id]='1m';renderFullChart(p.id);});
   },50);
 
   // Restore edit panel if one was open before re-render
@@ -2502,7 +2597,7 @@ async function refresh(tab){
   if(tab==='p'){renderPortSwitcher();recordPortfolioSnapshot();}checkPriceAlerts();
   // Render chart after DOM is ready
   if(tab==='p')setTimeout(()=>{
-    PORTFOLIOS.forEach(p=>renderPortfolioMiniChart(p.id,`port-chart-${p.id}`));
+    PORTFOLIOS.forEach(p=>{if(!_activeChartRange[p.id])_activeChartRange[p.id]='1m';renderFullChart(p.id);});
   },100);
 }
 const f2=n=>n!=null?n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}):'—';
