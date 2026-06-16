@@ -2802,9 +2802,41 @@ function renderDailyHistoryList(){
     el.innerHTML='<div style="font-size:11px;color:#94a3b8;line-height:1.6;">No predictions yet.<br>Generate your first report above.</div>';
     return;
   }
-  el.innerHTML=dailyPredictions.map((p,i)=>{
-    const acc=p.verified?`<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;background:${p.correct?'#dcfce7':'#fee2e2'};color:${p.correct?'#047857':'#b91c1c'};">${p.correct?'✓ Correct':'✗ Wrong'}</span>`
-    :`<span style="font-size:10px;font-weight:600;color:#94a3b8;cursor:pointer;" onclick="verifyPrediction(${i})">🔍 Verify</span>`;
+  // Accuracy summary banner
+  const verified=dailyPredictions.filter(p=>p.verified);
+  let statsHTML='';
+  if(verified.length){
+    const correct=verified.filter(p=>(p.outcome||(p.correct?'correct':'wrong'))==='correct').length;
+    const partial=verified.filter(p=>p.outcome==='partial').length;
+    const pct=Math.round(correct/verified.length*100);
+    const col=pct>=60?'#16b981':pct>=40?'#f7a83c':'#f24d6a';
+    // Per-ticker accuracy
+    const byTicker={};
+    verified.forEach(p=>{
+      if(!byTicker[p.ticker])byTicker[p.ticker]={c:0,t:0};
+      byTicker[p.ticker].t++;
+      if((p.outcome||(p.correct?'correct':'wrong'))==='correct')byTicker[p.ticker].c++;
+    });
+    const tickerStats=Object.entries(byTicker).filter(([,v])=>v.t>=2).sort((a,b)=>(b[1].c/b[1].t)-(a[1].c/a[1].t)).slice(0,5);
+    const tickerHTML=tickerStats.length?`<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:4px;">${tickerStats.map(([tk,v])=>{
+      const tp=Math.round(v.c/v.t*100);const tc=tp>=60?'#16b981':tp>=40?'#f7a83c':'#f24d6a';
+      return `<span style="font-size:9px;font-weight:700;padding:2px 7px;border-radius:10px;background:${tc}18;color:${tc};">${tk} ${tp}%</span>`;
+    }).join('')}</div>`:'';
+    statsHTML=`<div style="background:linear-gradient(135deg,${col}18,${col}08);border:1px solid ${col}40;border-radius:12px;padding:10px 12px;margin-bottom:10px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <div style="font-size:10px;font-weight:700;color:var(--t3);letter-spacing:1px;">AI ACCURACY</div>
+        <div style="font-size:18px;font-weight:800;color:${col};">${pct}%</div>
+      </div>
+      <div style="font-size:10px;color:var(--t3);margin-top:2px;">${correct} correct · ${partial} partial · ${verified.length-correct-partial} missed (of ${verified.length})</div>
+      <div style="height:5px;background:${col}22;border-radius:5px;margin-top:6px;overflow:hidden;"><div style="height:100%;width:${pct}%;background:${col};border-radius:5px;"></div></div>
+      ${tickerHTML}
+    </div>`;
+  }
+  el.innerHTML=statsHTML+dailyPredictions.map((p,i)=>{
+    const oc=p.verified?(p.outcome||(p.correct?'correct':'wrong')):null;
+    const ocCfg={correct:{bg:'#dcfce7',c:'#047857',l:'✓'},partial:{bg:'#fef3e3',c:'#b45309',l:'~'},wrong:{bg:'#fee2e2',c:'#b91c1c',l:'✗'}};
+    const acc=p.verified?`<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;background:${ocCfg[oc].bg};color:${ocCfg[oc].c};">${ocCfg[oc].l} ${oc.charAt(0).toUpperCase()+oc.slice(1)}</span>`
+    :`<span style="font-size:10px;font-weight:600;color:#94a3b8;cursor:pointer;" onclick="event.stopPropagation();showDailyReport(${i});">🔍 Verify</span>`;
     const bias=p.bias==='BUY'?'🟢':p.bias==='SELL'?'🔴':'🟡';
     return`<div onclick="showDailyReport(${i})" style="padding:9px 10px;border-radius:10px;cursor:pointer;margin-bottom:5px;background:#f8fafc;border:1px solid var(--b);transition:all 0.15s;" onmouseover="this.style.background='var(--pl)'" onmouseout="this.style.background='#f8fafc'">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px;">
@@ -2812,7 +2844,7 @@ function renderDailyHistoryList(){
         ${acc}
       </div>
       <div style="font-size:10px;color:#94a3b8;">${p.date}</div>
-      ${p.entryZone?`<div style="font-size:10px;color:var(--t3);margin-top:2px;">Entry: ${p.entryZone} · Target: ${p.target}</div>`:''}
+      ${p.entryZone&&p.entryZone!=='—'?`<div style="font-size:10px;color:var(--t3);margin-top:2px;">Entry: ${p.entryZone} · Target: ${p.target}</div>`:''}
     </div>`;
   }).join('');
 }
@@ -2986,7 +3018,10 @@ Confidence: High/Medium/Low — one sentence reason.
     showDailyReport(0);
 
   }catch(e){
+    clearInterval(stepInterval);
     content.innerHTML=`<div style="padding:20px;background:#fef2f2;border-radius:12px;color:var(--r);font-weight:600;max-width:820px;margin:0 auto;">Error: ${e.message}</div>`;
+  }finally{
+    clearInterval(stepInterval);
   }
 }
 
@@ -3001,19 +3036,28 @@ function showDailyReport(idx){
   const verifySection=!p.verified?`
     <div style="background:#fff;border-radius:14px;padding:16px;margin-bottom:16px;border:2px dashed var(--b);">
       <div style="font-size:12px;font-weight:700;color:var(--t);margin-bottom:10px;">🔍 End-of-Day Verification</div>
-      <div style="font-size:12px;color:var(--t3);margin-bottom:12px;">Was this prediction correct? Enter the closing price to verify accuracy.</div>
+      <div style="font-size:12px;color:var(--t3);margin-bottom:12px;">Auto-fetch the current price, or enter the closing price manually to check accuracy.</div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-        <input id="dt-verify-price-${idx}" type="number" step="0.01" placeholder="Closing price $" style="background:#f8fafc;border:1.5px solid var(--b);color:var(--t);padding:9px 12px;font-size:14px;font-weight:600;border-radius:10px;width:160px;font-family:inherit;">
-        <button onclick="verifyPrediction(${idx})" style="background:linear-gradient(135deg,var(--p),var(--pd));border:none;color:#fff;padding:10px 18px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">✓ Verify</button>
+        <input id="dt-verify-price-${idx}" type="number" step="0.01" inputmode="decimal" placeholder="Closing price $" style="background:#f8fafc;border:1.5px solid var(--b);color:var(--t);padding:11px 12px;font-size:16px;font-weight:600;border-radius:10px;width:150px;font-family:inherit;-webkit-appearance:none;">
+        <button onclick="verifyPrediction(${idx})" style="background:linear-gradient(135deg,var(--p),var(--pd));border:none;color:#fff;padding:11px 18px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">✓ Verify</button>
+        <button id="dt-autofetch-${idx}" onclick="verifyPrediction(${idx})" style="background:var(--pl);border:1px solid var(--p);color:var(--p);padding:11px 14px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">⚡ Auto-fetch price</button>
       </div>
     </div>`
-  :`<div style="background:${p.correct?'#ecfdf5':'#fef2f2'};border-radius:14px;padding:14px 16px;margin-bottom:16px;display:flex;align-items:center;gap:12px;">
-      <div style="font-size:28px;">${p.correct?'✅':'❌'}</div>
-      <div>
-        <div style="font-size:13px;font-weight:800;color:${p.correct?'#047857':'#b91c1c'};">${p.correct?'Prediction Correct!':'Prediction Incorrect'}</div>
-        <div style="font-size:11px;color:${p.correct?'#10b981':'#ef4444'};margin-top:2px;">Predicted: ${p.action} @ ${p.entryZone} · Actual close: $${p.actualClose?.toFixed(2)||'—'}</div>
-      </div>
-    </div>`;
+  :(()=>{
+      const oc=p.outcome||(p.correct?'correct':'wrong');
+      const cfg={correct:{bg:'#ecfdf5',c:'#047857',c2:'#10b981',icon:'✅',label:'Prediction Correct!'},
+                 partial:{bg:'#fef3e3',c:'#b45309',c2:'#f7a83c',icon:'🟡',label:'Partially Correct'},
+                 wrong:{bg:'#fef2f2',c:'#b91c1c',c2:'#f24d6a',icon:'❌',label:'Prediction Missed'}}[oc];
+      const moveStr=p.movePct!=null?`${p.movePct>=0?'+':''}${p.movePct}%`:'';
+      return`<div style="background:${cfg.bg};border-radius:14px;padding:14px 16px;margin-bottom:16px;display:flex;align-items:center;gap:12px;">
+        <div style="font-size:28px;">${cfg.icon}</div>
+        <div style="flex:1;">
+          <div style="font-size:13px;font-weight:800;color:${cfg.c};">${cfg.label}</div>
+          <div style="font-size:11px;color:${cfg.c2};margin-top:2px;">Predicted ${p.action} @ ${p.entryZone} · Close $${p.actualClose?.toFixed(2)||'—'} ${moveStr?`(${moveStr})`:''}</div>
+        </div>
+        <button onclick="dailyPredictions[${idx}].verified=false;saveDailyPredictions();showDailyReport(${idx});" style="background:rgba(0,0,0,0.05);border:none;color:${cfg.c};font-size:10px;font-weight:600;padding:5px 9px;border-radius:7px;cursor:pointer;font-family:inherit;">Redo</button>
+      </div>`;
+    })();
 
   content.innerHTML=`<div style="max-width:820px;margin:0 auto;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
@@ -3043,27 +3087,48 @@ async function verifyPrediction(idx){
   loadDailyPredictions();
   const p=dailyPredictions[idx];if(!p)return;
   const input=document.getElementById(`dt-verify-price-${idx}`);
-  const closePrice=input?parseFloat(input.value):null;
-  if(!closePrice||isNaN(closePrice)){toastError('Enter a valid closing price.');return;}
-  
-  const entryLow=p.entryZone?parseFloat(p.entryZone.replace(/[^0-9.–-]/g,'').split(/[–-]/)[0]):null;
-  const target=p.target?parseFloat(p.target.replace(/[^0-9.]/g,'')):null;
-  const stop=p.stopLoss?parseFloat(p.stopLoss.replace(/[^0-9.]/g,'')):null;
-  
-  let correct=false;
-  if(p.bias==='BUY'||p.action==='BUY'){
-    correct=target?closePrice>=target:(closePrice>(entryLow||0));
-  }else if(p.bias==='SELL'||p.action==='SELL'){
-    correct=stop?closePrice<=stop:(closePrice<(entryLow||999999));
-  }else{
-    correct=stop&&target?(closePrice>stop&&closePrice<target):true;
+  let closePrice=input?parseFloat(input.value):null;
+
+  // Auto-fetch if no manual price entered
+  if(!closePrice||isNaN(closePrice)){
+    const btn=document.getElementById(`dt-autofetch-${idx}`);
+    if(btn){btn.disabled=true;btn.textContent='⟳ Fetching...';}
+    const q=await fetchPrice(p.ticker).catch(()=>null);
+    if(btn){btn.disabled=false;btn.textContent='⚡ Auto-fetch price';}
+    if(q&&q.c>0){closePrice=q.c;}
+    else{toastError('Could not auto-fetch. Enter the closing price manually.');return;}
   }
-  
-  dailyPredictions[idx]={...p,verified:true,correct,actualClose:closePrice};
+
+  const entryLow=p.entryZone&&p.entryZone!=='—'?parseFloat(p.entryZone.replace(/[^0-9.–-]/g,'').split(/[–-]/)[0]):null;
+  const target=p.target&&p.target!=='—'?parseFloat(p.target.replace(/[^0-9.]/g,'')):null;
+  const stop=p.stopLoss&&p.stopLoss!=='—'?parseFloat(p.stopLoss.replace(/[^0-9.]/g,'')):null;
+  const base=p.priceAtAnalysis||entryLow||closePrice;
+
+  // 3-tier outcome: correct / partial / wrong
+  let outcome='wrong'; // 'correct' | 'partial' | 'wrong'
+  const movePct=base>0?((closePrice-base)/base)*100:0;
+
+  if(p.bias==='BUY'||p.action==='BUY'){
+    if(target&&closePrice>=target)outcome='correct';
+    else if(closePrice>base)outcome='partial'; // moved in right direction but didn't hit target
+    else if(stop&&closePrice<=stop)outcome='wrong';
+    else outcome='wrong';
+  }else if(p.bias==='SELL'||p.action==='SELL'){
+    if(stop&&closePrice<=stop)outcome='correct'; // for SELL, hitting the downside target
+    else if(target&&closePrice<=target)outcome='correct';
+    else if(closePrice<base)outcome='partial';
+    else outcome='wrong';
+  }else{ // HOLD/NEUTRAL: correct if stayed within range
+    if(stop&&target)outcome=(closePrice>stop&&closePrice<target)?'correct':'partial';
+    else outcome=Math.abs(movePct)<2?'correct':'partial';
+  }
+
+  dailyPredictions[idx]={...p,verified:true,outcome,correct:outcome==='correct',actualClose:closePrice,movePct:parseFloat(movePct.toFixed(2))};
   saveDailyPredictions();
   renderDailyHistoryList();
   showDailyReport(idx);
-  renderAccuracyStats();
+  const labels={correct:'✓ Prediction was correct!',partial:'~ Partially correct — right direction',wrong:'✗ Prediction missed'};
+  toast(labels[outcome],outcome==='correct'?'success':outcome==='partial'?'warning':'error');
 }
 
 function renderAccuracyStats(){
@@ -3133,17 +3198,55 @@ function renderReportsList(){
 function showReport(idx){
   const r=weeklyReports[idx];if(!r)return;
   const content=document.getElementById('rp-content');if(!content)return;
+  const canCompare=weeklyReports.length>1;
   content.innerHTML=`<div style="max-width:820px;margin:0 auto;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px;">
       <div>
         <div style="font-size:20px;font-weight:800;color:var(--t);">📊 ${t('reports_empty_title')}</div>
         <div style="font-size:12px;color:var(--t3);margin-top:4px;">${t('week_of')} ${r.weekOf} · ${t('generated')} ${r.date}</div>
       </div>
-      <button onclick="deleteReport(${idx})" style="background:#fee2e2;border:none;color:var(--r);font-size:11px;font-weight:700;padding:7px 12px;border-radius:9px;cursor:pointer;font-family:inherit;">${t('delete_report')}</button>
+      <div style="display:flex;gap:6px;">
+        ${canCompare?`<button onclick="compareReports(${idx})" style="background:var(--pl);border:1px solid var(--p);color:var(--p);font-size:11px;font-weight:700;padding:7px 12px;border-radius:9px;cursor:pointer;font-family:inherit;">⇄ Compare</button>`:''}
+        <button onclick="deleteReport(${idx})" style="background:#fee2e2;border:none;color:var(--r);font-size:11px;font-weight:700;padding:7px 12px;border-radius:9px;cursor:pointer;font-family:inherit;">${t('delete_report')}</button>
+      </div>
     </div>
     <div class="rp-body">${parseMarkdown(r.content)}</div>
   </div>`;
   document.querySelectorAll('#rp-sidebar > div').forEach((el,i)=>{el.style.background=i===idx?'var(--pl)':'#fff';});
+}
+
+function compareReports(idx){
+  if(weeklyReports.length<2)return;
+  // Compare this report with the one before it (older)
+  const newer=weeklyReports[idx];
+  const olderIdx=idx<weeklyReports.length-1?idx+1:idx-1;
+  const older=weeklyReports[olderIdx];
+  const content=document.getElementById('rp-content');if(!content)return;
+  // Section extractor
+  const getSection=(txt,re)=>{const m=txt.match(re);return m?m[0].replace(/^##[^\n]*\n/,'').replace(/[#*`]/g,'').trim().slice(0,600):'—';};
+  const secs=[
+    {t:'📈 Market Narrative',re:/##[^\n]*Narrative[\s\S]*?(?=\n##|$)/i},
+    {t:'🔭 Predictions',re:/##[^\n]*(?:Week Ahead|Refined Predictions)[\s\S]*?(?=\n##|$)/i},
+    {t:'📐 Key Levels',re:/##[^\n]*Technical Levels?[\s\S]*?(?=\n##|$)/i},
+  ];
+  content.innerHTML=`<div style="max-width:900px;margin:0 auto;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
+      <div style="font-size:18px;font-weight:800;color:var(--t);">⇄ Week Comparison</div>
+      <button onclick="showReport(${idx})" style="background:var(--pl);border:1px solid var(--p);color:var(--p);font-size:11px;font-weight:700;padding:7px 12px;border-radius:9px;cursor:pointer;font-family:inherit;">← Back</button>
+    </div>
+    <div style="display:flex;gap:12px;margin-bottom:16px;">
+      <div style="flex:1;text-align:center;background:var(--pl);border-radius:10px;padding:8px;"><div style="font-size:9px;font-weight:700;color:var(--t3);letter-spacing:1px;">OLDER</div><div style="font-size:13px;font-weight:800;color:var(--p);">${older.weekOf}</div></div>
+      <div style="display:flex;align-items:center;color:var(--t4);font-size:18px;">→</div>
+      <div style="flex:1;text-align:center;background:var(--pl);border-radius:10px;padding:8px;"><div style="font-size:9px;font-weight:700;color:var(--t3);letter-spacing:1px;">NEWER</div><div style="font-size:13px;font-weight:800;color:var(--p);">${newer.weekOf}</div></div>
+    </div>
+    ${secs.map(s=>`<div style="margin-bottom:18px;">
+      <div style="font-size:13px;font-weight:800;color:var(--t);margin-bottom:8px;">${s.t}</div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:240px;background:#fff;border:1px solid var(--b);border-radius:12px;padding:12px;font-size:12px;line-height:1.6;color:var(--t2);">${getSection(older.content,s.re)}</div>
+        <div style="flex:1;min-width:240px;background:#fff;border:1px solid var(--p);border-radius:12px;padding:12px;font-size:12px;line-height:1.6;color:var(--t2);box-shadow:var(--sh-sm);">${getSection(newer.content,s.re)}</div>
+      </div>
+    </div>`).join('')}
+  </div>`;
 }
 
 function deleteReport(idx){
@@ -3174,9 +3277,11 @@ async function generateWeeklyReport(){
     ? prevReports.map((r,i)=>`--- WEEK ${i+1} (${r.weekOf}) ---\n${r.content.slice(0,1200)}...`).join('\n\n')
     : 'No previous reports available — this is the first report.';
 
-  // Extract last week's predictions section for accuracy audit
+  // Extract last week's predictions — prefer structured data, fall back to prose
   const lastPredictions=prevReports.length>0
-    ? (prevReports[0].content.match(/##.*Week Ahead[\s\S]*?(?=##|$)/i)||[''])[0].slice(0,800)
+    ? (prevReports[0].predictions
+        ? `BULLISH SCENARIO: ${prevReports[0].predictions.bullish||'n/a'}\nBEARISH SCENARIO: ${prevReports[0].predictions.bearish||'n/a'}\nBASE CASE PROBABILITY: ${prevReports[0].predictions.probability||'?'}%\nKEY LEVELS: ${prevReports[0].predictions.levels||'n/a'}`
+        : (prevReports[0].content.match(/##.*Week Ahead[\s\S]*?(?=##|$)/i)||[''])[0].slice(0,800))
     : 'No previous predictions available.';
 
   const prompt=`You are an Adaptive AI Market Strategist with Recursive Memory. Your goal is to provide a weekly market analysis that evolves by learning from previous weeks' data and your own past predictions.
@@ -3256,12 +3361,18 @@ IMPORTANT: Be specific with numbers and percentages. Show your reasoning. The Ac
     if(!data.content)throw new Error('Empty response from Claude.');
     const text=(data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('\n');
     if(!text)throw new Error('No text in response.');
-    const report={id:'rp_'+Date.now(),weekOf,date:today.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}),content:text};
+    // Extract structured predictions (bull/bear scenarios + base case) for reliable future audits
+    const predictions={
+      bullish:(text.match(/[Bb]ull(?:ish)?[^\n:]*[:\s][^\n]*([\s\S]*?)(?=\n[-*🐻]|\n##|$)/)||['',''])[0].replace(/[#*`]/g,'').slice(0,300).trim(),
+      bearish:(text.match(/[Bb]ear(?:ish)?[^\n:]*[:\s][^\n]*([\s\S]*?)(?=\n[-*]|\n##|$)/)||['',''])[0].replace(/[#*`]/g,'').slice(0,300).trim(),
+      probability:(text.match(/[Bb]ase\s*[Cc]ase[^\n]*?(\d+)\s*%/)||['',''])[1]||'',
+      levels:(text.match(/##[^\n]*Technical Levels?[\s\S]*?(?=\n##|$)/i)||[''])[0].replace(/[#*`]/g,'').slice(0,400).trim()
+    };
+    const report={id:'rp_'+Date.now(),weekOf,date:today.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}),content:text,predictions};
     loadReports();weeklyReports.unshift(report);saveReports();renderReportsList();
   }catch(e){
     if(content)content.innerHTML=`<div style="padding:20px;background:#fef2f2;border-radius:12px;color:var(--r);font-weight:600;">Error: ${e.message}</div>`;
   }finally{
-    clearInterval(stepInterval);
     btn.disabled=false;
     btn.innerHTML=`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg> ${t('generate_report')}`;
   }
