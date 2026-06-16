@@ -1398,6 +1398,84 @@ function recordPortfolioSnapshot(){
   if(FB_ACTIVE)fbWrite(userPath('snapshots'),{snapshots,updatedAt:Date.now()}).catch(()=>{});
 }
 
+// ── BACKFILL portfolio history from real price data ──
+async function backfillPortfolioHistory(portId){
+  const port=PORTFOLIOS.find(p=>p.id===portId);
+  if(!port||!port.positions.length)return;
+  toast('Building chart history from market data...','info');
+
+  // Fetch ~1 year of daily closes for each holding
+  const histByTicker={};
+  for(const pos of port.positions){
+    const hist=await fetchPriceHistory(pos.ticker);
+    if(hist)histByTicker[pos.ticker]={hist,shares:pos.shares,cost:pos.cost};
+  }
+
+  // Build a date->value map: portfolio value = sum(shares * close) per date
+  const dateMap={};
+  Object.values(histByTicker).forEach(({hist,shares,cost})=>{
+    hist.forEach(({d,c})=>{
+      if(!dateMap[d])dateMap[d]={v:0,dep:0};
+      dateMap[d].v+=shares*c;
+    });
+  });
+
+  if(!Object.keys(dateMap).length){toastError('No history data available for these stocks.');return;}
+
+  const deposit=port.positions.reduce((s,x)=>s+x.shares*x.cost,0);
+  const snapshots=LS.get('st_snapshots')||{};
+  const existing=snapshots[portId]||[];
+  const existingDates=new Set(existing.map(s=>s.d));
+
+  Object.entries(dateMap).forEach(([d,obj])=>{
+    if(!existingDates.has(d)&&obj.v>0){
+      existing.push({d,v:parseFloat(obj.v.toFixed(2)),dep:parseFloat(deposit.toFixed(2))});
+    }
+  });
+  existing.sort((a,b)=>a.d.localeCompare(b.d));
+  snapshots[portId]=existing.slice(-1825);
+  LS.set('st_snapshots',snapshots);
+  if(FB_ACTIVE)fbWrite(userPath('snapshots'),{snapshots,updatedAt:Date.now()}).catch(()=>{});
+
+  toastSuccess('Chart history loaded!');
+  _activeChartRange[portId]='1y';
+  renderPORT();
+  setTimeout(()=>renderFullChart(portId),100);
+}
+
+// Fetch ~1y daily close history for a ticker via Yahoo
+async function fetchPriceHistory(ticker){
+  const sym=TICKER_CACHE[ticker]||ticker;
+  const enc=encodeURIComponent(sym);
+  const base=`https://query1.finance.yahoo.com/v8/finance/chart/${enc}?interval=1d&range=1y`;
+  const urls=[];
+  if(YAHOO_PROXY)urls.push(`${YAHOO_PROXY}?t=${enc}&range=1y`);
+  urls.push(
+    `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(base)}`,
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(base)}`
+  );
+  for(const url of urls){
+    try{
+      const r=await fetch(url,{signal:AbortSignal.timeout(10000)});
+      if(!r.ok)continue;
+      const d=await r.json();
+      const res=d?.chart?.result?.[0];
+      if(!res)continue;
+      const ts=res.timestamp||[];
+      const closes=res.indicators?.quote?.[0]?.close||[];
+      const out=[];
+      for(let i=0;i<ts.length;i++){
+        if(closes[i]!=null){
+          const date=new Date(ts[i]*1000).toISOString().split('T')[0];
+          out.push({d:date,c:closes[i]});
+        }
+      }
+      if(out.length)return out;
+    }catch{}
+  }
+  return null;
+}
+
 function getPortfolioChartData(portId){
   const snapshots=LS.get('st_snapshots')||{};
   return (snapshots[portId]||[]).sort((a,b)=>a.d.localeCompare(b.d));
@@ -1432,19 +1510,28 @@ function renderFullChart(portId){
   const chgEl=document.getElementById(`pchart-chg-${portId}`);
   if(!canvas)return;
 
-  // Update range tab active states
+  // Determine which ranges actually have 2+ data points, disable the rest
+  const daysOfData=allData.length>0?Math.round((new Date()-new Date(allData[0].d))/86400000):0;
   document.querySelectorAll(`[data-chart-range="${portId}"] button`).forEach(b=>{
-    const on=b.dataset.range===range;
+    const r=b.dataset.range;
+    const hasData=filterChartRange(allData,r).length>=2;
+    const on=r===range;
+    b.disabled=!hasData;
     b.style.background=on?'var(--p)':'transparent';
-    b.style.color=on?'#fff':'var(--t3)';
+    b.style.color=on?'#fff':(hasData?'var(--t3)':'var(--t4)');
+    b.style.opacity=hasData?'1':'0.35';
+    b.style.cursor=hasData?'pointer':'not-allowed';
   });
 
   if(data.length<2){
     const ctx=canvas.getContext('2d');
-    ctx.clearRect(0,0,canvas.width,canvas.height);
-    canvas.height=140;
-    ctx.fillStyle='#94a3b8';ctx.font='12px Plus Jakarta Sans,sans-serif';ctx.textAlign='center';
-    ctx.fillText('Not enough data yet for this range',canvas.offsetWidth/2,70);
+    const dpr=window.devicePixelRatio||1;
+    const w=canvas.offsetWidth||320;canvas.width=w*dpr;canvas.height=160*dpr;canvas.style.height='160px';
+    ctx.scale(dpr,dpr);ctx.clearRect(0,0,w,160);
+    ctx.fillStyle='#94a3b8';ctx.font='600 12px Plus Jakarta Sans,sans-serif';ctx.textAlign='center';
+    ctx.fillText(`${daysOfData} day${daysOfData!==1?'s':''} of history so far`,w/2,72);
+    ctx.font='11px Plus Jakarta Sans,sans-serif';ctx.fillStyle='#a4a8c8';
+    ctx.fillText('Chart builds as you use the app daily',w/2,92);
     if(valEl)valEl.textContent=formatCurrency(allData.length?allData[allData.length-1].v:0);
     if(chgEl)chgEl.innerHTML='';
     return;
@@ -1457,11 +1544,9 @@ function renderFullChart(portId){
   const isUp=change>=0;
   const col=isUp?'#16b981':'#f24d6a';
 
-  // Update header value + change
   if(valEl)valEl.textContent=formatCurrency(last);
-  if(chgEl)chgEl.innerHTML=`<span style="color:${col};font-weight:700;font-size:13px;">${isUp?'↗':'↘'} ${isUp?'+':''}${formatCurrency(change).replace(/^[^0-9.-]*/,m=>m)}${''} (${isUp?'+':''}${changePct.toFixed(2)}%)</span> <span style="color:var(--t4);font-size:11px;">${range.toUpperCase()}</span>`;
+  if(chgEl)chgEl.innerHTML=`<span style="color:${col};font-weight:700;font-size:13px;">${isUp?'↗':'↘'} ${isUp?'+':''}${formatCurrency(Math.abs(change))} (${isUp?'+':''}${changePct.toFixed(2)}%)</span> <span style="color:var(--t4);font-size:11px;">${range.toUpperCase()}</span>`;
 
-  // Draw chart
   const ctx=canvas.getContext('2d');
   const dpr=window.devicePixelRatio||1;
   const w=canvas.offsetWidth||320;
@@ -1480,7 +1565,6 @@ function renderFullChart(portId){
     v:d.v,d:d.d
   }));
 
-  // Gradient fill under line
   const grad=ctx.createLinearGradient(0,0,0,ht);
   grad.addColorStop(0,isUp?'rgba(22,185,129,0.22)':'rgba(242,77,106,0.22)');
   grad.addColorStop(1,'rgba(255,255,255,0)');
@@ -1489,7 +1573,6 @@ function renderFullChart(portId){
   ctx.lineTo(pts[pts.length-1].x,ht-padBot);ctx.closePath();
   ctx.fillStyle=grad;ctx.fill();
 
-  // Line
   ctx.beginPath();ctx.moveTo(pts[0].x,pts[0].y);
   for(let i=1;i<pts.length;i++){
     const xc=(pts[i].x+pts[i-1].x)/2,yc=(pts[i].y+pts[i-1].y)/2;
@@ -1498,7 +1581,6 @@ function renderFullChart(portId){
   ctx.lineTo(pts[pts.length-1].x,pts[pts.length-1].y);
   ctx.strokeStyle=col;ctx.lineWidth=2.5;ctx.lineJoin='round';ctx.lineCap='round';ctx.stroke();
 
-  // End dot
   const lp=pts[pts.length-1];
   ctx.beginPath();ctx.arc(lp.x,lp.y,4,0,Math.PI*2);ctx.fillStyle=col;ctx.fill();
   ctx.beginPath();ctx.arc(lp.x,lp.y,4,0,Math.PI*2);ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.stroke();
@@ -1508,8 +1590,9 @@ function renderFullChart(portId){
 function portfolioChartCard(portId){
   const ranges=['1d','1w','1m','3m','ytd','1y','5y','max'];
   return `<div style="background:var(--card);border:1px solid var(--b);border-radius:var(--rad);padding:16px;margin-bottom:12px;box-shadow:var(--sh-sm);">
-    <div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:2px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;">
       <div style="font-size:9px;font-weight:700;color:var(--t3);letter-spacing:2px;">PORTFOLIO VALUE</div>
+      <button id="pchart-load-${portId}" onclick="backfillPortfolioHistory('${portId}')" style="background:var(--pl);border:1px solid var(--p);color:var(--p);font-size:9px;font-weight:700;padding:4px 9px;border-radius:7px;cursor:pointer;font-family:inherit;letter-spacing:0.5px;">↺ LOAD HISTORY</button>
     </div>
     <div id="pchart-val-${portId}" style="font-size:24px;font-weight:800;color:var(--t);letter-spacing:-0.5px;">—</div>
     <div id="pchart-chg-${portId}" style="margin-bottom:10px;min-height:18px;"></div>
@@ -1819,7 +1902,7 @@ function renderPORT(){
     <div class="sc2" style="background:#fffbeb;border-color:#fde68a"><div class="slbl" style="color:#f59e0b">TOP HOLDING</div><div class="sval" style="color:#b45309">${top?.ticker||'—'}</div></div>
   </div>`:'';
   // Desktop: analyze + delete inside right panel. Mobile: sticky bar + ⋯ menu
-  const chartSection=pos.length&&getPortfolioChartData(port.id).length>=2?portfolioChartCard(port.id):'';
+  const chartSection=pos.length?portfolioChartCard(port.id):'';
   const rightH=summaryCards+(isDesktop&&pos.length?`
   <button class="abig" onclick="anzAll()">${t('analyze_portfolio')} ${port.name}</button>
   ${PORTFOLIOS.length>1?`<button class="del-port-btn" onclick="deletePortfolio()">${t('delete_portfolio')} "${port.name}"</button>`:''}`:``);
