@@ -398,7 +398,7 @@ input,button,select{font-family:'Montserrat',sans-serif;}
   .qrow{padding:8px 12px;}
 
   .pt-left,.pt-right{display:none!important;}
-  .pt-center{width:100%!important;background:#f0f2f8;}
+  .pt-center{width:100%!important;background:var(--bg);}
   .pt-center .port-switcher{padding:10px 12px;overflow-x:auto;flex-shrink:0;}
   .pt-center .pbar{padding:8px 14px;background:#fff;flex-shrink:0;}
 
@@ -562,12 +562,12 @@ input,button,select{font-family:'Montserrat',sans-serif;}
 [data-theme="dark"] .tb.on{background:var(--p);color:#fff;border-color:var(--p);}
 [data-theme="dark"] .pcrd,[data-theme="dark"] .fcrd,[data-theme="dark"] .wcard,[data-theme="dark"] .sc2,[data-theme="dark"] #sb,[data-theme="dark"] .bbl.a,[data-theme="dark"] #rp-sidebar{background:var(--card);border-color:var(--b);}
 [data-theme="dark"] .bbl.u{background:#3730a3;}
-[data-theme="dark"] .pt-center,[data-theme="dark"] .wt-right,[data-theme="dark"] #prt,[data-theme="dark"] #rpt,[data-theme="dark"] #dtt,[data-theme="dark"] .pt-center-scr,[data-theme="dark"] #dt-content,[data-theme="dark"] #rp-content,[data-theme="dark"] #app{background:#0f172a;}
+[data-theme="dark"] .pt-center,[data-theme="dark"] .wt-right,[data-theme="dark"] #prt,[data-theme="dark"] #rpt,[data-theme="dark"] #dtt,[data-theme="dark"] .pt-center-scr,[data-theme="dark"] #dt-content,[data-theme="dark"] #rp-content,[data-theme="dark"] #app,[data-theme="dark"] #pscr,[data-theme="dark"] #pt,[data-theme="dark"] #wt{background:var(--bg)!important;}
 [data-theme="dark"] .ifield,[data-theme="dark"] .finp,[data-theme="dark"] .mob-finp,[data-theme="dark"] .inp{background:#1e293b;border-color:#334155;color:#f1f5f9;}
 [data-theme="dark"] .bnav{background:#0f172a;border-color:#1e293b;}
 [data-theme="dark"] .port-tab{background:#1e293b;color:#94a3b8;border-color:#334155;}
 [data-theme="dark"] .port-tab.on{background:var(--p);color:#fff;}
-[data-theme="dark"] .pt-center .pbar,[data-theme="dark"] .pt-center .port-switcher,[data-theme="dark"] .wt-left,[data-theme="dark"] .pt-left,[data-theme="dark"] .pt-right,[data-theme="dark"] .dt-left-spacer{background:#0f172a;border-color:#1e293b;}
+[data-theme="dark"] .pt-center .pbar,[data-theme="dark"] .pt-center .port-switcher,[data-theme="dark"] .wt-left,[data-theme="dark"] .pt-left,[data-theme="dark"] .pt-right,[data-theme="dark"] .dt-left-spacer{background:var(--card)!important;border-color:var(--b);}
 [data-theme="dark"] .prow{border-color:#334155;}
 [data-theme="dark"] .prow:hover,[data-theme="dark"] .prow-wrap.editing{background:#1e293b;}
 [data-theme="dark"] .rp-body{color:#f1f5f9;}
@@ -813,6 +813,15 @@ button:active{transform:scale(0.97);}
       <div class="pbar">
         <div class="pbar-ts" id="p-ts">Prices not loaded</div>
         <div style="display:flex;gap:6px;align-items:center;">
+          <select id="port-sort" onchange="setPortSort(this.value)" class="rbtn" style="background:none;border:1px solid var(--b);color:var(--t3);font-size:10px;padding:5px 6px;cursor:pointer;font-family:inherit;">
+            <option value="custom">↕ Manual</option>
+            <option value="name">A–Z Name</option>
+            <option value="gain-desc">▼ Gain $</option>
+            <option value="gain-asc">▲ Gain $</option>
+            <option value="pct-desc">▼ Gain %</option>
+            <option value="pct-asc">▲ Gain %</option>
+            <option value="value-desc">▼ Value</option>
+          </select>
           <button onclick="exportPortfolioCSV()" class="rbtn" style="background:none;border:1px solid var(--b);color:var(--t3);font-size:10px;" title="Export CSV">⬇ CSV</button>
           <button class="rbtn" id="p-rb" onclick="refresh('p')"><span class="ri">↻</span> Refresh</button>
         </div>
@@ -1843,6 +1852,29 @@ function createPortfolio(){
   saveLocal();renderPortSwitcher();renderPORT();
 }
 
+let PORT_SORT=LS.get('st_port_sort')||'custom';
+function setPortSort(mode){
+  PORT_SORT=mode;
+  LS.set('st_port_sort',mode);
+  renderPORT();
+}
+function sortPositions(arr){
+  const a=[...arr];
+  const gain=p=>{const q=PC[p.ticker];return q?(q.c-p.cost)*p.shares:-Infinity;};
+  const pct=p=>{const q=PC[p.ticker];return q?((q.c/p.cost)-1)*100:-Infinity;};
+  const val=p=>{const q=PC[p.ticker];return q?q.c*p.shares:0;};
+  switch(PORT_SORT){
+    case 'name':a.sort((x,y)=>x.ticker.localeCompare(y.ticker));break;
+    case 'gain-desc':a.sort((x,y)=>gain(y)-gain(x));break;
+    case 'gain-asc':a.sort((x,y)=>gain(x)-gain(y));break;
+    case 'pct-desc':a.sort((x,y)=>pct(y)-pct(x));break;
+    case 'pct-asc':a.sort((x,y)=>pct(x)-pct(y));break;
+    case 'value-desc':a.sort((x,y)=>val(y)-val(x));break;
+    default:break; // custom = original order
+  }
+  return a;
+}
+
 function renderPORT(){
   const port=activePort();
   const isDesktop=window.innerWidth>=900;
@@ -1851,7 +1883,9 @@ function renderPORT(){
     if(isDesktop){document.getElementById('pscr-left').innerHTML='';document.getElementById('pscr-right').innerHTML='';}
     return;
   }
-  const pos=port.positions||[];
+  const posRaw=port.positions||[];
+  // Attach original index so edit/delete still target the right position after sorting
+  const pos=sortPositions(posRaw.map((p,oi)=>({...p,_oi:oi})));
   const tot=pos.reduce((s,p)=>s+p.shares*p.cost,0);
   let lT=0,lC=0;
   pos.forEach(p=>{const q=PC[p.ticker];if(q){lT+=p.shares*q.c;lC+=p.shares*p.cost;}});
@@ -1922,7 +1956,8 @@ function renderPORT(){
   if(pos.length){
     centerH+=chartSection;
     centerH+=`<div class="pcrd">`;
-    pos.forEach((p,i)=>{
+    pos.forEach((p,_si)=>{
+      const i=p._oi!==undefined?p._oi:_si;
       const col=COLS[i%COLS.length],q=PC[p.ticker],up=q?q.d>=0:true;
       const pv=q?(q.c-p.cost)*p.shares:null,pp=q?((q.c/p.cost)-1)*100:null;
       centerH+=`<div class="prow-wrap" id="prow-wrap-${i}">
@@ -1971,6 +2006,7 @@ function renderPORT(){
     document.getElementById('pscr-left').innerHTML='';
     document.getElementById('pscr-right').innerHTML='';
   }
+  const sortSel=document.getElementById('port-sort');if(sortSel)sortSel.value=PORT_SORT;
 
 
   // Render portfolio chart after DOM paint
@@ -2078,10 +2114,34 @@ function checkPriceAlerts(){
     const hit=(al.direction==='above'&&q.c>=al.target)||(al.direction==='below'&&q.c<=al.target);
     if(hit){
       al.triggered=true;changed=true;
-      toastWarning(`🔔 ALERT: ${al.ticker} hit $${q.c.toFixed(2)} (target: $${al.target})`);
+      const dir=al.direction==='above'?'rose above':'dropped below';
+      const msg=`${al.ticker} ${dir} ${formatCurrency(al.target)} — now ${formatCurrency(q.c)}`;
+      toastWarning(`🔔 ${msg}`);
+      // Browser push notification (works even when tab is in background)
+      sendPushNotification(`🔔 Price Alert: ${al.ticker}`, msg);
     }
   });
   if(changed)saveAlerts();
+}
+
+function sendPushNotification(title,body){
+  if(!('Notification' in window))return;
+  if(Notification.permission==='granted'){
+    try{new Notification(title,{body,icon:'icon-192.png',badge:'icon-192.png',tag:'stockr-alert'});}catch(e){}
+  }
+}
+
+async function requestNotificationPermission(){
+  if(!('Notification' in window)){toastError('This device does not support notifications.');return;}
+  if(Notification.permission==='granted'){toastSuccess('Notifications already enabled!');renderProfile();return;}
+  const perm=await Notification.requestPermission();
+  if(perm==='granted'){
+    toastSuccess('Push notifications enabled!');
+    sendPushNotification('Stockr Notifications On','Alerts will fire when your price targets hit.');
+  }else{
+    toastError('Notifications blocked. Enable them in your browser settings.');
+  }
+  renderProfile();
 }
 
 function showAlertsModal(ticker){
@@ -3791,6 +3851,9 @@ function renderProfile(){
     <div style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;background:${fbOk?'#dcfce7':'#f1f5f9'};color:${fbOk?'#047857':'#94a3b8'};">${fbOk?'ON':'OFF'}</div>
   </div>`;
 
+  // ── Preferences header ──
+  html+=`<div style="font-size:10px;font-weight:700;color:var(--t3);letter-spacing:2px;margin:14px 2px 8px;">PREFERENCES</div>`;
+
   // ── Language ──
   html+=`<div style="background:#fff;border-radius:14px;overflow:hidden;margin-bottom:10px;box-shadow:0 1px 4px rgba(0,0,0,0.05);">
     <div style="padding:14px 16px;display:flex;align-items:center;gap:12px;">
@@ -3811,6 +3874,15 @@ function renderProfile(){
     </div>
   </div>`;
 
+  // ── Push Notifications ──
+  const notifPerm=('Notification' in window)?Notification.permission:'unsupported';
+  const notifOn=notifPerm==='granted';
+  html+=`<div style="background:var(--card);border-radius:14px;padding:14px 16px;margin-bottom:10px;box-shadow:var(--sh-sm);display:flex;align-items:center;gap:12px;">
+    <div style="width:36px;height:36px;border-radius:10px;background:${notifOn?'#ecfdf5':'#f8fafc'};border:1px solid ${notifOn?'#a7f3d0':'var(--b)'};display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">🔔</div>
+    <div style="flex:1;"><div style="font-size:13px;font-weight:700;color:var(--t);">Price Alert Notifications</div><div style="font-size:11px;color:${notifOn?'#10b981':'var(--t4)'};margin-top:1px;">${notifPerm==='unsupported'?'Not supported on this device':notifOn?'Enabled — push alerts active':'Get notified when targets hit'}</div></div>
+    ${notifPerm==='unsupported'?'':notifOn?'<div style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;background:#dcfce7;color:#047857;">ON</div>':`<button onclick="requestNotificationPermission()" style="background:var(--pl);border:1px solid var(--p);color:var(--p);font-size:11px;font-weight:700;padding:7px 12px;border-radius:9px;cursor:pointer;font-family:inherit;flex-shrink:0;">Enable</button>`}
+  </div>`;
+
   // ── Dark mode ──
   html+=`<div style="background:#fff;border-radius:14px;padding:14px 16px;margin-bottom:10px;box-shadow:0 1px 4px rgba(0,0,0,0.05);display:flex;align-items:center;justify-content:space-between;gap:12px;">
     <div style="display:flex;align-items:center;gap:12px;">
@@ -3826,6 +3898,9 @@ function renderProfile(){
   const currencyPanel=Object.keys(CURRENCIES).map(c=>`<button onclick="setCurrency('${c}')" style="padding:7px 14px;border-radius:20px;border:1.5px solid ${BASE_CURRENCY===c?'var(--p)':'var(--b)'};background:${BASE_CURRENCY===c?'var(--pl)':'#f8fafc'};color:${BASE_CURRENCY===c?'var(--p)':'var(--t)'};font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;">${c} ${CURRENCIES[c]}</button>`).join('');
   html+=serviceCard('currency-panel','💱','Base Currency',BASE_CURRENCY+' — '+(CURRENCIES[BASE_CURRENCY]||'$'),true,'ON','ON',
     `<div style="display:flex;flex-wrap:wrap;gap:8px;">${currencyPanel}</div>`);
+
+  // ── AI model header ──
+  html+=`<div style="font-size:10px;font-weight:700;color:var(--t3);letter-spacing:2px;margin:14px 2px 8px;">AI MODEL</div>`;
 
   // ── Claude model ──
   const modelBtns=CLAUDE_MODELS.map(m=>`
@@ -3921,6 +3996,34 @@ document.addEventListener('DOMContentLoaded',async()=>{
   LANG=LS.get('st_lang')||'en';
   applyLang();
   const saved=LS.get('st_auth');
+  const bio=LS.get('st_biometric');
+  // If biometric is enabled, require it on EVERY open before entering the app
+  if(saved?.uid&&saved?.email&&bio?.credId&&window.PublicKeyCredential){
+    document.getElementById('auth-screen').style.display='flex';
+    const sc=document.querySelector('#auth-screen .sc');
+    // Hide the normal login form, show only the biometric gate
+    if(sc)sc.querySelectorAll('.inp,.lbl,.bigbtn,.auth-switch,#auth-confirm,#auth-confirm-lbl').forEach(el=>el.style.display='none');
+    const gate=document.createElement('div');
+    gate.style.cssText='text-align:center;';
+    gate.innerHTML=`<div style="font-size:46px;margin-bottom:10px;">🔐</div>
+      <div style="font-size:16px;font-weight:800;color:var(--t);margin-bottom:4px;">Welcome back</div>
+      <div style="font-size:13px;color:var(--t3);margin-bottom:18px;">${saved.email}</div>
+      <button id="bio-auto-btn" style="width:100%;background:linear-gradient(135deg,var(--p),var(--pd));border:none;color:#fff;padding:15px;border-radius:14px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:10px;">🔐 Unlock with Face ID / Fingerprint</button>
+      <button id="bio-other-btn" style="width:100%;background:none;border:none;color:var(--t3);padding:12px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;margin-top:8px;">Use a different account</button>`;
+    if(sc)sc.appendChild(gate);
+    const bioBtn=gate.querySelector('#bio-auto-btn');
+    bioBtn.onclick=async()=>{
+      bioBtn.disabled=true;
+      bioBtn.innerHTML='<span style="display:inline-block;animation:spin 0.8s linear infinite">⟳</span> Verifying...';
+      const ok=await loginWithBiometric();
+      if(!ok){bioBtn.disabled=false;bioBtn.innerHTML='🔐 Unlock with Face ID / Fingerprint';}
+    };
+    gate.querySelector('#bio-other-btn').onclick=()=>{
+      LS.del('st_auth');location.reload();
+    };
+    setTimeout(()=>bioBtn.click(),500);
+    return;
+  }
   if(saved?.uid&&saved?.email){
     USER_ID=saved.uid;USER_EMAIL=saved.email;IS_GUEST=false;FB_ACTIVE=true;
     await startApp();
@@ -3928,8 +4031,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
   }
   // Show login screen
   document.getElementById('auth-screen').style.display='flex';
-  // Auto-trigger biometric if registered
-  const bio=LS.get('st_biometric');
+  // Auto-trigger biometric if registered (no saved session case)
   if(bio?.credId&&window.PublicKeyCredential){
     const bioBtn=document.createElement('button');
     bioBtn.id='bio-auto-btn';
