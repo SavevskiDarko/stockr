@@ -209,7 +209,7 @@ input,button,select{font-family:'Montserrat',sans-serif;}
 .rbtn.spin .ri{animation:sp 0.8s linear infinite;}
 @keyframes sp{from{transform:rotate(0)}to{transform:rotate(360deg)}}
 .ri{display:inline-block;}
-.scr{flex:1;overflow-y:auto;padding:12px 11px;background:#fff;}
+.scr{flex:1;overflow-y:auto;padding:12px 11px;background:var(--card);}
 
 /* PORTFOLIO SWITCHER */
 .port-switcher{display:flex;gap:8px;align-items:center;padding:10px 12px;background:var(--bg);border-bottom:1px solid var(--b);flex-shrink:0;overflow-x:auto;scrollbar-width:none;}
@@ -644,6 +644,16 @@ button:active{transform:scale(0.97);}
 /* Position rows and edit panels */
 [data-theme="dark"] .prow{background:transparent;}
 [data-theme="dark"] .pr-edit-inp{background:#23252f;border-color:#3a3e5c;color:var(--t);}
+
+/* ── DARK MODE: remaining white elements ── */
+[data-theme="dark"] .modal{background:var(--card);color:var(--t);}
+[data-theme="dark"] .ibar{background:var(--card);border-color:var(--b);}
+[data-theme="dark"] .mob-sheet{background:var(--card);color:var(--t);}
+[data-theme="dark"] .wt-right .pbar{background:var(--card);}
+[data-theme="dark"] .tab-menu{background:var(--card);border-color:var(--b);}
+[data-theme="dark"] .pr-cancel-btn{background:#23252f;border-color:var(--b);color:var(--t);}
+[data-theme="dark"] .scr{background:var(--card);}
+[data-theme="dark"] .pt-left,[data-theme="dark"] .pt-right,[data-theme="dark"] .wt-left{background:var(--card);}
 </style>
 </head>
 
