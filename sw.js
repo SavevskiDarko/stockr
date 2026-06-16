@@ -1,6 +1,6 @@
 // ── STOCKR SERVICE WORKER ──────────────────────────
 // Bump this version on EVERY deploy — this is the cache-buster
-const VERSION = 'stockr-v23';
+const VERSION = 'stockr-v24';
 const CACHE = `stockr-${VERSION}`;
 
 // Files to pre-cache on install
