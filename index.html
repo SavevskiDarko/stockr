@@ -522,13 +522,13 @@ input,button,select{font-family:'Montserrat',sans-serif;}
   /* Portfolio — left 260px | center flex | right 260px */
   #pt{display:none;flex-direction:row;flex:1;min-height:0;}
   #pt[style*="flex"]{display:flex;}
-  .pt-left{width:260px;flex-shrink:0;background:#fff;border-right:1px solid var(--b);display:flex;flex-direction:column;overflow-y:auto;}
+  .pt-left{width:260px;flex-shrink:0;background:var(--card);border-right:1px solid var(--b);display:flex;flex-direction:column;overflow-y:auto;}
   .pt-center{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--bg);}
   .pt-center .port-switcher{padding:12px 16px;background:#fff;border-bottom:1px solid var(--b);}
   .pt-center .pbar{padding:8px 16px;background:#fff;}
   .pt-center-scr{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;min-height:0;padding:16px 16px 24px;display:block;}
   .pt-center-scr .pcrd{margin-bottom:10px;}
-  .pt-right{width:260px;flex-shrink:0;background:#fff;border-left:1px solid var(--b);overflow-y:auto;padding:16px;}
+  .pt-right{width:260px;flex-shrink:0;background:var(--card);border-left:1px solid var(--b);overflow-y:auto;padding:16px;}
   .pt-right .sgrid{grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;}
   .pt-right .sval{font-size:18px;}
 
@@ -536,7 +536,7 @@ input,button,select{font-family:'Montserrat',sans-serif;}
   #wt{display:none;flex-direction:column;flex:1;}
   #wt[style*="flex"]{display:flex;}
   .wt-inner{display:flex;flex:1;min-height:0;}
-  .wt-left{width:260px;flex-shrink:0;background:#fff;border-right:1px solid var(--b);overflow-y:auto;padding:16px;}
+  .wt-left{width:260px;flex-shrink:0;background:var(--card);border-right:1px solid var(--b);overflow-y:auto;padding:16px;}
   .wt-right{flex:1;overflow-y:auto;padding:16px;background:var(--bg);}
   .watch-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;}
   .wprice{font-size:20px;}
@@ -626,6 +626,19 @@ button:active{transform:scale(0.97);}
 /* Card entrance animation */
 @keyframes cardIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
 .pcrd,.wcard{animation:cardIn 0.3s cubic-bezier(.4,0,.2,1) both;}
+
+/* ── DARK MODE: catch inline white backgrounds on JS-rendered cards ── */
+[data-theme="dark"] [style*="background:#fff"]{background:var(--card)!important;}
+[data-theme="dark"] [style*="background:#f8fafc"]{background:#23252f!important;}
+[data-theme="dark"] [style*="background:#f0f2f8"]{background:var(--bg)!important;}
+[data-theme="dark"] [style*="background: #fff"]{background:var(--card)!important;}
+[data-theme="dark"] .pcrd [style*="#f8fafc"]{background:#23252f!important;}
+/* Fix dark-mode text that was hardcoded dark on light cards */
+[data-theme="dark"] [style*="color:#0f172a"],[data-theme="dark"] [style*="color:#1a1d2e"],[data-theme="dark"] [style*="color:#13152b"]{color:var(--t)!important;}
+[data-theme="dark"] [style*="color:#334155"],[data-theme="dark"] [style*="color:#3a3e5c"]{color:var(--t2)!important;}
+/* Position rows and edit panels */
+[data-theme="dark"] .prow{background:transparent;}
+[data-theme="dark"] .pr-edit-inp{background:#23252f;border-color:#3a3e5c;color:var(--t);}
 </style>
 </head>
 
@@ -847,14 +860,14 @@ button:active{transform:scale(0.97);}
   <!-- DAILY TRADE -->
   <div id="dtt" style="display:none;flex-direction:column;flex:1;min-height:0;">
     <!-- Mobile top bar: ticker input (hidden on desktop) -->
-    <div class="dt-mobile-bar" style="background:#fff;border-bottom:1px solid var(--b);padding:12px 14px;flex-shrink:0;display:flex;gap:8px;align-items:center;">
+    <div class="dt-mobile-bar" style="background:var(--card);border-bottom:1px solid var(--b);padding:12px 14px;flex-shrink:0;display:flex;gap:8px;align-items:center;">
       <input id="dt-ticker-mob" class="mob-finp" placeholder="Ticker (e.g. AAPL)" style="flex:1;text-transform:uppercase;font-weight:700;font-size:15px;padding:11px 13px;" oninput="this.value=this.value.toUpperCase();document.getElementById('dt-ticker').value=this.value;" onkeydown="if(event.key==='Enter')generateDailyReport()">
       <button onclick="document.getElementById('dt-ticker').value=document.getElementById('dt-ticker-mob').value;generateDailyReport()" style="background:linear-gradient(135deg,var(--p),var(--pd));border:none;color:#fff;padding:11px 16px;border-radius:12px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;flex-shrink:0;">⚡ Analyze</button>
     </div>
     <!-- Desktop: side-by-side. Mobile: stacked -->
     <div style="display:flex;flex:1;min-height:0;overflow:hidden;">
       <!-- Left panel (desktop only) -->
-      <div class="dt-left-spacer" style="width:260px;flex-shrink:0;min-width:0;background:#fff;border-right:1px solid var(--b);display:flex;flex-direction:column;overflow:hidden;padding:0;">
+      <div class="dt-left-spacer" style="width:260px;flex-shrink:0;min-width:0;background:var(--card);border-right:1px solid var(--b);display:flex;flex-direction:column;overflow:hidden;padding:0;">
         <div style="padding:14px 14px 0;overflow:hidden;">
           <div style="font-size:10px;font-weight:700;color:var(--p);letter-spacing:2px;margin-bottom:12px;">⚡ DAILY TRADE PREP</div>
           <div style="margin-bottom:10px;">
@@ -872,7 +885,7 @@ button:active{transform:scale(0.97);}
         <div id="dt-history-list" style="flex:1;overflow-y:auto;padding:0 8px 14px;"></div>
       </div>
       <!-- Main content -->
-      <div style="flex:1;overflow-y:auto;background:#f0f2f8;padding:20px;" id="dt-content">
+      <div style="flex:1;overflow-y:auto;background:var(--bg);padding:20px;" id="dt-content">
         <div style="max-width:820px;margin:0 auto;text-align:center;padding-top:40px;">
           <div style="font-size:48px;margin-bottom:16px;">⚡</div>
           <div style="font-size:20px;font-weight:800;color:var(--t);margin-bottom:8px;">Daily Trading Prep</div>
@@ -884,16 +897,16 @@ button:active{transform:scale(0.97);}
 
   <!-- PROFILE -->
   <div id="prt" style="display:none;flex-direction:row;flex:1;min-height:0;">
-    <div style="width:260px;flex-shrink:0;background:#fff;border-right:1px solid var(--b);"></div>
-    <div style="flex:1;overflow-y:auto;padding:20px 24px;background:#f0f2f8;padding-bottom:80px;">
+    <div style="width:260px;flex-shrink:0;background:var(--card);border-right:1px solid var(--b);"></div>
+    <div style="flex:1;overflow-y:auto;padding:20px 24px;background:var(--bg);padding-bottom:80px;">
       <div id="profile-content" style="max-width:600px;"></div>
     </div>
   </div>
 
   <!-- REPORTS -->
-  <div id="rpt" style="display:none;flex-direction:column;flex:1;min-height:0;background:#f0f2f8;">
+  <div id="rpt" style="display:none;flex-direction:column;flex:1;min-height:0;background:var(--bg);">
     <!-- Header bar — 260px spacer matches other tabs -->
-    <div style="background:#fff;border-bottom:1px solid var(--b);padding:0;display:flex;align-items:stretch;flex-shrink:0;">
+    <div style="background:var(--card);border-bottom:1px solid var(--b);padding:0;display:flex;align-items:stretch;flex-shrink:0;">
       <div class="rpt-left-spacer" style="width:260px;flex-shrink:0;border-right:1px solid var(--b);"></div>
       <div style="flex:1;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;"><div>
         <div style="font-size:11px;font-weight:700;color:var(--p);letter-spacing:2px;">WEEKLY MARKET REPORTS</div>
@@ -906,11 +919,11 @@ button:active{transform:scale(0.97);}
     </div>
       </div>
     <!-- Mobile report selector (hidden on desktop) -->
-    <div id="rp-mobile-selector" style="display:none;background:#fff;border-bottom:1px solid var(--b);padding:10px 14px;flex-shrink:0;"></div>
+    <div id="rp-mobile-selector" style="display:none;background:var(--card);border-bottom:1px solid var(--b);padding:10px 14px;flex-shrink:0;"></div>
     <!-- Report list + content -->
     <div style="display:flex;flex:1;min-height:0;overflow:hidden;">
       <!-- Sidebar: past reports -->
-      <div id="rp-sidebar" style="width:260px;flex-shrink:0;border-right:1px solid var(--b);background:#fff;overflow-y:auto;"></div>
+      <div id="rp-sidebar" style="width:260px;flex-shrink:0;border-right:1px solid var(--b);background:var(--card);overflow-y:auto;"></div>
       <!-- Main content -->
       <div id="rp-content" style="flex:1;overflow-y:auto;padding:20px;"></div>
     </div>
@@ -3797,7 +3810,7 @@ function renderProfile(){
 
   // ── User card ──
   let html='';
-  html+=`<div style="background:#fff;border-radius:16px;padding:18px;margin-bottom:12px;box-shadow:0 1px 4px rgba(0,0,0,0.06);">
+  html+=`<div style="background:var(--card);border-radius:16px;padding:18px;margin-bottom:12px;box-shadow:var(--sh-sm);">
     <div style="display:flex;align-items:center;gap:14px;margin-bottom:${IS_GUEST?'0':'14px'};">
       <div style="width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,var(--p),var(--pd));display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;color:#fff;flex-shrink:0;">${avatar}</div>
       <div style="flex:1;min-width:0;">
@@ -3838,14 +3851,14 @@ function renderProfile(){
   );
 
   // ── Real-time prices ──
-  html+=`<div style="background:#fff;border-radius:14px;padding:14px 16px;margin-bottom:10px;box-shadow:0 1px 4px rgba(0,0,0,0.05);display:flex;align-items:center;gap:12px;">
+  html+=`<div style="background:var(--card);border-radius:14px;padding:14px 16px;margin-bottom:10px;box-shadow:var(--sh-sm);display:flex;align-items:center;gap:12px;">
     <div style="width:36px;height:36px;border-radius:10px;background:#ecfdf5;border:1px solid #a7f3d0;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">📈</div>
     <div style="flex:1;"><div style="font-size:13px;font-weight:700;color:var(--t);">Price Sources</div><div style="font-size:11px;color:#10b981;margin-top:1px;">${polyOk?'Polygon.io (US) + Finnhub + Yahoo (EU)':'Finnhub (US) + Yahoo Finance (EU)'}</div></div>
     <div style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;background:#dcfce7;color:#047857;">ON</div>
   </div>`;
 
   // ── Firebase Sync ──
-  html+=`<div style="background:#fff;border-radius:14px;padding:14px 16px;margin-bottom:10px;box-shadow:0 1px 4px rgba(0,0,0,0.05);display:flex;align-items:center;gap:12px;">
+  html+=`<div style="background:var(--card);border-radius:14px;padding:14px 16px;margin-bottom:10px;box-shadow:var(--sh-sm);display:flex;align-items:center;gap:12px;">
     <div style="width:36px;height:36px;border-radius:10px;background:${fbOk?'#ecfdf5':'#f8fafc'};border:1px solid ${fbOk?'#a7f3d0':'#e2e8f0'};display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">☁️</div>
     <div style="flex:1;"><div style="font-size:13px;font-weight:700;color:var(--t);">Firebase Sync</div><div style="font-size:11px;color:${fbOk?'#10b981':'#94a3b8'};margin-top:1px;">${fbOk?'Syncing as '+USER_EMAIL:'Sign in to enable sync'}</div></div>
     <div style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;background:${fbOk?'#dcfce7':'#f1f5f9'};color:${fbOk?'#047857':'#94a3b8'};">${fbOk?'ON':'OFF'}</div>
@@ -3855,7 +3868,7 @@ function renderProfile(){
   html+=`<div style="font-size:10px;font-weight:700;color:var(--t3);letter-spacing:2px;margin:14px 2px 8px;">PREFERENCES</div>`;
 
   // ── Language ──
-  html+=`<div style="background:#fff;border-radius:14px;overflow:hidden;margin-bottom:10px;box-shadow:0 1px 4px rgba(0,0,0,0.05);">
+  html+=`<div style="background:var(--card);border-radius:14px;overflow:hidden;margin-bottom:10px;box-shadow:var(--sh-sm);">
     <div style="padding:14px 16px;display:flex;align-items:center;gap:12px;">
       <div style="width:36px;height:36px;border-radius:10px;background:#f0fdf4;border:1px solid #bbf7d0;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">🌐</div>
       <div style="flex:1;"><div style="font-size:13px;font-weight:700;color:var(--t);">Language</div><div style="font-size:11px;color:#10b981;margin-top:1px;">${LANG==='mk'?'Македонски':'English'}</div></div>
@@ -3884,13 +3897,13 @@ function renderProfile(){
   </div>`;
 
   // ── Dark mode ──
-  html+=`<div style="background:#fff;border-radius:14px;padding:14px 16px;margin-bottom:10px;box-shadow:0 1px 4px rgba(0,0,0,0.05);display:flex;align-items:center;justify-content:space-between;gap:12px;">
+  html+=`<div style="background:var(--card);border-radius:14px;padding:14px 16px;margin-bottom:10px;box-shadow:var(--sh-sm);display:flex;align-items:center;justify-content:space-between;gap:12px;">
     <div style="display:flex;align-items:center;gap:12px;">
       <div style="width:36px;height:36px;border-radius:10px;background:#1e293b;border:1px solid #334155;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">${DARK_MODE?'☀️':'🌙'}</div>
       <div><div style="font-size:13px;font-weight:700;color:var(--t);">Dark Mode</div><div style="font-size:11px;color:var(--t3);margin-top:1px;">${DARK_MODE?'On':'Off'}</div></div>
     </div>
     <div onclick="applyDarkMode(!DARK_MODE);renderProfile();" style="width:44px;height:24px;border-radius:12px;background:${DARK_MODE?'var(--p)':'#e2e8f0'};cursor:pointer;position:relative;flex-shrink:0;transition:background 0.2s;">
-      <div style="position:absolute;top:2px;${DARK_MODE?'right:2px':'left:2px'};width:20px;height:20px;border-radius:50%;background:#fff;transition:all 0.2s;box-shadow:0 1px 4px rgba(0,0,0,0.2);"></div>
+      <div style="position:absolute;top:2px;${DARK_MODE?'right:2px':'left:2px'};width:20px;height:20px;border-radius:50%;background:var(--card);transition:all 0.2s;box-shadow:0 1px 4px rgba(0,0,0,0.2);"></div>
     </div>
   </div>`;
 
@@ -3906,7 +3919,7 @@ function renderProfile(){
   const modelBtns=CLAUDE_MODELS.map(m=>`
     <div onclick="setModel('${m.id}')" style="display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:10px;border:2px solid ${CLAUDE_MODEL===m.id?'var(--p)':'var(--b)'};background:${CLAUDE_MODEL===m.id?'var(--pl)':'#f8fafc'};cursor:pointer;margin-bottom:8px;">
       <div style="width:16px;height:16px;border-radius:50%;border:2px solid ${CLAUDE_MODEL===m.id?'var(--p)':'#cbd5e1'};background:${CLAUDE_MODEL===m.id?'var(--p)':'transparent'};flex-shrink:0;display:flex;align-items:center;justify-content:center;">
-        ${CLAUDE_MODEL===m.id?'<div style="width:6px;height:6px;border-radius:50%;background:#fff;"></div>':''}
+        ${CLAUDE_MODEL===m.id?'<div style="width:6px;height:6px;border-radius:50%;background:var(--card);"></div>':''}
       </div>
       <div style="flex:1;"><div style="font-size:13px;font-weight:700;color:${CLAUDE_MODEL===m.id?'var(--p)':'var(--t)'};">${m.label}</div><div style="font-size:11px;color:var(--t3);">${m.desc}</div></div>
       ${CLAUDE_MODEL===m.id?'<div style="font-size:10px;font-weight:700;background:var(--p);color:#fff;padding:3px 8px;border-radius:20px;">ACTIVE</div>':''}
@@ -3916,7 +3929,7 @@ function renderProfile(){
   // ── Biometric ──
   if(window.PublicKeyCredential){
     const hasBio=!!LS.get('st_biometric');
-    html+=`<div style="background:#fff;border-radius:14px;padding:14px 16px;margin-bottom:10px;box-shadow:0 1px 4px rgba(0,0,0,0.05);display:flex;align-items:center;gap:12px;">
+    html+=`<div style="background:var(--card);border-radius:14px;padding:14px 16px;margin-bottom:10px;box-shadow:var(--sh-sm);display:flex;align-items:center;gap:12px;">
       <div style="width:36px;height:36px;border-radius:10px;background:${hasBio?'#ecfdf5':'#f8fafc'};border:1px solid ${hasBio?'#a7f3d0':'#e2e8f0'};display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">🔐</div>
       <div style="flex:1;"><div style="font-size:13px;font-weight:700;color:var(--t);">Biometric Login</div><div style="font-size:11px;color:${hasBio?'#10b981':'#94a3b8'};margin-top:1px;">${hasBio?'Face ID / Fingerprint enabled':'Quick login with fingerprint or face'}</div></div>
       <button onclick="${hasBio?'removeBiometric()':'registerBiometric()'}" style="background:${hasBio?'#fee2e2':'#f0f4ff'};border:none;color:${hasBio?'var(--r)':'var(--p)'};font-size:11px;font-weight:700;padding:7px 12px;border-radius:9px;cursor:pointer;font-family:inherit;flex-shrink:0;">${hasBio?'Remove':'Enable'}</button>
@@ -3925,7 +3938,7 @@ function renderProfile(){
 
   // ── Trading 212 ──
   html+=`<div style="font-size:10px;font-weight:700;color:var(--t3);letter-spacing:2px;margin:14px 2px 8px;">BROKER INTEGRATION</div>`;
-  html+=`<div style="background:#fff;border-radius:14px;overflow:hidden;margin-bottom:10px;box-shadow:0 1px 4px rgba(0,0,0,0.05);">
+  html+=`<div style="background:var(--card);border-radius:14px;overflow:hidden;margin-bottom:10px;box-shadow:var(--sh-sm);">
     <div style="padding:14px 16px;display:flex;align-items:center;gap:12px;cursor:pointer;" onclick="toggleService('t212-panel')">
       <div style="width:36px;height:36px;border-radius:10px;background:${T212_KEY?'#ecfdf5':'#f8fafc'};border:1px solid ${T212_KEY?'#a7f3d0':'#e2e8f0'};display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">📱</div>
       <div style="flex:1;"><div style="font-size:13px;font-weight:700;color:var(--t);">Trading 212</div><div style="font-size:11px;color:${T212_KEY?'#10b981':'#94a3b8'};margin-top:1px;">${T212_KEY?'Connected — import & sync enabled':'Connect to import your real portfolio'}</div></div>
@@ -3952,7 +3965,7 @@ function renderProfile(){
 }
 
 function serviceCard(panelId,icon,title,subtitle,on,onLabel,offLabel,panelContent){
-  return `<div style="background:#fff;border-radius:14px;overflow:hidden;margin-bottom:10px;box-shadow:0 1px 4px rgba(0,0,0,0.05);">
+  return `<div style="background:var(--card);border-radius:14px;overflow:hidden;margin-bottom:10px;box-shadow:0 1px 4px rgba(0,0,0,0.05);">
     <div style="padding:14px 16px;display:flex;align-items:center;gap:12px;cursor:pointer;" onclick="toggleService('${panelId}')">
       <div style="width:36px;height:36px;border-radius:10px;background:${on?'#ecfdf5':'#f8fafc'};border:1px solid ${on?'#a7f3d0':'#e2e8f0'};display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">${icon}</div>
       <div style="flex:1;"><div style="font-size:13px;font-weight:700;color:var(--t);">${title}</div><div style="font-size:11px;color:${on?'#10b981':'#94a3b8'};margin-top:1px;">${subtitle}</div></div>
