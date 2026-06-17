@@ -3092,7 +3092,13 @@ function showPortMenu_close(){closePortMenu();}
 
 let dailyPredictions = [];
 
-function loadDailyPredictions(){dailyPredictions=LS.get('st_daily')||[];}
+function loadDailyPredictions(){
+  dailyPredictions=LS.get('st_daily')||[];
+  // Normalize legacy tickers (TESLA→TSLA etc) so duplicates merge in stats
+  let fixed=false;
+  dailyPredictions.forEach(p=>{const n=normalizeTicker(p.ticker);if(n!==p.ticker){p.ticker=n;fixed=true;}});
+  if(fixed)LS.set('st_daily',dailyPredictions);
+}
 function saveDailyPredictions(){
   LS.set('st_daily',dailyPredictions.slice(0,60));
   if(FB_ACTIVE&&USER_ID)fbWrite(userPath('daily'),{predictions:dailyPredictions.slice(0,60),updatedAt:Date.now()}).catch(()=>{});
@@ -3158,9 +3164,10 @@ function renderDailyHistoryList(){
     // Per-ticker accuracy
     const byTicker={};
     verified.forEach(p=>{
-      if(!byTicker[p.ticker])byTicker[p.ticker]={c:0,t:0};
-      byTicker[p.ticker].t++;
-      if((p.outcome||(p.correct?'correct':'wrong'))==='correct')byTicker[p.ticker].c++;
+      const tk=normalizeTicker(p.ticker);
+      if(!byTicker[tk])byTicker[tk]={c:0,t:0};
+      byTicker[tk].t++;
+      if((p.outcome||(p.correct?'correct':'wrong'))==='correct')byTicker[tk].c++;
     });
     const tickerStats=Object.entries(byTicker).filter(([,v])=>v.t>=2).sort((a,b)=>(b[1].c/b[1].t)-(a[1].c/a[1].t)).slice(0,5);
     const tickerHTML=tickerStats.length?`<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:4px;">${tickerStats.map(([tk,v])=>{
@@ -3202,7 +3209,7 @@ function renderDailyHistoryList(){
 }
 
 async function generateDailyReport(){
-  const ticker=(document.getElementById('dt-ticker').value||'').trim().toUpperCase();
+  const ticker=normalizeTicker(document.getElementById('dt-ticker').value);
   if(!ticker){toastError('Please enter a ticker symbol.');return;}
   if(!CK||!CK.startsWith('sk-ant')){toastError('Claude API key required — add in Profile.');return;}
 
@@ -3236,7 +3243,7 @@ async function generateDailyReport(){
   const today=new Date().toLocaleDateString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
   // Build learning context from past predictions for this ticker
   loadDailyPredictions();
-  const pastForTicker=dailyPredictions.filter(p=>p.ticker===ticker).slice(0,10);
+  const pastForTicker=dailyPredictions.filter(p=>normalizeTicker(p.ticker)===ticker).slice(0,10);
   const verifiedPast=pastForTicker.filter(p=>p.verified);
   const accuracy=verifiedPast.length>0?Math.round(verifiedPast.filter(p=>p.correct).length/verifiedPast.length*100):null;
 
