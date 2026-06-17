@@ -371,12 +371,14 @@ input,button,select{font-family:'Montserrat',sans-serif;}
   }
   .bni{
     flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
-    gap:2px;background:none;border:none;cursor:pointer;padding:0 1px;min-width:0;
-    color:#94a3b8;font-family:inherit;font-size:9px;font-weight:600;
+    gap:3px;background:none;border:none;cursor:pointer;padding:0 2px;min-width:0;
+    color:#94a3b8;font-family:inherit;font-size:10px;font-weight:600;
     transition:color 0.15s;position:relative;
     -webkit-tap-highlight-color:transparent;
   }
   .bni span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;}
+  .more-item{display:flex;align-items:center;gap:14px;width:100%;padding:15px 16px;background:var(--bg);border:1px solid var(--b);border-radius:13px;font-size:15px;font-weight:700;color:var(--t);cursor:pointer;font-family:inherit;text-align:left;}
+  .more-item:active{background:var(--pl);}
   .bni svg{width:22px;height:22px;transition:all 0.2s;}
   .bni.on{color:var(--p);}
   .bni.on svg{stroke:var(--p);filter:drop-shadow(0 0 6px rgba(99,102,241,0.4));}
@@ -768,23 +770,38 @@ button:active{transform:scale(0.97);}
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
       <span>Chat</span>
     </button>
-    <button class="bni" id="bnirp" onclick="ST('rp')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-      <span>Reports</span>
-    </button>
     <button class="bni" id="bnidt" onclick="ST('dt')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
       <span>Daily</span>
     </button>
-    <button class="bni" id="bnimp" onclick="ST('mp')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11H3v10h6V11z"/><path d="M21 3h-6v18h6V3z"/><path d="M15 7H9v14h6V7z"/></svg>
-      <span>Prep</span>
+    <button class="bni" id="bnimore" onclick="openMoreMenu()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>
+      <span>More</span>
     </button>
-    <button class="bni" id="bnipr" onclick="ST('pr')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
-      <span>Profile</span>
-    </button>
+    <!-- hidden nav targets for state sync -->
+    <button id="bnirp" onclick="ST('rp')" style="display:none;"></button>
+    <button id="bnipr" onclick="ST('pr')" style="display:none;"></button>
+    <button id="bnimp" onclick="ST('mp')" style="display:none;"></button>
   </nav>
+
+  <!-- MORE MENU SHEET (mobile) -->
+  <div class="mob-sheet-overlay" id="more-sheet" onclick="if(event.target===this)closeMoreMenu()">
+    <div class="mob-sheet">
+      <div class="mob-sheet-handle"></div>
+      <div class="mob-sheet-title">More</div>
+      <div style="display:flex;flex-direction:column;gap:8px;padding-top:8px;">
+        <button class="more-item" onclick="ST('rp');closeMoreMenu()">
+          <span style="font-size:20px;">📊</span><span>Reports</span>
+        </button>
+        <button class="more-item" onclick="ST('mp');closeMoreMenu()">
+          <span style="font-size:20px;">📋</span><span>Daily Prep</span>
+        </button>
+        <button class="more-item" onclick="ST('pr');closeMoreMenu()">
+          <span style="font-size:20px;">👤</span><span>Profile</span>
+        </button>
+      </div>
+    </div>
+  </div>
 
   <!-- CHAT -->
   <div id="ct">
@@ -4219,6 +4236,15 @@ function parseMarkdown(md){
     .replace(/\n\n/g,'<br><br>');
 }
 
+function openMoreMenu(){
+  const s=document.getElementById('more-sheet');
+  if(s){s.classList.add('open');document.body.setAttribute('data-sheet-open','more');}
+}
+function closeMoreMenu(){
+  const s=document.getElementById('more-sheet');
+  if(s){s.classList.remove('open');document.body.removeAttribute('data-sheet-open');}
+}
+
 function ST(t){
   ['c','p','w','rp','dt','mp','pr'].forEach(x=>{
     const el=document.getElementById(x==='c'?'ct':x==='pr'?'prt':x==='rp'?'rpt':x==='dt'?'dtt':x==='mp'?'mpt':x+'t');
@@ -4227,7 +4253,10 @@ function ST(t){
   });
   const navMap={c:'bnic',p:'bnip',w:'bniw',rp:'bnirp',dt:'bnidt',mp:'bnimp',pr:'bnipr'};
   Object.values(navMap).forEach(id=>{const el=document.getElementById(id);if(el)el.classList.remove('on');});
-  const activeNav=document.getElementById(navMap[t]);if(activeNav)activeNav.classList.add('on');
+  const moreBtn=document.getElementById('bnimore');if(moreBtn)moreBtn.classList.remove('on');
+  // Reports, Daily Prep, Profile live under the "More" button on mobile
+  if(['rp','mp','pr'].includes(t)){if(moreBtn)moreBtn.classList.add('on');}
+  else{const activeNav=document.getElementById(navMap[t]);if(activeNav)activeNav.classList.add('on');}
   if(t!=='p'){const b=document.getElementById('mob-analyze-bar');if(b)b.classList.remove('visible');}
   if(t==='p'){const b=document.getElementById('mob-analyze-bar');if(b)b.classList.add('visible');}
   const histBtn=document.querySelector('.hist-btn');
