@@ -3341,9 +3341,9 @@ Confidence: High/Medium/Low — one sentence reason.
       || text.match(/Hard\s+[Ss]top[^$\d]*\$?([\d,.]+)/i);
     const target1Match=text.match(/Target\s+1[^$\d]*\$?([\d,.]+)/i)
       || text.match(/Target\s+1[^:]*:\s*\$?([\d,.]+)/i);
-    const actionMatch=text.match(/\*\*Action[*:\s]+([A-Z]+)/i)
-      || text.match(/\bAction\b[:\s*]+([A-Z]+)/i)
-      || text.match(/(?:^|\n)\*\*([A-Z]+)\*\*\s*(?:—|-|:)/m);
+    const actionMatch=text.match(/\*\*Action[*:\s]*\**\s*(?:is\s+|a\s+)*(BUY|SELL|HOLD|AVOID)/i)
+      || text.match(/\bAction\b[:\s*]*(?:is\s+|a\s+)*(BUY|SELL|HOLD|AVOID)/i)
+      || text.match(/\b(BUY|SELL|HOLD|AVOID)\b/);
     
     const cleanNum=s=>s?.replace(/,/g,'')||'';
     const bias=biasMatch?(biasMatch[1].toUpperCase().includes('BULL')?'BUY':biasMatch[1].toUpperCase().includes('BEAR')?'SELL':'NEUTRAL')
@@ -3434,7 +3434,7 @@ function showDailyReport(idx){
       <div style="text-align:center;"><div style="font-size:9px;font-weight:700;color:var(--t3);letter-spacing:1px;">ENTRY ZONE</div><div style="font-size:15px;font-weight:800;color:var(--p);">${p.entryZone}</div></div>
       <div style="text-align:center;"><div style="font-size:9px;font-weight:700;color:var(--t3);letter-spacing:1px;">STOP LOSS</div><div style="font-size:15px;font-weight:800;color:#ef4444;">${p.stopLoss}</div></div>
       <div style="text-align:center;"><div style="font-size:9px;font-weight:700;color:var(--t3);letter-spacing:1px;">TARGET 1</div><div style="font-size:15px;font-weight:800;color:#10b981;">${p.target}</div></div>
-      <div style="text-align:center;"><div style="font-size:9px;font-weight:700;color:var(--t3);letter-spacing:1px;">ACTION</div><div style="font-size:15px;font-weight:800;color:${biasColor};">${p.action}</div></div>
+      <div style="text-align:center;"><div style="font-size:9px;font-weight:700;color:var(--t3);letter-spacing:1px;">ACTION</div><div style="font-size:15px;font-weight:800;color:${biasColor};">${['BUY','SELL','HOLD','AVOID'].includes(p.action)?p.action:(p.bias==='BUY'?'BUY':p.bias==='SELL'?'SELL':'HOLD')}</div></div>
     </div>
     ${verifySection}
     <!-- Full report -->
