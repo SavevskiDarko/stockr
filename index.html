@@ -1563,14 +1563,31 @@ function filterChartRange(data,range){
 let _activeChartRange={};
 let _showSpy=false;
 async function toggleSpyBenchmark(portId){
-  _showSpy=!_showSpy;
-  if(_showSpy&&!_spyHistory){
-    const btn=document.getElementById(`pchart-spy-${portId}`);
-    if(btn)btn.textContent='⟳...';
-    await getSpyHistory();
-    if(btn)btn.textContent='vs S&P 500';
+  // Need at least 2 days of portfolio history to compare
+  const allData=getPortfolioChartData(portId);
+  if(allData.length<2){
+    toastWarning('Load portfolio history first (↺ Load History) so there\u2019s data to compare against the S&P 500.');
+    return;
   }
+  if(!_showSpy&&!_spyHistory){
+    const btn=document.getElementById(`pchart-spy-${portId}`);
+    if(btn){btn.textContent='⟳ Loading S&P...';btn.disabled=true;}
+    await getSpyHistory();
+    if(btn){btn.textContent='vs S&P 500';btn.disabled=false;}
+    if(!_spyHistory){
+      toastError('Could not load S&P 500 data (price source unavailable). Try again shortly.');
+      return;
+    }
+  }
+  _showSpy=!_showSpy;
   renderFullChart(portId);
+  if(_showSpy){
+    const range=_activeChartRange[portId]||'1m';
+    const win=filterChartRange(allData,range);
+    const sd=win.length?win[0].d:null;
+    const spyWin=sd?_spyHistory.filter(s=>s.d>=sd):[];
+    if(spyWin.length<2)toastWarning('Not enough overlapping S&P data for this range — try 1M or longer.');
+  }
 }
 function setChartRange(portId,range){
   _activeChartRange[portId]=range;
@@ -1588,6 +1605,9 @@ function renderFullChart(portId){
 
   // Determine which ranges actually have 2+ data points, disable the rest
   const daysOfData=allData.length>0?Math.round((new Date()-new Date(allData[0].d))/86400000):0;
+  // Sync SPY toggle button state
+  const spyBtn=document.getElementById(`pchart-spy-${portId}`);
+  if(spyBtn){spyBtn.style.background=_showSpy?'var(--p)':'var(--pl)';spyBtn.style.color=_showSpy?'#fff':'var(--p)';}
   document.querySelectorAll(`[data-chart-range="${portId}"] button`).forEach(b=>{
     const r=b.dataset.range;
     const hasData=filterChartRange(allData,r).length>=2;
