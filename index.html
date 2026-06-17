@@ -836,6 +836,15 @@ button:active{transform:scale(0.97);}
     </div>
   </div>
 
+  <!-- NEWS SHEET -->
+  <div class="mob-sheet-overlay" id="news-sheet" onclick="if(event.target===this)closeNewsSheet()">
+    <div class="mob-sheet" style="max-height:75vh;">
+      <div class="mob-sheet-handle"></div>
+      <div class="mob-sheet-title" id="news-title">📰 News</div>
+      <div id="news-body" style="overflow-y:auto;max-height:60vh;padding-top:8px;"></div>
+    </div>
+  </div>
+
   <!-- PORTFOLIO -->
   <div id="pt">
     <!-- Desktop: 3-column layout. Mobile: stacked -->
@@ -856,6 +865,7 @@ button:active{transform:scale(0.97);}
             <option value="pct-asc">▲ Gain %</option>
             <option value="value-desc">▼ Value</option>
           </select>
+          <button onclick="showRealizedHistory()" class="rbtn" style="background:none;border:1px solid var(--b);color:var(--t3);font-size:10px;" title="Realized gains history">💰 Realized</button>
           <button onclick="cleanupDuplicates()" class="rbtn" style="background:none;border:1px solid var(--b);color:var(--t3);font-size:10px;" title="Merge duplicate tickers">⊕ Dedupe</button>
           <button onclick="exportPortfolioCSV()" class="rbtn" style="background:none;border:1px solid var(--b);color:var(--t3);font-size:10px;" title="Export CSV">⬇ CSV</button>
           <button class="rbtn" id="p-rb" onclick="refresh('p')"><span class="ri">↻</span> Refresh</button>
@@ -1321,6 +1331,8 @@ async function pullFromFirebase(){
   if(snapData?.snapshots){LS.set('st_snapshots',snapData.snapshots);}
   const mpData=await fbRead(p('marketpreps'));
   if(mpData?.preps){marketPreps=mpData.preps;LS.set('st_marketpreps',marketPreps);}
+  const rzData=await fbRead(p('realized'));
+  if(rzData?.sales){realizedSales=rzData.sales;LS.set('st_realized',realizedSales);}
   if(document.getElementById('app')?.style.display!=='none'){
     renderPortSwitcher();renderPORT();renderWATCH();renderSB();renderMSGS();
   }
@@ -1549,6 +1561,17 @@ function filterChartRange(data,range){
 }
 
 let _activeChartRange={};
+let _showSpy=false;
+async function toggleSpyBenchmark(portId){
+  _showSpy=!_showSpy;
+  if(_showSpy&&!_spyHistory){
+    const btn=document.getElementById(`pchart-spy-${portId}`);
+    if(btn)btn.textContent='⟳...';
+    await getSpyHistory();
+    if(btn)btn.textContent='vs S&P 500';
+  }
+  renderFullChart(portId);
+}
 function setChartRange(portId,range){
   _activeChartRange[portId]=range;
   renderFullChart(portId);
@@ -1637,6 +1660,39 @@ function renderFullChart(portId){
   const lp=pts[pts.length-1];
   ctx.beginPath();ctx.arc(lp.x,lp.y,4,0,Math.PI*2);ctx.fillStyle=col;ctx.fill();
   ctx.beginPath();ctx.arc(lp.x,lp.y,4,0,Math.PI*2);ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.stroke();
+
+  // ── SPY benchmark overlay (normalized % to match portfolio's % move) ──
+  if(_showSpy&&_spyHistory&&_spyHistory.length>1){
+    // Align SPY data to the same date window as portfolio data
+    const startDate=data[0].d, endDate=data[data.length-1].d;
+    const spyWin=_spyHistory.filter(s=>s.d>=startDate&&s.d<=endDate);
+    if(spyWin.length>1){
+      const spyFirst=spyWin[0].c;
+      // Portfolio % range for shared y-scale
+      const portFirst=values[0];
+      const portPcts=values.map(v=>(v/portFirst-1)*100);
+      const spyPcts=spyWin.map(s=>(s.c/spyFirst-1)*100);
+      const allPcts=portPcts.concat(spyPcts);
+      const pMin=Math.min(...allPcts),pMax=Math.max(...allPcts),pRange=(pMax-pMin)||1;
+      // Redraw portfolio line on the shared % scale (so comparison is fair)
+      const yOf=pct=>padTop+(1-(pct-pMin)/pRange)*(ht-padTop-padBot);
+      // SPY line (grey dashed)
+      const spyPts=spyWin.map((s,i)=>({x:padX+(i/(spyWin.length-1))*(w-padX*2),y:yOf((s.c/spyFirst-1)*100)}));
+      ctx.beginPath();ctx.setLineDash([5,4]);
+      ctx.moveTo(spyPts[0].x,spyPts[0].y);
+      spyPts.forEach(p=>ctx.lineTo(p.x,p.y));
+      ctx.strokeStyle='#94a3b8';ctx.lineWidth=1.8;ctx.stroke();ctx.setLineDash([]);
+      // Legend
+      const spyLast=(spyWin[spyWin.length-1].c/spyFirst-1)*100;
+      const portLast=portPcts[portPcts.length-1];
+      const beat=portLast>=spyLast;
+      if(chgEl){
+        chgEl.innerHTML=`<span style="color:${col};font-weight:700;font-size:13px;">${portLast>=0?'+':''}${portLast.toFixed(2)}%</span>
+          <span style="color:#94a3b8;font-size:11px;margin-left:8px;">S&P ${spyLast>=0?'+':''}${spyLast.toFixed(2)}%</span>
+          <span style="color:${beat?'#16b981':'#f24d6a'};font-size:11px;font-weight:700;margin-left:6px;">${beat?'▲ Beating':'▼ Lagging'} market</span>`;
+      }
+    }
+  }
 }
 
 // Build the full chart card HTML
@@ -1645,7 +1701,10 @@ function portfolioChartCard(portId){
   return `<div style="background:var(--card);border:1px solid var(--b);border-radius:var(--rad);padding:16px;margin-bottom:12px;box-shadow:var(--sh-sm);">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;">
       <div style="font-size:9px;font-weight:700;color:var(--t3);letter-spacing:2px;">PORTFOLIO VALUE</div>
-      <button id="pchart-load-${portId}" onclick="backfillPortfolioHistory('${portId}')" style="background:var(--pl);border:1px solid var(--p);color:var(--p);font-size:9px;font-weight:700;padding:4px 9px;border-radius:7px;cursor:pointer;font-family:inherit;letter-spacing:0.5px;">↺ LOAD HISTORY</button>
+      <div style="display:flex;gap:5px;">
+        <button id="pchart-spy-${portId}" onclick="toggleSpyBenchmark('${portId}')" style="background:${_showSpy?'var(--p)':'var(--pl)'};border:1px solid var(--p);color:${_showSpy?'#fff':'var(--p)'};font-size:9px;font-weight:700;padding:4px 9px;border-radius:7px;cursor:pointer;font-family:inherit;letter-spacing:0.5px;">vs S&P 500</button>
+        <button id="pchart-load-${portId}" onclick="backfillPortfolioHistory('${portId}')" style="background:var(--pl);border:1px solid var(--p);color:var(--p);font-size:9px;font-weight:700;padding:4px 9px;border-radius:7px;cursor:pointer;font-family:inherit;letter-spacing:0.5px;">↺ LOAD HISTORY</button>
+      </div>
     </div>
     <div id="pchart-val-${portId}" style="font-size:24px;font-weight:800;color:var(--t);letter-spacing:-0.5px;">—</div>
     <div id="pchart-chg-${portId}" style="margin-bottom:10px;min-height:18px;"></div>
@@ -1896,6 +1955,15 @@ function createPortfolio(){
   saveLocal();renderPortSwitcher();renderPORT();
 }
 
+let _posSearch='';
+function filterPositions(q){
+  _posSearch=q;
+  // Re-render only the position list area without rebuilding the search box (keeps focus)
+  renderPORT();
+  // Restore focus + cursor to the search box after re-render
+  const box=document.getElementById('pos-search');
+  if(box){box.focus();box.setSelectionRange(box.value.length,box.value.length);}
+}
 let PORT_SORT=LS.get('st_port_sort')||'custom';
 function setPortSort(mode){
   PORT_SORT=mode;
@@ -1919,6 +1987,93 @@ function sortPositions(arr){
   return a;
 }
 
+// ── PORTFOLIO ANALYTICS: allocation donut ──
+function allocationDonut(portId){
+  const port=PORTFOLIOS.find(p=>p.id===portId);
+  if(!port||!port.positions.length)return '';
+  const holdings=port.positions.map(p=>{
+    const q=PC[p.ticker];
+    return{ticker:p.ticker,value:q?q.c*p.shares:p.cost*p.shares};
+  }).filter(h=>h.value>0).sort((a,b)=>b.value-a.value);
+  if(!holdings.length)return '';
+  const total=holdings.reduce((s,h)=>s+h.value,0);
+  const DCOLS=['#5b5bf0','#8b6cf6','#56cfe1','#f78fb3','#fbc16a','#16b981','#f24d6a','#a78bfa','#34d399','#fb923c'];
+  // Build conic-gradient
+  let acc=0;const segs=[];
+  holdings.forEach((hd,i)=>{
+    const pct=hd.value/total*100;
+    const col=DCOLS[i%DCOLS.length];
+    segs.push(`${col} ${acc}% ${acc+pct}%`);
+    hd.pct=pct;hd.col=col;
+    acc+=pct;
+  });
+  const legend=holdings.slice(0,8).map(hd=>`<div style="display:flex;align-items:center;gap:6px;font-size:11px;margin-bottom:4px;">
+    <div style="width:9px;height:9px;border-radius:2px;background:${hd.col};flex-shrink:0;"></div>
+    <span style="font-weight:700;color:var(--t);">${hd.ticker}</span>
+    <span style="color:var(--t3);margin-left:auto;">${hd.pct.toFixed(1)}%</span>
+  </div>`).join('');
+  const topPct=holdings[0].pct;
+  const concentrated=topPct>40;
+  return `<div style="background:var(--card);border:1px solid var(--b);border-radius:var(--rad);padding:16px;margin-bottom:12px;box-shadow:var(--sh-sm);">
+    <div style="font-size:9px;font-weight:700;color:var(--t3);letter-spacing:2px;margin-bottom:12px;">ALLOCATION</div>
+    <div style="display:flex;gap:18px;align-items:center;flex-wrap:wrap;">
+      <div style="width:120px;height:120px;border-radius:50%;background:conic-gradient(${segs.join(',')});flex-shrink:0;position:relative;">
+        <div style="position:absolute;inset:24px;background:var(--card);border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+          <div style="font-size:10px;color:var(--t3);">${holdings.length}</div>
+          <div style="font-size:10px;color:var(--t3);">stocks</div>
+        </div>
+      </div>
+      <div style="flex:1;min-width:140px;">${legend}</div>
+    </div>
+    ${concentrated?`<div style="margin-top:12px;padding:8px 10px;background:var(--al);border-radius:9px;font-size:11px;color:#b45309;">⚠️ ${holdings[0].ticker} is ${topPct.toFixed(0)}% of your portfolio — consider diversifying.</div>`:''}
+  </div>`;
+}
+
+// ── SPY benchmark history (cached) ──
+let _spyHistory=null;
+async function getSpyHistory(){
+  if(_spyHistory)return _spyHistory;
+  const hist=await fetchPriceHistory('SPY');
+  if(hist)_spyHistory=hist;
+  return hist;
+}
+
+// ── Per-stock news via Finnhub ──
+async function fetchStockNews(ticker){
+  try{
+    const to=new Date().toISOString().split('T')[0];
+    const from=new Date(Date.now()-7*86400000).toISOString().split('T')[0];
+    const r=await fetch(`https://finnhub.io/api/v1/company-news?symbol=${ticker}&from=${from}&to=${to}&token=${FK}`,{signal:AbortSignal.timeout(7000)});
+    if(!r.ok)return null;
+    const d=await r.json();
+    return Array.isArray(d)?d.slice(0,5):null;
+  }catch{return null;}
+}
+async function showStockNews(ticker){
+  const sheet=document.getElementById('news-sheet');
+  const body=document.getElementById('news-body');
+  const title=document.getElementById('news-title');
+  if(!sheet)return;
+  title.textContent=`📰 ${ticker} News`;
+  body.innerHTML='<div style="text-align:center;padding:30px;color:var(--t3);">⟳ Loading news...</div>';
+  sheet.classList.add('open');
+  document.body.setAttribute('data-sheet-open','news');
+  const news=await fetchStockNews(ticker);
+  if(!news||!news.length){
+    body.innerHTML='<div style="text-align:center;padding:30px;color:var(--t3);">No recent news found for '+ticker+'.</div>';
+    return;
+  }
+  body.innerHTML=news.map(n=>`<a href="${n.url}" target="_blank" rel="noopener" style="display:block;padding:12px;background:var(--bg);border-radius:12px;margin-bottom:8px;text-decoration:none;border:1px solid var(--b);">
+    <div style="font-size:13px;font-weight:700;color:var(--t);line-height:1.4;margin-bottom:4px;">${n.headline}</div>
+    <div style="font-size:11px;color:var(--t3);">${n.source} · ${new Date(n.datetime*1000).toLocaleDateString()}</div>
+  </a>`).join('');
+}
+function closeNewsSheet(){
+  const sheet=document.getElementById('news-sheet');
+  if(sheet)sheet.classList.remove('open');
+  document.body.removeAttribute('data-sheet-open');
+}
+
 function renderPORT(){
   const port=activePort();
   const isDesktop=window.innerWidth>=900;
@@ -1928,11 +2083,14 @@ function renderPORT(){
     return;
   }
   const posRaw=port.positions||[];
-  // Attach original index so edit/delete still target the right position after sorting
-  const pos=sortPositions(posRaw.map((p,oi)=>({...p,_oi:oi})));
-  const tot=pos.reduce((s,p)=>s+p.shares*p.cost,0);
+  // Full set for totals (always whole portfolio)
+  const posAll=sortPositions(posRaw.map((p,oi)=>({...p,_oi:oi})));
+  // Displayed set (may be filtered by search)
+  let pos=posAll;
+  if(_posSearch){pos=posAll.filter(p=>p.ticker.toLowerCase().includes(_posSearch.toLowerCase()));}
+  const tot=posAll.reduce((s,p)=>s+p.shares*p.cost,0);
   let lT=0,lC=0;
-  pos.forEach(p=>{const q=PC[p.ticker];if(q){lT+=p.shares*q.c;lC+=p.shares*p.cost;}});
+  posAll.forEach(p=>{const q=PC[p.ticker];if(q){lT+=p.shares*q.c;lC+=p.shares*p.cost;}});
   const pnl=lT-lC,pnlP=lC>0?pnl/lC*100:0,hasPx=lT>0;
 
   // ── Left panel (desktop only): name + add form ──
@@ -1999,6 +2157,11 @@ function renderPORT(){
   let centerH='';
   if(pos.length){
     centerH+=chartSection;
+    centerH+=allocationDonut(port.id);
+    // Search/filter box (shows when 8+ positions)
+    if(posRaw.length>=8){
+      centerH+=`<div style="margin-bottom:10px;"><input id="pos-search" oninput="filterPositions(this.value)" placeholder="🔍 Search positions..." class="mob-finp" style="width:100%;" value="${_posSearch||''}"></div>`;
+    }
     centerH+=`<div class="pcrd">`;
     pos.forEach((p,_si)=>{
       const i=p._oi!==undefined?p._oi:_si;
@@ -2029,6 +2192,7 @@ function renderPORT(){
             </div>
             <div class="pr-edit-actions">
               <button class="pr-save-btn" onclick="saveEdit(${i})">✓ Save</button>
+              <button class="pr-cancel-btn" onclick="showStockNews('${p.ticker}')" style="background:var(--pl);color:var(--p);">📰 News</button>
               <button class="pr-cancel-btn" onclick="toggleEdit(${i})">Cancel</button>
             </div>
           </div>
@@ -2572,9 +2736,61 @@ function saveEdit(i){
 
 function delP(i){
   const port=activePort();if(!port)return;
-  if(!confirm(`Remove ${port.positions[i].ticker} from portfolio?`))return;
+  const p=port.positions[i];if(!p)return;
+  const q=PC[p.ticker];
+  // If we have a live price, offer to record this as a realized sale
+  if(q&&q.c>0){
+    const realized=(q.c-p.cost)*p.shares;
+    const sign=realized>=0?'+':'';
+    if(confirm(`Remove ${p.ticker}?\n\nCurrent value: ${formatCurrency(q.c*p.shares)}\nRealized P&L: ${sign}${formatCurrency(realized)}\n\nOK = record as a sale (saved to history)\nCancel = just remove`)){
+      recordRealizedSale(p,q.c,realized);
+    }
+  }else{
+    if(!confirm(`Remove ${p.ticker} from portfolio?`))return;
+  }
   port.positions.splice(i,1);saveLocal();renderPORT();
   if(FB_ACTIVE)fbWrite(userPath('portfolios'),{portfolios:PORTFOLIOS,updatedAt:Date.now()}).catch(e=>console.warn('FB:',e?.message||e));
+}
+
+// ── REALIZED GAINS / CLOSED POSITIONS ──
+let realizedSales=[];
+function loadRealized(){realizedSales=LS.get('st_realized')||[];}
+function saveRealized(){LS.set('st_realized',realizedSales.slice(-200));if(FB_ACTIVE)fbWrite(userPath('realized'),{sales:realizedSales.slice(-200),updatedAt:Date.now()}).catch(()=>{});}
+function recordRealizedSale(p,sellPrice,realized){
+  loadRealized();
+  realizedSales.unshift({
+    ticker:p.ticker,shares:p.shares,cost:p.cost,sellPrice:parseFloat(sellPrice.toFixed(4)),
+    realized:parseFloat(realized.toFixed(2)),pct:p.cost>0?parseFloat(((sellPrice/p.cost-1)*100).toFixed(2)):0,
+    date:new Date().toISOString().split('T')[0]
+  });
+  saveRealized();
+  toastSuccess(`Recorded sale of ${p.ticker}: ${realized>=0?'+':''}${formatCurrency(realized)} realized`);
+}
+function showRealizedHistory(){
+  loadRealized();
+  const sheet=document.getElementById('news-sheet');
+  const body=document.getElementById('news-body');
+  const title=document.getElementById('news-title');
+  if(!sheet)return;
+  title.textContent='💰 Realized Gains';
+  if(!realizedSales.length){
+    body.innerHTML='<div style="text-align:center;padding:30px;color:var(--t3);">No closed positions yet. When you remove a holding with a live price, you can record it here.</div>';
+  }else{
+    const totalRealized=realizedSales.reduce((s,r)=>s+r.realized,0);
+    const col=totalRealized>=0?'#16b981':'#f24d6a';
+    body.innerHTML=`<div style="background:${col}15;border:1px solid ${col}40;border-radius:12px;padding:12px;margin-bottom:12px;text-align:center;">
+      <div style="font-size:10px;font-weight:700;color:var(--t3);letter-spacing:1px;">TOTAL REALIZED P&L</div>
+      <div style="font-size:22px;font-weight:800;color:${col};">${totalRealized>=0?'+':''}${formatCurrency(totalRealized)}</div>
+    </div>`+realizedSales.map(r=>{
+      const rc=r.realized>=0?'#16b981':'#f24d6a';
+      return `<div style="padding:11px;background:var(--bg);border-radius:11px;margin-bottom:7px;border:1px solid var(--b);display:flex;justify-content:space-between;align-items:center;">
+        <div><div style="font-size:13px;font-weight:800;color:var(--t);">${r.ticker}</div><div style="font-size:10px;color:var(--t3);">${r.shares}sh · $${r.cost}→$${r.sellPrice} · ${r.date}</div></div>
+        <div style="text-align:right;"><div style="font-size:13px;font-weight:800;color:${rc};">${r.realized>=0?'+':''}${formatCurrency(r.realized)}</div><div style="font-size:10px;color:${rc};">${r.pct>=0?'+':''}${r.pct}%</div></div>
+      </div>`;
+    }).join('');
+  }
+  sheet.classList.add('open');
+  document.body.setAttribute('data-sheet-open','news');
 }
 
 function deletePortfolio(){
@@ -3319,7 +3535,13 @@ Confidence: High/Medium/Low — one sentence reason.
 
 ---
 *Stockr Adaptive Daily · ${today} · ${ticker} · ${pastForTicker.length} past analyses · ${accuracy!==null?accuracy+'% accuracy on this ticker':'no verified data yet'}*
-*⚠️ Educational only — not financial advice.*`;
+*⚠️ Educational only — not financial advice.*
+
+CRITICAL: After the report above, output the key trade parameters as a JSON object on its own, wrapped EXACTLY in these markers (no markdown, no code fence):
+<<<JSON>>>
+{"bias":"BULLISH|BEARISH|NEUTRAL","action":"BUY|SELL|HOLD|AVOID","entryLow":number_or_null,"entryHigh":number_or_null,"stopLoss":number_or_null,"target":number_or_null,"confidence":"High|Medium|Low"}
+<<<END>>>
+Use plain numbers (no $ or commas). If a value is unknown, use null.`;
 
   try{
     const res=await fetch('https://api.anthropic.com/v1/messages',{
@@ -3329,41 +3551,61 @@ Confidence: High/Medium/Low — one sentence reason.
     });
     const data=await res.json();
     if(!res.ok||data.error)throw new Error(data.error?.message||`API error ${res.status}`);
-    const text=(data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('\n');
-    if(!text)throw new Error('No response from Claude.');
+    const rawText=(data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('\n');
+    if(!rawText)throw new Error('No response from Claude.');
 
-    // Parse key trading values from the report
-    // Flexible parsing — Claude uses various formats like **Entry Zone:** $X–$Y or Entry Zone: $X - $Y
-    const biasMatch=text.match(/(?:Trading\s+Bias|Bias)[^\n]*?(BULLISH|BEARISH|NEUTRAL)/i);
-    const entryMatch=text.match(/Entry\s+Zone[^$\d]*\$?([\d,.]+)\s*[–—\-–]+\s*\$?([\d,.]+)/i)
-      || text.match(/Entry[^$\d]*\$?([\d,.]+)\s*[–—\-–]+\s*\$?([\d,.]+)/i);
-    const stopMatch=text.match(/Stop\s+Loss[^$\d]*\$?([\d,.]+)/i)
-      || text.match(/Hard\s+[Ss]top[^$\d]*\$?([\d,.]+)/i);
-    const target1Match=text.match(/Target\s+1[^$\d]*\$?([\d,.]+)/i)
-      || text.match(/Target\s+1[^:]*:\s*\$?([\d,.]+)/i);
-    const actionMatch=text.match(/\*\*Action[*:\s]*\**\s*(?:is\s+|a\s+)*(BUY|SELL|HOLD|AVOID)/i)
-      || text.match(/\bAction\b[:\s*]*(?:is\s+|a\s+)*(BUY|SELL|HOLD|AVOID)/i)
-      || text.match(/\b(BUY|SELL|HOLD|AVOID)\b/);
-    
-    const cleanNum=s=>s?.replace(/,/g,'')||'';
-    const bias=biasMatch?(biasMatch[1].toUpperCase().includes('BULL')?'BUY':biasMatch[1].toUpperCase().includes('BEAR')?'SELL':'NEUTRAL')
-      :(text.match(/\bBULLISH\b/i)?'BUY':text.match(/\bBEARISH\b/i)?'SELL':'NEUTRAL');
-    // Determine action from multiple sources
-    let action='HOLD';
-    if(actionMatch)action=actionMatch[1].toUpperCase();
-    else if(text.match(/\bVerdict[^A-Z]*(BUY|SELL|HOLD|AVOID)\b/i))action=text.match(/\bVerdict[^A-Z]*(BUY|SELL|HOLD|AVOID)\b/i)[1].toUpperCase();
-    else action=bias==='BUY'?'BUY':bias==='SELL'?'SELL':'HOLD';
+    // ── Parse structured JSON block (reliable) ──
+    let parsed=null;
+    const jsonMatch=rawText.match(/<<<JSON>>>\s*([\s\S]*?)\s*<<<END>>>/);
+    if(jsonMatch){
+      try{parsed=JSON.parse(jsonMatch[1].trim());}catch(e){parsed=null;}
+    }
+    // Strip the JSON block from the displayed report
+    const text=rawText.replace(/<<<JSON>>>[\s\S]*?<<<END>>>/,'').trim();
 
+    const validActions=['BUY','SELL','HOLD','AVOID'];
+    const validBias=['BULLISH','BEARISH','NEUTRAL'];
+    const numOrNull=v=>(typeof v==='number'&&!isNaN(v))?v:(v&&!isNaN(parseFloat(v))?parseFloat(v):null);
+
+    let bias,action,entryLow,entryHigh,stopLoss,target,confidence;
+    if(parsed){
+      // Use clean structured data
+      bias=validBias.includes((parsed.bias||'').toUpperCase())?(parsed.bias.toUpperCase()==='BULLISH'?'BUY':parsed.bias.toUpperCase()==='BEARISH'?'SELL':'NEUTRAL'):'NEUTRAL';
+      action=validActions.includes((parsed.action||'').toUpperCase())?parsed.action.toUpperCase():(bias==='BUY'?'BUY':bias==='SELL'?'SELL':'HOLD');
+      entryLow=numOrNull(parsed.entryLow);
+      entryHigh=numOrNull(parsed.entryHigh);
+      stopLoss=numOrNull(parsed.stopLoss);
+      target=numOrNull(parsed.target);
+      confidence=parsed.confidence||'';
+    }else{
+      // ── Fallback: regex parsing if JSON missing/malformed ──
+      const biasMatch=text.match(/(?:Trading\s+Bias|Bias)[^\n]*?(BULLISH|BEARISH|NEUTRAL)/i);
+      const entryMatch=text.match(/Entry\s+Zone[^$\d]*\$?([\d,.]+)\s*[–—\-]+\s*\$?([\d,.]+)/i)||text.match(/Entry[^$\d]*\$?([\d,.]+)\s*[–—\-]+\s*\$?([\d,.]+)/i);
+      const stopMatch=text.match(/Stop\s+Loss[^$\d]*\$?([\d,.]+)/i)||text.match(/Hard\s+[Ss]top[^$\d]*\$?([\d,.]+)/i);
+      const target1Match=text.match(/Target\s+1[^$\d]*\$?([\d,.]+)/i);
+      const actionMatch=text.match(/\bAction\b[:\s*]*\**\s*(?:is\s+|a\s+)*(BUY|SELL|HOLD|AVOID)/i);
+      const cn=s=>s?parseFloat(s.replace(/,/g,'')):null;
+      bias=biasMatch?(biasMatch[1].toUpperCase().includes('BULL')?'BUY':biasMatch[1].toUpperCase().includes('BEAR')?'SELL':'NEUTRAL'):(text.match(/\bBULLISH\b/i)?'BUY':text.match(/\bBEARISH\b/i)?'SELL':'NEUTRAL');
+      action=actionMatch?actionMatch[1].toUpperCase():(bias==='BUY'?'BUY':bias==='SELL'?'SELL':'HOLD');
+      entryLow=entryMatch?cn(entryMatch[1]):null;
+      entryHigh=entryMatch?cn(entryMatch[2]):null;
+      stopLoss=stopMatch?cn(stopMatch[1]):null;
+      target=target1Match?cn(target1Match[1]):null;
+      confidence='';
+    }
+
+    const fmt=n=>n!=null?`$${n}`:'—';
     const prediction={
       id:'dt_'+Date.now(),
       ticker,
       date:new Date().toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'}),
       dateKey:new Date().toDateString(),
       bias,
-      entryZone:entryMatch?`$${cleanNum(entryMatch[1])}–$${cleanNum(entryMatch[2])}`:'—',
-      stopLoss:stopMatch?`$${cleanNum(stopMatch[1])}`:'—',
-      target:target1Match?`$${cleanNum(target1Match[1])}`:'—',
-      action,
+      entryZone:(entryLow!=null&&entryHigh!=null)?`$${entryLow}–$${entryHigh}`:(entryLow!=null?`$${entryLow}`:'—'),
+      entryLow,entryHigh,
+      stopLoss:fmt(stopLoss),stopLossNum:stopLoss,
+      target:fmt(target),targetNum:target,
+      action,confidence,
       priceAtAnalysis:priceData?.c||null,
       content:text,
       verified:false,
@@ -3458,9 +3700,10 @@ async function verifyPrediction(idx){
     else{toastError('Could not auto-fetch. Enter the closing price manually.');return;}
   }
 
-  const entryLow=p.entryZone&&p.entryZone!=='—'?parseFloat(p.entryZone.replace(/[^0-9.–-]/g,'').split(/[–-]/)[0]):null;
-  const target=p.target&&p.target!=='—'?parseFloat(p.target.replace(/[^0-9.]/g,'')):null;
-  const stop=p.stopLoss&&p.stopLoss!=='—'?parseFloat(p.stopLoss.replace(/[^0-9.]/g,'')):null;
+  // Prefer clean numeric fields (new predictions); fall back to parsing strings (old ones)
+  const entryLow=p.entryLow!=null?p.entryLow:(p.entryZone&&p.entryZone!=='—'?parseFloat(p.entryZone.replace(/[^0-9.–-]/g,'').split(/[–-]/)[0]):null);
+  const target=p.targetNum!=null?p.targetNum:(p.target&&p.target!=='—'?parseFloat(p.target.replace(/[^0-9.]/g,'')):null);
+  const stop=p.stopLossNum!=null?p.stopLossNum:(p.stopLoss&&p.stopLoss!=='—'?parseFloat(p.stopLoss.replace(/[^0-9.]/g,'')):null);
   const base=p.priceAtAnalysis||entryLow||closePrice;
 
   // 3-tier outcome: correct / partial / wrong
@@ -3897,7 +4140,12 @@ For each holding:
 ---
 *Stockr Adaptive AI Report · ${weekOf} · Model: ${CLAUDE_MODEL}*
 
-IMPORTANT: Be specific with numbers and percentages. Show your reasoning. The Accuracy Audit is the most important section — honest self-assessment of past predictions improves future accuracy. Keep each section concise but data-rich.`;
+IMPORTANT: Be specific with numbers and percentages. Show your reasoning. The Accuracy Audit is the most important section — honest self-assessment of past predictions improves future accuracy. Keep each section concise but data-rich.
+
+CRITICAL: After the report, output your key predictions as JSON wrapped EXACTLY in these markers (no code fence):
+<<<JSON>>>
+{"bullish":"one-line bull scenario","bearish":"one-line bear scenario","probability":"base case probability as a number 0-100","levels":"key support/resistance levels as text","trend":"REVERSAL|CONTINUATION|RANGE"}
+<<<END>>>`;
   try{
     const res=await fetch('https://api.anthropic.com/v1/messages',{
       method:'POST',
@@ -3908,15 +4156,26 @@ IMPORTANT: Be specific with numbers and percentages. Show your reasoning. The Ac
     console.log('Report API response:',data);
     if(!res.ok||data.error)throw new Error(data.error?.message||`API error ${res.status}`);
     if(!data.content)throw new Error('Empty response from Claude.');
-    const text=(data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('\n');
-    if(!text)throw new Error('No text in response.');
-    // Extract structured predictions (bull/bear scenarios + base case) for reliable future audits
-    const predictions={
-      bullish:(text.match(/[Bb]ull(?:ish)?[^\n:]*[:\s][^\n]*([\s\S]*?)(?=\n[-*🐻]|\n##|$)/)||['',''])[0].replace(/[#*`]/g,'').slice(0,300).trim(),
-      bearish:(text.match(/[Bb]ear(?:ish)?[^\n:]*[:\s][^\n]*([\s\S]*?)(?=\n[-*]|\n##|$)/)||['',''])[0].replace(/[#*`]/g,'').slice(0,300).trim(),
-      probability:(text.match(/[Bb]ase\s*[Cc]ase[^\n]*?(\d+)\s*%/)||['',''])[1]||'',
-      levels:(text.match(/##[^\n]*Technical Levels?[\s\S]*?(?=\n##|$)/i)||[''])[0].replace(/[#*`]/g,'').slice(0,400).trim()
-    };
+    const rawText=(data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('\n');
+    if(!rawText)throw new Error('No text in response.');
+    // Parse structured JSON predictions (reliable), fall back to regex
+    let predictions;
+    const jm=rawText.match(/<<<JSON>>>\s*([\s\S]*?)\s*<<<END>>>/);
+    if(jm){
+      try{
+        const pj=JSON.parse(jm[1].trim());
+        predictions={bullish:pj.bullish||'',bearish:pj.bearish||'',probability:String(pj.probability||''),levels:pj.levels||'',trend:pj.trend||''};
+      }catch(e){predictions=null;}
+    }
+    const text=rawText.replace(/<<<JSON>>>[\s\S]*?<<<END>>>/,'').trim();
+    if(!predictions){
+      predictions={
+        bullish:(text.match(/[Bb]ull(?:ish)?[^\n:]*[:\s][^\n]*([\s\S]*?)(?=\n[-*🐻]|\n##|$)/)||['',''])[0].replace(/[#*`]/g,'').slice(0,300).trim(),
+        bearish:(text.match(/[Bb]ear(?:ish)?[^\n:]*[:\s][^\n]*([\s\S]*?)(?=\n[-*]|\n##|$)/)||['',''])[0].replace(/[#*`]/g,'').slice(0,300).trim(),
+        probability:(text.match(/[Bb]ase\s*[Cc]ase[^\n]*?(\d+)\s*%/)||['',''])[1]||'',
+        levels:(text.match(/##[^\n]*Technical Levels?[\s\S]*?(?=\n##|$)/i)||[''])[0].replace(/[#*`]/g,'').slice(0,400).trim()
+      };
+    }
     const report={id:'rp_'+Date.now(),weekOf,date:today.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}),content:text,predictions};
     loadReports();weeklyReports.unshift(report);saveReports();renderReportsList();
   }catch(e){
