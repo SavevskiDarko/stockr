@@ -371,11 +371,12 @@ input,button,select{font-family:'Montserrat',sans-serif;}
   }
   .bni{
     flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
-    gap:3px;background:none;border:none;cursor:pointer;
-    color:#94a3b8;font-family:inherit;font-size:10px;font-weight:600;
+    gap:2px;background:none;border:none;cursor:pointer;padding:0 1px;min-width:0;
+    color:#94a3b8;font-family:inherit;font-size:9px;font-weight:600;
     transition:color 0.15s;position:relative;
     -webkit-tap-highlight-color:transparent;
   }
+  .bni span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;}
   .bni svg{width:22px;height:22px;transition:all 0.2s;}
   .bni.on{color:var(--p);}
   .bni.on svg{stroke:var(--p);filter:drop-shadow(0 0 6px rgba(99,102,241,0.4));}
@@ -749,6 +750,7 @@ button:active{transform:scale(0.97);}
     <button class="tb" id="tbw" onclick="ST('w')">⭐ Watchlist</button>
     <button class="tb" id="tbrp" onclick="ST('rp')">📊 Reports</button>
     <button class="tb" id="tbdt" onclick="ST('dt')">⚡ Daily Trade</button>
+    <button class="tb" id="tbmp" onclick="ST('mp')">📋 Daily Prep</button>
     <button class="tb" id="tbpr" onclick="ST('pr')">👤 Profile</button>
   </div>
 
@@ -773,6 +775,10 @@ button:active{transform:scale(0.97);}
     <button class="bni" id="bnidt" onclick="ST('dt')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
       <span>Daily</span>
+    </button>
+    <button class="bni" id="bnimp" onclick="ST('mp')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11H3v10h6V11z"/><path d="M21 3h-6v18h6V3z"/><path d="M15 7H9v14h6V7z"/></svg>
+      <span>Prep</span>
     </button>
     <button class="bni" id="bnipr" onclick="ST('pr')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
@@ -850,6 +856,7 @@ button:active{transform:scale(0.97);}
             <option value="pct-asc">▲ Gain %</option>
             <option value="value-desc">▼ Value</option>
           </select>
+          <button onclick="cleanupDuplicates()" class="rbtn" style="background:none;border:1px solid var(--b);color:var(--t3);font-size:10px;" title="Merge duplicate tickers">⊕ Dedupe</button>
           <button onclick="exportPortfolioCSV()" class="rbtn" style="background:none;border:1px solid var(--b);color:var(--t3);font-size:10px;" title="Export CSV">⬇ CSV</button>
           <button class="rbtn" id="p-rb" onclick="refresh('p')"><span class="ri">↻</span> Refresh</button>
         </div>
@@ -907,6 +914,13 @@ button:active{transform:scale(0.97);}
           <div style="font-size:13px;color:var(--t3);line-height:1.7;max-width:400px;margin:0 auto;">Enter a ticker to get a full AI-powered daily trading report — intraday levels, bias, entry/exit zones, and a buy/sell verdict.</div>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- DAILY PREP (general market briefing) -->
+  <div id="mpt" style="display:none;flex-direction:column;flex:1;min-height:0;background:var(--bg);">
+    <div style="flex:1;overflow-y:auto;padding:0;" id="mp-scroll">
+      <div id="mp-content" style="max-width:880px;margin:0 auto;padding:20px 24px 100px;"></div>
     </div>
   </div>
 
@@ -1305,6 +1319,8 @@ async function pullFromFirebase(){
   if(dtData?.predictions?.length){dailyPredictions=dtData.predictions;LS.set('st_daily',dailyPredictions);}
   const snapData=await fbRead(p('snapshots'));
   if(snapData?.snapshots){LS.set('st_snapshots',snapData.snapshots);}
+  const mpData=await fbRead(p('marketpreps'));
+  if(mpData?.preps){marketPreps=mpData.preps;LS.set('st_marketpreps',marketPreps);}
   if(document.getElementById('app')?.style.display!=='none'){
     renderPortSwitcher();renderPORT();renderWATCH();renderSB();renderMSGS();
   }
@@ -2501,16 +2517,22 @@ function renamePort(name){
 }
 
 function addP(){
-  const t=document.getElementById('ft').value.trim().toUpperCase();
+  const t=normalizeTicker(document.getElementById('ft').value);
   const s=parseFloat(document.getElementById('fs').value);
   const c=parseFloat(document.getElementById('fc').value);
   if(!t||!s||!c)return;
   const port=activePort();if(!port)return;
-  const i=port.positions.findIndex(p=>p.ticker===t);
-  if(i>=0)port.positions[i]={ticker:t,shares:s,cost:c};
-  else port.positions.push({ticker:t,shares:s,cost:c});
+  const i=port.positions.findIndex(p=>normalizeTicker(p.ticker)===t);
+  if(i>=0){
+    const existing={...port.positions[i],ticker:t};
+    port.positions[i]=mergeLots(existing,{ticker:t,shares:s,cost:c});
+    toastSuccess(`Merged into existing ${t} position`);
+  }else{
+    port.positions.push({ticker:t,shares:s,cost:c});
+  }
   saveLocal();renderPORT();refresh('p');
   if(FB_ACTIVE)fbWrite(userPath('portfolios'),{portfolios:PORTFOLIOS,updatedAt:Date.now()}).catch(e=>console.warn('FB:',e?.message||e));
+  document.getElementById('ft').value='';document.getElementById('fs').value='';document.getElementById('fc').value='';
 }
 
 function toggleEdit(i){
@@ -2940,14 +2962,71 @@ function closePortSheet(){
   document.getElementById('port-sheet-overlay').classList.remove('open');
   document.body.removeAttribute('data-sheet-open');
 }
+// ── TICKER NORMALIZATION — map common company names to real symbols ──
+const TICKER_ALIASES={
+  TESLA:'TSLA',APPLE:'AAPL',GOOGLE:'GOOGL',ALPHABET:'GOOGL',AMAZON:'AMZN',
+  MICROSOFT:'MSFT',NVIDIA:'NVDA',FACEBOOK:'META',METAPLATFORMS:'META',
+  NETFLIX:'NFLX',DISNEY:'DIS',WALMART:'WMT',COCACOLA:'KO',COKE:'KO',
+  BERKSHIRE:'BRK.B',PAYPAL:'PYPL',INTEL:'INTC',BOEING:'BA',NIKE:'NKE',
+  STARBUCKS:'SBUX',MCDONALDS:'MCD',VISA:'V',MASTERCARD:'MA',JPMORGAN:'JPM',
+  GOLDMAN:'GS',PFIZER:'PFE',MODERNA:'MRNA',ORACLE:'ORCL',SALESFORCE:'CRM',
+  ADOBE:'ADBE',CISCO:'CSCO',QUALCOMM:'QCOM',BROADCOM:'AVGO',AMD:'AMD',
+  PALANTIR:'PLTR',COINBASE:'COIN',ROBINHOOD:'HOOD',UBER:'UBER',LYFT:'LYFT',
+  AIRBNB:'ABNB',SPOTIFY:'SPOT',SHOPIFY:'SHOP',SNOWFLAKE:'SNOW',
+  SPACEX:'SPCX',MARVELL:'MRVL',MICRON:'MU',FEDEX:'FDX'
+};
+function normalizeTicker(raw){
+  let t=(raw||'').trim().toUpperCase().replace(/\s+/g,'');
+  // Strip common suffixes people add
+  t=t.replace(/\b(INC|CORP|CO|LTD|PLC)\.?$/,'');
+  return TICKER_ALIASES[t]||t;
+}
+// Weighted-average merge of two lots of the same ticker
+function mergeLots(a,b){
+  const totalShares=a.shares+b.shares;
+  const avgCost=totalShares>0?((a.shares*a.cost)+(b.shares*b.cost))/totalShares:0;
+  return{ticker:a.ticker,shares:parseFloat(totalShares.toFixed(6)),cost:parseFloat(avgCost.toFixed(4))};
+}
+// Scan a portfolio for duplicate tickers (after normalization) and merge them
+function cleanupDuplicates(){
+  const port=activePort();if(!port||!port.positions.length){toastWarning('No positions to clean up.');return;}
+  // Group by normalized ticker
+  const groups={};
+  port.positions.forEach(p=>{
+    const norm=normalizeTicker(p.ticker);
+    if(!groups[norm])groups[norm]=[];
+    groups[norm].push({...p,ticker:norm});
+  });
+  const dupes=Object.entries(groups).filter(([,lots])=>lots.length>1);
+  if(!dupes.length){toastSuccess('No duplicates found — your portfolio is clean!');return;}
+  const names=dupes.map(([tk,lots])=>`${tk} (${lots.length} entries)`).join(', ');
+  if(!confirm(`Found duplicates: ${names}.\n\nMerge each into a single position with weighted-average cost?`))return;
+  const merged=[];
+  Object.entries(groups).forEach(([tk,lots])=>{
+    if(lots.length===1){merged.push({ticker:tk,shares:lots[0].shares,cost:lots[0].cost});}
+    else{merged.push(lots.reduce((acc,l)=>mergeLots(acc,l)));}
+  });
+  port.positions=merged;
+  saveLocal();renderPORT();refresh('p');
+  if(FB_ACTIVE)fbWrite(userPath('portfolios'),{portfolios:PORTFOLIOS,updatedAt:Date.now()}).catch(()=>{});
+  toastSuccess(`Merged ${dupes.length} duplicate${dupes.length>1?'s':''}!`);
+}
+
 function mobAddP(){
-  const t=(document.getElementById('mob-ft').value||'').trim().toUpperCase();
+  const t=normalizeTicker(document.getElementById('mob-ft').value);
   const s=parseFloat(document.getElementById('mob-fs').value);
   const c=parseFloat(document.getElementById('mob-fc').value);
   if(!t||!s||!c){toastError('Please fill in all fields.');return;}
   const port=activePort();if(!port)return;
-  const i=port.positions.findIndex(p=>p.ticker===t);
-  if(i>=0)port.positions[i]={ticker:t,shares:s,cost:c};else port.positions.push({ticker:t,shares:s,cost:c});
+  const i=port.positions.findIndex(p=>normalizeTicker(p.ticker)===t);
+  if(i>=0){
+    // Merge with existing holding (weighted-average cost)
+    const existing={...port.positions[i],ticker:t};
+    port.positions[i]=mergeLots(existing,{ticker:t,shares:s,cost:c});
+    toastSuccess(`Merged into existing ${t} position`);
+  }else{
+    port.positions.push({ticker:t,shares:s,cost:c});
+  }
   saveLocal();renderPORT();refresh('p');
   if(FB_ACTIVE)fbWrite(userPath('portfolios'),{portfolios:PORTFOLIOS,updatedAt:Date.now()}).catch(e=>console.warn('FB:',e?.message||e));
   document.getElementById('mob-ft').value='';document.getElementById('mob-fs').value='';document.getElementById('mob-fc').value='';
@@ -3104,13 +3183,20 @@ function renderDailyHistoryList(){
     const acc=p.verified?`<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;background:${ocCfg[oc].bg};color:${ocCfg[oc].c};">${ocCfg[oc].l} ${oc.charAt(0).toUpperCase()+oc.slice(1)}</span>`
     :`<span style="font-size:10px;font-weight:600;color:#94a3b8;cursor:pointer;" onclick="event.stopPropagation();showDailyReport(${i});">🔍 Verify</span>`;
     const bias=p.bias==='BUY'?'🟢':p.bias==='SELL'?'🔴':'🟡';
-    return`<div onclick="showDailyReport(${i})" style="padding:9px 10px;border-radius:10px;cursor:pointer;margin-bottom:5px;background:#f8fafc;border:1px solid var(--b);transition:all 0.15s;" onmouseover="this.style.background='var(--pl)'" onmouseout="this.style.background='#f8fafc'">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px;">
-        <div style="font-size:13px;font-weight:800;color:var(--t);">${bias} ${p.ticker}</div>
-        ${acc}
+    return`<div style="padding:9px 10px;border-radius:10px;margin-bottom:5px;background:#f8fafc;border:1px solid var(--b);transition:all 0.15s;">
+      <div onclick="showDailyReport(${i})" style="cursor:pointer;" onmouseover="this.parentElement.style.background='var(--pl)'" onmouseout="this.parentElement.style.background='#f8fafc'">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px;">
+          <div style="font-size:13px;font-weight:800;color:var(--t);">${bias} ${p.ticker}</div>
+          ${acc}
+        </div>
+        <div style="font-size:10px;color:#94a3b8;">${p.date}</div>
+        ${p.entryZone&&p.entryZone!=='—'?`<div style="font-size:10px;color:var(--t3);margin-top:2px;">Entry: ${p.entryZone} · Target: ${p.target}</div>`:''}
       </div>
-      <div style="font-size:10px;color:#94a3b8;">${p.date}</div>
-      ${p.entryZone&&p.entryZone!=='—'?`<div style="font-size:10px;color:var(--t3);margin-top:2px;">Entry: ${p.entryZone} · Target: ${p.target}</div>`:''}
+      <div style="display:flex;gap:4px;margin-top:6px;padding-top:6px;border-top:1px solid var(--b);">
+        <button onclick="event.stopPropagation();moveDailyPrediction(${i},-1)" ${i===0?'disabled':''} style="flex:1;background:var(--bg);border:none;color:var(--t3);font-size:11px;padding:4px;border-radius:6px;cursor:${i===0?'not-allowed':'pointer'};opacity:${i===0?'0.4':'1'};font-family:inherit;" title="Move up">↑</button>
+        <button onclick="event.stopPropagation();moveDailyPrediction(${i},1)" ${i===dailyPredictions.length-1?'disabled':''} style="flex:1;background:var(--bg);border:none;color:var(--t3);font-size:11px;padding:4px;border-radius:6px;cursor:${i===dailyPredictions.length-1?'not-allowed':'pointer'};opacity:${i===dailyPredictions.length-1?'0.4':'1'};font-family:inherit;" title="Move down">↓</button>
+        <button onclick="event.stopPropagation();deleteDailyReport(${i})" style="flex:1;background:#fee2e2;border:none;color:#b91c1c;font-size:11px;padding:4px;border-radius:6px;cursor:pointer;font-family:inherit;" title="Delete">🗑</button>
+      </div>
     </div>`;
   }).join('');
 }
@@ -3406,6 +3492,15 @@ function renderAccuracyStats(){
   // Could render in a stats section if desired
 }
 
+function moveDailyPrediction(idx,dir){
+  loadDailyPredictions();
+  const ni=idx+dir;
+  if(ni<0||ni>=dailyPredictions.length)return;
+  [dailyPredictions[idx],dailyPredictions[ni]]=[dailyPredictions[ni],dailyPredictions[idx]];
+  saveDailyPredictions();
+  renderDailyHistoryList();
+}
+
 function deleteDailyReport(idx){
   if(!confirm('Delete this daily report?'))return;
   loadDailyPredictions();
@@ -3413,6 +3508,187 @@ function deleteDailyReport(idx){
   saveDailyPredictions();
   renderDailyHistoryList();
   document.getElementById('dt-content').innerHTML=`<div style="max-width:820px;margin:40px auto;text-align:center;"><div style="font-size:48px;margin-bottom:16px;">⚡</div><div style="font-size:18px;font-weight:800;color:var(--t);">Select a report or generate a new one</div></div>`;
+}
+
+// ── DAILY PREP — general market morning briefing ──
+let marketPreps=[];
+function loadMarketPreps(){marketPreps=LS.get('st_marketpreps')||[];}
+function saveMarketPreps(){LS.set('st_marketpreps',marketPreps.slice(0,30));if(FB_ACTIVE)fbWrite(userPath('marketpreps'),{preps:marketPreps.slice(0,30),updatedAt:Date.now()}).catch(()=>{});}
+
+function renderMarketPrep(){
+  loadMarketPreps();
+  const el=document.getElementById('mp-content');if(!el)return;
+  const latest=marketPreps[0];
+  let html=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:10px;">
+    <div>
+      <div style="font-size:11px;font-weight:700;color:var(--p);letter-spacing:3px;">DAILY MARKET PREP</div>
+      <div style="font-size:13px;color:var(--t3);margin-top:3px;">Pre-market briefing · US open 15:30 CET / 9:30 ET</div>
+    </div>
+    <button id="mp-gen-btn" onclick="generateMarketPrep()" class="bigbtn" style="width:auto;padding:12px 20px;font-size:14px;">📋 Generate Today's Prep</button>
+  </div>`;
+
+  if(!CK||!CK.startsWith('sk-ant')){
+    html+=`<div style="background:var(--al);border:1px solid var(--a);border-radius:14px;padding:16px;color:var(--t2);font-size:13px;line-height:1.6;">⚠️ Add your Claude API key in Profile to generate market prep briefings.</div>`;
+  }
+
+  // History selector
+  if(marketPreps.length){
+    html+=`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px;">`;
+    marketPreps.forEach((p,i)=>{
+      html+=`<button onclick="showMarketPrep(${i})" style="background:${i===0?'var(--pl)':'var(--card)'};border:1px solid ${i===0?'var(--p)':'var(--b)'};color:${i===0?'var(--p)':'var(--t3)'};font-size:11px;font-weight:700;padding:6px 11px;border-radius:9px;cursor:pointer;font-family:inherit;">${p.label}</button>`;
+    });
+    html+=`</div>`;
+  }
+
+  html+=`<div id="mp-report">`;
+  if(latest){
+    html+=marketPrepBody(latest,0);
+  }else{
+    html+=`<div style="text-align:center;padding:50px 20px;">
+      <div style="font-size:52px;margin-bottom:16px;">📋</div>
+      <div style="font-size:18px;font-weight:800;color:var(--t);margin-bottom:8px;">No briefing yet today</div>
+      <div style="font-size:13px;color:var(--t3);max-width:420px;margin:0 auto;line-height:1.6;">Generate a full pre-market briefing: market overview, top news, economic calendar, earnings, key levels, sector focus, bull/bear positioning, and a risk reminder — all from live market data.</div>
+    </div>`;
+  }
+  html+=`</div>`;
+  el.innerHTML=html;
+}
+
+function marketPrepBody(p,idx){
+  return `<div style="background:var(--card);border:1px solid var(--b);border-radius:var(--rad);padding:22px;box-shadow:var(--sh-sm);">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+      <div style="font-size:13px;color:var(--t3);">Generated ${p.date}</div>
+      <div style="display:flex;gap:6px;">
+        <button onclick="exportMarketPrepPDF(${idx})" style="background:var(--pl);border:1px solid var(--p);color:var(--p);font-size:11px;font-weight:700;padding:7px 12px;border-radius:9px;cursor:pointer;font-family:inherit;">⬇ PDF</button>
+        <button onclick="deleteMarketPrep(${idx})" style="background:#fee2e2;border:none;color:var(--r);font-size:11px;font-weight:700;padding:7px 12px;border-radius:9px;cursor:pointer;font-family:inherit;">🗑 Delete</button>
+      </div>
+    </div>
+    <div class="rp-body">${parseMarkdown(p.content)}</div>
+  </div>`;
+}
+
+function showMarketPrep(idx){
+  loadMarketPreps();
+  const p=marketPreps[idx];if(!p)return;
+  document.getElementById('mp-report').innerHTML=marketPrepBody(p,idx);
+  // Update selector highlight
+  document.querySelectorAll('#mp-content > div button').forEach(()=>{});
+  renderMarketPrep();
+  setTimeout(()=>{document.getElementById('mp-report').innerHTML=marketPrepBody(p,idx);},10);
+}
+
+function deleteMarketPrep(idx){
+  if(!confirm('Delete this market prep briefing?'))return;
+  loadMarketPreps();
+  marketPreps.splice(idx,1);
+  saveMarketPreps();
+  renderMarketPrep();
+}
+
+async function generateMarketPrep(){
+  if(!CK||!CK.startsWith('sk-ant')){toastError('Add your Claude API key in Profile first.');return;}
+  const btn=document.getElementById('mp-gen-btn');
+  const report=document.getElementById('mp-report');
+  if(btn){btn.disabled=true;btn.textContent='⟳ Researching markets...';}
+
+  const now=new Date();
+  const today=now.toLocaleDateString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+  let step=0;
+  const steps=['🔍 Searching market news...','📊 Gathering index levels...','📅 Checking economic calendar...','📈 Analyzing sectors...','✍️ Writing your briefing...'];
+  if(report)report.innerHTML=`<div style="text-align:center;padding:50px 20px;"><div style="font-size:40px;margin-bottom:16px;animation:spin 1.2s linear infinite;display:inline-block;">⟳</div><div id="mp-step" style="font-size:14px;font-weight:600;color:var(--t2);">${steps[0]}</div></div>`;
+  const stepTimer=setInterval(()=>{step=(step+1)%steps.length;const s=document.getElementById('mp-step');if(s)s.textContent=steps[step];},2200);
+
+  const prompt=`You are a professional pre-market analyst writing today's DAILY MARKET PREP briefing for ${today}. Use web search to get CURRENT, accurate market data — index levels, news, economic events, earnings. This is a general US market briefing (not about any single portfolio).
+
+Search for: today's stock market futures, latest market news, today's economic calendar, this week's earnings, Fed/FOMC news, major index levels (S&P 500, Nasdaq, Dow).
+
+Write a clean, professional briefing in markdown with EXACTLY these 8 numbered sections:
+
+## 1. 📊 Market Overview
+2-3 sentences on yesterday's close and today's setup (futures, sentiment, the main thing moving markets).
+
+## 2. 📰 Today's Top News
+3-5 bullet points of the most market-relevant headlines with specifics (numbers, companies).
+
+## 3. 📅 Economic Calendar
+Today's scheduled economic releases with times (ET). Mark high-impact ones with ★.
+
+## 4. 📈 Earnings in Focus
+Notable earnings today and over the next 7 days. If none today, say so and look ahead.
+
+## 5. 📐 Key Levels
+S&P 500, Nasdaq, Dow: prior close, support, resistance/ATH. Plus 10-yr yield and WTI crude if relevant.
+
+## 6. 🏭 Sectors in Focus
+2-4 sectors likely in play today and why (tie to the news/calendar).
+
+## 7. 🎯 How to Position
+Two scenarios:
+**▲ Bullish case:** what would drive markets up today and likely targets.
+**▼ Bearish case:** what would drive markets down and likely downside.
+
+## 8. ⚠️ Risk Reminder
+2-3 sentences on the day's biggest risk/volatility driver and a discipline note. End with "Educational content, not financial advice."
+
+Be concise but data-rich. Use real current numbers from your searches. Today is ${today}.`;
+
+  try{
+    const res=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':CK,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify({model:CLAUDE_MODEL,max_tokens:5000,tools:[{type:'web_search_20250305',name:'web_search'}],messages:[{role:'user',content:prompt}]})
+    });
+    const data=await res.json();
+    if(!res.ok||data.error)throw new Error(data.error?.message||`API error ${res.status}`);
+    const text=(data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('\n');
+    if(!text)throw new Error('No text in response.');
+
+    const prep={
+      id:'mp_'+Date.now(),
+      date:now.toLocaleString('en-US',{weekday:'short',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}),
+      label:now.toLocaleDateString('en-US',{month:'short',day:'numeric'}),
+      content:text
+    };
+    loadMarketPreps();
+    marketPreps.unshift(prep);
+    saveMarketPreps();
+    clearInterval(stepTimer);
+    renderMarketPrep();
+    toastSuccess('Daily prep ready!');
+  }catch(e){
+    clearInterval(stepTimer);
+    if(report)report.innerHTML=`<div style="padding:20px;background:var(--rl);border-radius:12px;color:var(--r);font-weight:600;">Error: ${e.message}</div>`;
+  }finally{
+    clearInterval(stepTimer);
+    if(btn){btn.disabled=false;btn.textContent='📋 Generate Today’s Prep';}
+  }
+}
+
+function exportMarketPrepPDF(idx){
+  loadMarketPreps();
+  const p=marketPreps[idx];if(!p)return;
+  // Build a printable window — uses browser's print-to-PDF
+  const w=window.open('','_blank');
+  if(!w){toastError('Allow popups to export PDF.');return;}
+  const bodyHtml=parseMarkdown(p.content);
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Daily Market Prep — ${p.label}</title>
+  <style>
+    body{font-family:-apple-system,'Segoe UI',Roboto,sans-serif;max-width:760px;margin:0 auto;padding:40px 32px;color:#1a1a2e;line-height:1.6;}
+    .hdr{border-bottom:3px solid #5b5bf0;padding-bottom:16px;margin-bottom:24px;}
+    .hdr h1{margin:0;font-size:24px;color:#4a45e0;letter-spacing:1px;}
+    .hdr .sub{color:#666;font-size:13px;margin-top:4px;}
+    h2{font-size:17px;color:#4a45e0;margin-top:24px;margin-bottom:8px;border-left:3px solid #5b5bf0;padding-left:10px;}
+    strong{color:#1a1a2e;}
+    ul{padding-left:20px;}li{margin-bottom:4px;}
+    .foot{margin-top:32px;padding-top:14px;border-top:1px solid #ddd;color:#999;font-size:11px;text-align:center;}
+    @media print{body{padding:20px;}}
+  </style></head><body>
+    <div class="hdr"><h1>📋 DAILY MARKET PREP</h1><div class="sub">Pre-market briefing · Generated ${p.date}</div></div>
+    ${bodyHtml}
+    <div class="foot">Stockr · Educational content, not financial advice · ${p.date}</div>
+  </body></html>`);
+  w.document.close();
+  setTimeout(()=>{w.print();},400);
 }
 
 // ── WEEKLY MARKET REPORTS ─────────────────────────
@@ -3658,12 +3934,12 @@ function parseMarkdown(md){
 }
 
 function ST(t){
-  ['c','p','w','rp','dt','pr'].forEach(x=>{
-    const el=document.getElementById(x==='c'?'ct':x==='pr'?'prt':x==='rp'?'rpt':x==='dt'?'dtt':x+'t');
+  ['c','p','w','rp','dt','mp','pr'].forEach(x=>{
+    const el=document.getElementById(x==='c'?'ct':x==='pr'?'prt':x==='rp'?'rpt':x==='dt'?'dtt':x==='mp'?'mpt':x+'t');
     if(el)el.style.display=x===t?'flex':'none';
     const tb=document.getElementById('tb'+x);if(tb)tb.className='tb'+(x===t?' on':'');
   });
-  const navMap={c:'bnic',p:'bnip',w:'bniw',rp:'bnirp',dt:'bnidt',pr:'bnipr'};
+  const navMap={c:'bnic',p:'bnip',w:'bniw',rp:'bnirp',dt:'bnidt',mp:'bnimp',pr:'bnipr'};
   Object.values(navMap).forEach(id=>{const el=document.getElementById(id);if(el)el.classList.remove('on');});
   const activeNav=document.getElementById(navMap[t]);if(activeNav)activeNav.classList.add('on');
   if(t!=='p'){const b=document.getElementById('mob-analyze-bar');if(b)b.classList.remove('visible');}
@@ -3681,6 +3957,7 @@ function ST(t){
   if(t==='rp'){document.getElementById('rpt').style.display='flex';renderReportsList();}
   if(t!=='dt'){const dhb=document.getElementById('dt-mob-hist-btn');if(dhb)dhb.remove();}
   if(t==='dt'){document.getElementById('dtt').style.display='flex';renderDailyTab();}
+  if(t==='mp'){document.getElementById('mpt').style.display='flex';renderMarketPrep();}
 }
 
 // ══════════════════════════════════════════════════
