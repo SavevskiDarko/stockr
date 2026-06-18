@@ -3845,16 +3845,76 @@ function renderMarketPrep(){
 }
 
 function marketPrepBody(p,idx){
-  return `<div style="background:var(--card);border:1px solid var(--b);border-radius:var(--rad);padding:22px;box-shadow:var(--sh-sm);">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+  return `<div style="background:var(--card);border:1px solid var(--b);border-radius:var(--rad);padding:18px;box-shadow:var(--sh-sm);">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
       <div style="font-size:13px;color:var(--t3);">Generated ${p.date}</div>
       <div style="display:flex;gap:6px;">
         <button onclick="exportMarketPrepPDF(${idx})" style="background:var(--pl);border:1px solid var(--p);color:var(--p);font-size:11px;font-weight:700;padding:7px 12px;border-radius:9px;cursor:pointer;font-family:inherit;">⬇ PDF</button>
         <button onclick="deleteMarketPrep(${idx})" style="background:#fee2e2;border:none;color:var(--r);font-size:11px;font-weight:700;padding:7px 12px;border-radius:9px;cursor:pointer;font-family:inherit;">🗑 Delete</button>
       </div>
     </div>
-    <div class="rp-body">${parseMarkdown(p.content)}</div>
+    ${prepCards(p.content)}
   </div>`;
+}
+
+// Split the briefing markdown into tight, bordered section cards
+function prepCards(md){
+  // Pull out the title line (first # or 📋 line)
+  const lines=md.split('\n');
+  let title='';
+  // Split on ## headings into sections
+  const parts=md.split(/(?=^##\s)/m);
+  let intro='',cards='';
+  parts.forEach((part,i)=>{
+    if(!part.trim())return;
+    const hm=part.match(/^##\s+(.+)$/m);
+    if(!hm){
+      // Pre-section content (title + tagline) — render as header band
+      const clean=part.replace(/^#\s+(.+)$/gm,'<div style="font-size:18px;font-weight:800;color:var(--t);">$1</div>')
+        .replace(/^📋(.+)$/gm,'<div style="font-size:17px;font-weight:800;color:var(--t);">📋$1</div>')
+        .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\*(.+?)\*/g,'<em>$1</em>')
+        .trim();
+      if(clean)intro+=`<div style="margin-bottom:12px;line-height:1.5;color:var(--t2);font-size:12px;">${clean}</div>`;
+      return;
+    }
+    const heading=hm[1].trim();
+    const body=part.replace(/^##\s+.+$/m,'').trim();
+    cards+=`<div style="background:var(--bg);border:1px solid var(--b);border-radius:14px;padding:13px 15px;margin-bottom:10px;">
+      <div style="font-size:13px;font-weight:800;color:var(--p);margin-bottom:8px;letter-spacing:0.2px;">${heading}</div>
+      <div class="prep-sec" style="font-size:12.5px;color:var(--t);line-height:1.6;">${prepInner(body)}</div>
+    </div>`;
+  });
+  return intro+cards;
+}
+
+// Inner markdown → HTML for a section (tables, lists, bold)
+function prepInner(md){
+  let s=md;
+  // Markdown tables → styled HTML table
+  s=s.replace(/((?:^\|.*\|[ \t]*\n?)+)/gm,(block)=>{
+    const rows=block.trim().split('\n').filter(r=>r.includes('|'));
+    if(rows.length<2)return block;
+    const cells=r=>r.split('|').slice(1,-1).map(c=>c.trim());
+    // Skip separator row (---)
+    const dataRows=rows.filter(r=>!/^\|[\s:|-]+\|$/.test(r.trim()));
+    const head=cells(dataRows[0]);
+    const bodyRows=dataRows.slice(1);
+    let html='<div style="overflow-x:auto;margin:6px 0;"><table style="width:100%;border-collapse:collapse;font-size:11.5px;">';
+    html+='<tr>'+head.map(c=>`<th style="text-align:left;padding:6px 8px;background:var(--pl);color:var(--p);font-weight:700;border-radius:0;white-space:nowrap;">${c}</th>`).join('')+'</tr>';
+    bodyRows.forEach(r=>{
+      html+='<tr>'+cells(r).map(c=>`<td style="padding:6px 8px;border-bottom:1px solid var(--b);">${c.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')}</td>`).join('')+'</tr>';
+    });
+    html+='</table></div>';
+    return html;
+  });
+  s=s.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+     .replace(/\*(.+?)\*/g,'<em>$1</em>')
+     .replace(/^[*-]\s+(.+)$/gm,'<li style="margin-bottom:4px;">$1</li>')
+     .replace(/(<li[^>]*>.*?<\/li>\n?)+/gs,'<ul style="margin:5px 0 5px 16px;padding:0;">$&</ul>')
+     .replace(/^---$/gm,'')
+     .replace(/\n{2,}/g,'<br><br>')
+     .replace(/\n/g,'<br>');
+  return s;
 }
 
 function showMarketPrep(idx){
@@ -3889,6 +3949,11 @@ async function generateMarketPrep(){
   const stepTimer=setInterval(()=>{step=(step+1)%steps.length;const s=document.getElementById('mp-step');if(s)s.textContent=steps[step];},2200);
 
   const prompt=`You are a professional pre-market analyst writing today's DAILY MARKET PREP briefing for ${today}. Use web search to get CURRENT, accurate market data — index levels, news, economic events, earnings. This is a general US market briefing (not about any single portfolio).
+
+CRITICAL OUTPUT RULES:
+- Output ONLY the finished briefing in markdown. NEVER include meta-commentary such as "I'll search for...", "Let me compile...", "Now I have the data", or any description of your research process. Start directly with the first heading.
+- Cross-check key figures (index closing levels, yields, oil) across your search results. If sources disagree, use the most recent/authoritative value and do not contradict yourself between sections. The closing level you state in the Overview must match the one in Key Levels.
+- Use real current numbers only. Do not invent or estimate levels.
 
 Search for: today's stock market futures, latest market news, today's economic calendar, this week's earnings, Fed/FOMC news, major index levels (S&P 500, Nasdaq, Dow).
 
@@ -3930,8 +3995,15 @@ Be concise but data-rich. Use real current numbers from your searches. Today is 
     });
     const data=await res.json();
     if(!res.ok||data.error)throw new Error(data.error?.message||`API error ${res.status}`);
-    const text=(data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('\n');
+    let text=(data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('\n');
     if(!text)throw new Error('No text in response.');
+    // Safety net: strip any meta-preamble before the first markdown heading or the title
+    const firstHeading=text.search(/(^|\n)#{1,3}\s/);
+    const titleIdx=text.indexOf('📋');
+    let cut=-1;
+    if(titleIdx>=0&&titleIdx<400)cut=titleIdx;
+    else if(firstHeading>=0&&firstHeading<400)cut=firstHeading;
+    if(cut>0)text=text.slice(cut).replace(/^\n+/,'');
 
     const prep={
       id:'mp_'+Date.now(),
@@ -3960,9 +4032,10 @@ function exportMarketPrepPDF(idx){
   // Build a printable window — uses browser's print-to-PDF
   const w=window.open('','_blank');
   if(!w){toastError('Allow popups to export PDF.');return;}
-  const bodyHtml=parseMarkdown(p.content);
+  const bodyHtml=prepCards(p.content);
   w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Daily Market Prep — ${p.label}</title>
   <style>
+    :root{--p:#5b5bf0;--pl:#eeeefe;--bg:#f5f5fb;--card:#fff;--t:#13152b;--t2:#3a3e5c;--t3:#6c7193;--b:#eaeaf4;--rad:18px;}
     body{font-family:-apple-system,'Segoe UI',Roboto,sans-serif;max-width:760px;margin:0 auto;padding:40px 32px;color:#1a1a2e;line-height:1.6;}
     .hdr{border-bottom:3px solid #5b5bf0;padding-bottom:16px;margin-bottom:24px;}
     .hdr h1{margin:0;font-size:24px;color:#4a45e0;letter-spacing:1px;}
