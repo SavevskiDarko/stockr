@@ -1016,6 +1016,7 @@ const APP_FK='d7udv7pr01qnv95n8q0gd7udv7pr01qnv95n8q10';
 let FB_PID=APP_FB_PID, FB_KEY=APP_FB_KEY, FB_ACTIVE=false;
 let CK='', FK=APP_FK;
 let T212_KEY='';
+let T212_SECRET='';
 let POLYGON_KEY='';
 let CLAUDE_MODEL='claude-sonnet-4-5';
 
@@ -2625,29 +2626,31 @@ function t212Ticker(raw){
 
 async function fetchT212Positions(){
   if(!T212_KEY){toastError('Add your Trading 212 API key in Profile first.');return null;}
+  if(!T212_SECRET){toastError('Add your Trading 212 API Secret in Profile — both key and secret are required.');return null;}
   const useProxy=PROXY_URL&&PROXY_URL.startsWith('http');
-  // Demo keys only work against demo.trading212.com; live keys against live.
   const t212Env=LS.get('st_t212_env')||'live';
   const t212Host=t212Env==='demo'?'https://demo.trading212.com':'https://live.trading212.com';
+  // T212 uses HTTP Basic Auth: base64(API_KEY:API_SECRET)
+  const basicAuth='Basic '+btoa(`${T212_KEY}:${T212_SECRET}`);
   const endpoint=useProxy
     ? PROXY_URL.replace(/\/$/,'')+'/t212/api/v0/equity/positions?host='+encodeURIComponent(t212Host)
     : t212Host+'/api/v0/equity/positions';
   try{
     const r = await fetch(endpoint,{
-      headers: useProxy ? {'X-T212-Key': T212_KEY} : {'Authorization': T212_KEY},
+      headers: useProxy ? {'X-T212-Auth': basicAuth} : {'Authorization': basicAuth},
       signal: AbortSignal.timeout(12000)
     });
-    if(r.status===401){toastError('Trading 212: Invalid key. Check (1) Live vs Demo account match, (2) key not revoked, (3) API scope enabled.');return null;}
-    if(r.status===403){toastError('Trading 212: Key lacks permission. Enable portfolio/positions scope when generating it.');return null;}
+    if(r.status===401){toastError('Trading 212: Invalid credentials. Check your API key AND secret are both correct, and Live vs Demo matches.');return null;}
+    if(r.status===403){toastError('Trading 212: Key lacks permission. Enable portfolio/positions scope.');return null;}
     if(r.status===429){toastError('Trading 212: Rate limit hit. Try again in a moment.');return null;}
     if(!r.ok){toastError('Trading 212 error: '+r.status);return null;}
     return await r.json();
   }catch(e){
     if(e.message.includes('CORS')||e.message.includes('Failed to fetch')){
       if(useProxy){
-        toastError('Proxy unreachable. Check your Proxy URL in Profile and that the Worker is deployed.');
+        toastError('Proxy unreachable. Check your Proxy URL and that the Worker is deployed.');
       }else{
-        toastError('Trading 212 blocked by CORS. Set up the Proxy URL in Profile (Cloudflare Worker) to enable import.');
+        toastError('Trading 212 blocked by CORS. Set up the Proxy URL in Profile.');
       }
     } else {
       toastError('Trading 212 connection failed: '+e.message);
@@ -2683,20 +2686,52 @@ async function importFromT212(){
   });
 
   const port=activePort();
-  const choice=confirm('Trading 212: Found '+mapped.length+' positions.\n\n• OK = Import into "'+( port?.name||'current portfolio')+'"\n• Cancel = Create new "Trading 212" portfolio');
+  // Show a clear choice modal instead of an ambiguous OK/Cancel confirm
+  showT212ImportChoice(mapped,pricesUpdated,port);
+}
 
-  if(choice&&port){
-    mapped.forEach(p=>{
-      const idx=port.positions.findIndex(x=>x.ticker===p.ticker);
-      if(idx>=0)port.positions[idx]={...p};else port.positions.push(p);
-    });
-    toastSuccess('✓ Imported '+mapped.length+' positions ('+pricesUpdated+' prices updated)');
-  }else{
+function showT212ImportChoice(mapped,pricesUpdated,port){
+  const existing=document.getElementById('t212-choice-overlay');
+  if(existing)existing.remove();
+  const overlay=document.createElement('div');
+  overlay.id='t212-choice-overlay';
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
+  overlay.onclick=e=>{if(e.target===overlay)overlay.remove();};
+  overlay.innerHTML=`<div style="background:var(--card);border-radius:18px;padding:22px;max-width:380px;width:100%;box-shadow:var(--sh-lg);">
+    <div style="font-size:17px;font-weight:800;color:var(--t);margin-bottom:6px;">Import ${mapped.length} positions</div>
+    <div style="font-size:13px;color:var(--t3);line-height:1.5;margin-bottom:18px;">Found ${mapped.length} positions in your Trading 212 account. Where should they go?</div>
+    <button id="t212-new-btn" style="width:100%;background:var(--p);border:none;color:#fff;padding:14px;border-radius:13px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:10px;text-align:left;">
+      <div>🆕 Create new "Trading 212" portfolio</div>
+      <div style="font-size:11px;font-weight:500;opacity:0.85;margin-top:2px;">Recommended — keeps your current portfolio untouched</div>
+    </button>
+    <button id="t212-merge-btn" style="width:100%;background:var(--bg);border:1px solid var(--b);color:var(--t2);padding:14px;border-radius:13px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:10px;text-align:left;">
+      <div>➕ Merge into "${port?.name||'current portfolio'}"</div>
+      <div style="font-size:11px;font-weight:500;color:var(--t4);margin-top:2px;">Adds these to your active portfolio (same tickers get overwritten)</div>
+    </button>
+    <button id="t212-cancel-btn" style="width:100%;background:none;border:none;color:var(--t3);padding:10px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">Cancel</button>
+  </div>`;
+  document.body.appendChild(overlay);
+
+  document.getElementById('t212-new-btn').onclick=()=>{
     const newPort={id:'p_t212_'+Date.now(),name:'Trading 212',positions:mapped};
     PORTFOLIOS.push(newPort);ACTIVE_PORT_ID=newPort.id;
     toastSuccess('✓ Created "Trading 212" portfolio with '+mapped.length+' positions');
-  }
+    overlay.remove();finishT212Import();
+  };
+  document.getElementById('t212-merge-btn').onclick=()=>{
+    if(port){
+      mapped.forEach(p=>{
+        const i=port.positions.findIndex(x=>normalizeTicker(x.ticker)===normalizeTicker(p.ticker));
+        if(i>=0)port.positions[i]={...p};else port.positions.push(p);
+      });
+      toastSuccess('✓ Imported '+mapped.length+' positions ('+pricesUpdated+' prices updated)');
+    }
+    overlay.remove();finishT212Import();
+  };
+  document.getElementById('t212-cancel-btn').onclick=()=>overlay.remove();
+}
 
+function finishT212Import(){
   saveLocal();
   if(FB_ACTIVE)fbWrite(userPath('portfolios'),{portfolios:PORTFOLIOS,updatedAt:Date.now()}).catch(()=>{});
   renderPortSwitcher();renderPORT();ST('p');
@@ -2746,9 +2781,12 @@ function saveProxyUrl(){
 
 function saveT212Key(){
   const val=(document.getElementById('prof-t212')?.value||'').trim();
+  const sec=(document.getElementById('prof-t212-secret')?.value||'').trim();
   if(!val){toastError('Please enter your Trading 212 API key.');return;}
+  if(!sec){toastError('Please enter your Trading 212 API Secret too — both are required.');return;}
   const isNew=!T212_KEY;
   T212_KEY=val;LS.set('st_t212',T212_KEY);
+  T212_SECRET=sec;LS.set('st_t212_secret',T212_SECRET);
   renderProfile();
   // Re-open the panel after re-render
   setTimeout(()=>{
@@ -2759,12 +2797,13 @@ function saveT212Key(){
       toastSuccess('Trading 212 connected! Importing your positions...');
       importFromT212();
     } else {
-      toastSuccess('Trading 212 key updated.');
+      toastSuccess('Trading 212 credentials updated.');
     }
   },100);
 }
 function removeT212Key(){
   T212_KEY='';LS.del('st_t212');
+  T212_SECRET='';LS.del('st_t212_secret');
   renderProfile();toastSuccess('Trading 212 disconnected.');
 }
 
@@ -4731,6 +4770,8 @@ function renderProfile(){
       </div>
       <div style="font-size:10px;font-weight:700;color:var(--p);letter-spacing:2px;margin-bottom:6px;">API KEY</div>
       <input class="mob-finp" id="prof-t212" type="password" placeholder="Your Trading 212 API key..." value="${T212_KEY||''}" style="margin-bottom:8px;display:block;">
+      <div style="font-size:10px;font-weight:700;color:var(--p);letter-spacing:2px;margin-bottom:6px;">API SECRET</div>
+      <input class="mob-finp" id="prof-t212-secret" type="password" placeholder="Your Trading 212 API secret..." value="${T212_SECRET||''}" style="margin-bottom:8px;display:block;">
       <div style="font-size:11px;color:var(--t4);margin-bottom:12px;line-height:1.6;">Get your key: <b>Trading 212 app → Settings → API (Beta) → Generate API key</b></div>
       <div style="display:flex;gap:8px;margin-bottom:8px;">
         <button onclick="saveT212Key()" class="mob-add-btn" style="font-size:12px;padding:11px;flex:1;">${T212_KEY?'Update Key':'Connect T212'}</button>
@@ -4786,6 +4827,7 @@ function closeSB(){document.getElementById('sb').classList.remove('open');docume
 document.addEventListener('DOMContentLoaded',async()=>{
   CLAUDE_MODEL=LS.get('st_model')||'claude-sonnet-4-5';
   T212_KEY=LS.get('st_t212')||'';
+  T212_SECRET=LS.get('st_t212_secret')||'';
   POLYGON_KEY=LS.get('st_polygon')||'';
   BASE_CURRENCY=LS.get('st_currency')||'USD';
   const savedDark=LS.get('st_dark');if(savedDark)applyDarkMode(true);
