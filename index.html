@@ -2611,17 +2611,40 @@ function showDailyHistorySheet(){
 // ── TRADING 212 INTEGRATION ───────────────────────
 
 
+// Trading 212 uses some outdated/internal tickers — map them to current symbols
+const T212_TICKER_FIXES={
+  FB:'META',        // Facebook → Meta (renamed)
+  YNDX:'NBIS',      // old Yandex listing → Nebius
+  SNDK1:'SNDK',     // SanDisk with T212 suffix
+  GOOG:'GOOGL',     // normalize to class A
+  SQ:'XYZ',         // Block renamed ticker
+  FISV:'FI',        // Fiserv renamed
+  RE:'EG',          // Everest renamed
+  ANTM:'ELV',       // Anthem → Elevance
+  WLTW:'WTW',       // Willis Towers Watson
+  TWTR:'X',         // legacy Twitter (if present)
+  XPOA:'QBTS',      // DPCM Capital SPAC → D-Wave Quantum
+  VUAAL:'VUAA',     // T212 ETF lowercase-l artifact
+  VUAA1:'VUAA'
+};
 function t212Ticker(raw){
   // Convert "AAPL_US_EQ" → "AAPL", "VUAA_EQ" → "VUAA", "AIR_PA_EQ" → "AIR.PA"
   if(!raw) return raw;
   let t = raw.replace(/_EQ$/, '').replace(/_US$/, '');
+  // T212 sometimes appends a lowercase letter to ETF tickers (VUAAl → VUAA)
+  t = t.replace(/([A-Z]{3,})l$/, '$1');
   // Exchange suffix handling: _PA → .PA, _AS → .AS, _L → .L, etc.
   const exchMap = {_PA:'.PA',_AS:'.AS',_DE:'.DE',_MI:'.MI',_MC:'.MC',_L:'.L',
                    _ST:'.ST',_OL:'.OL',_SW:'.SW',_HE:'.HE',_CO:'.CO',_BR:'.BR'};
   for(const [k,v] of Object.entries(exchMap)){
-    if(t.endsWith(k)){return t.slice(0,-k.length)+v;}
+    if(t.endsWith(k)){t=t.slice(0,-k.length)+v;break;}
   }
-  return t;
+  // Strip any trailing digit suffix T212 adds to disambiguate (e.g. SNDK1 → SNDK)
+  const noDigit=t.replace(/\d+$/,'');
+  if(T212_TICKER_FIXES[t]) return T212_TICKER_FIXES[t];
+  if(T212_TICKER_FIXES[noDigit]) return T212_TICKER_FIXES[noDigit];
+  if(/^[A-Z]+\d+$/.test(t)&&!t.includes('.')) return noDigit;
+  return T212_TICKER_FIXES[t]||t;
 }
 
 async function fetchT212Positions(){
@@ -3355,6 +3378,15 @@ function normalizeTicker(raw){
   let t=(raw||'').trim().toUpperCase().replace(/\s+/g,'');
   // Strip common suffixes people add
   t=t.replace(/\b(INC|CORP|CO|LTD|PLC)\.?$/,'');
+  // Apply T212 renames (FB→META etc) if that map exists
+  if(typeof T212_TICKER_FIXES!=='undefined'){
+    if(T212_TICKER_FIXES[t])t=T212_TICKER_FIXES[t];
+    else{
+      const nd=t.replace(/\d+$/,'');
+      if(T212_TICKER_FIXES[nd])t=T212_TICKER_FIXES[nd];
+      else if(/^[A-Z]+\d+$/.test(t))t=nd; // SNDK1 → SNDK
+    }
+  }
   return TICKER_ALIASES[t]||t;
 }
 // Weighted-average merge of two lots of the same ticker
