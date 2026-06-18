@@ -2625,17 +2625,20 @@ function t212Ticker(raw){
 
 async function fetchT212Positions(){
   if(!T212_KEY){toastError('Add your Trading 212 API key in Profile first.');return null;}
-  // Use the proxy if configured (required — T212 blocks direct browser calls via CORS)
   const useProxy=PROXY_URL&&PROXY_URL.startsWith('http');
+  // Demo keys only work against demo.trading212.com; live keys against live.
+  const t212Env=LS.get('st_t212_env')||'live';
+  const t212Host=t212Env==='demo'?'https://demo.trading212.com':'https://live.trading212.com';
   const endpoint=useProxy
-    ? PROXY_URL.replace(/\/$/,'')+'/t212/api/v0/equity/positions'
-    : 'https://live.trading212.com/api/v0/equity/positions';
+    ? PROXY_URL.replace(/\/$/,'')+'/t212/api/v0/equity/positions?host='+encodeURIComponent(t212Host)
+    : t212Host+'/api/v0/equity/positions';
   try{
     const r = await fetch(endpoint,{
       headers:{'Authorization': T212_KEY},
       signal: AbortSignal.timeout(12000)
     });
-    if(r.status===401){toastError('Trading 212: Invalid API key.');return null;}
+    if(r.status===401){toastError('Trading 212: Invalid key. Check (1) Live vs Demo account match, (2) key not revoked, (3) API scope enabled.');return null;}
+    if(r.status===403){toastError('Trading 212: Key lacks permission. Enable portfolio/positions scope when generating it.');return null;}
     if(r.status===429){toastError('Trading 212: Rate limit hit. Try again in a moment.');return null;}
     if(!r.ok){toastError('Trading 212 error: '+r.status);return null;}
     return await r.json();
@@ -2721,6 +2724,13 @@ function savePolygonKey(){
   if(!val){toastError('Please enter your Polygon.io API key.');return;}
   POLYGON_KEY=val;LS.set('st_polygon',POLYGON_KEY);
   renderProfile();toastSuccess('Polygon.io connected!');
+}
+
+function setT212Env(env){
+  LS.set('st_t212_env',env);
+  toastSuccess(env==='demo'?'Switched to Demo/Practice account':'Switched to Live account');
+  renderProfile();
+  setTimeout(()=>{const p=document.getElementById('t212-panel');if(p)p.style.display='block';},10);
 }
 
 function saveProxyUrl(){
@@ -4714,6 +4724,11 @@ function renderProfile(){
       <div style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;background:${T212_KEY?'#dcfce7':'#f1f5f9'};color:${T212_KEY?'#047857':'#94a3b8'};">${T212_KEY?'ON':'OFF'}</div>
     </div>
     <div id="t212-panel" style="display:none;padding:0 16px 14px;">
+      <div style="font-size:10px;font-weight:700;color:var(--p);letter-spacing:2px;margin-bottom:6px;">ACCOUNT TYPE</div>
+      <div style="display:flex;gap:6px;margin-bottom:12px;">
+        <button onclick="setT212Env('live')" id="t212-env-live" class="pbtn" style="flex:1;${(LS.get('st_t212_env')||'live')==='live'?'background:var(--p);color:#fff;border-color:var(--p);':''}">💰 Live</button>
+        <button onclick="setT212Env('demo')" id="t212-env-demo" class="pbtn" style="flex:1;${(LS.get('st_t212_env')||'live')==='demo'?'background:var(--p);color:#fff;border-color:var(--p);':''}">🎮 Demo / Practice</button>
+      </div>
       <div style="font-size:10px;font-weight:700;color:var(--p);letter-spacing:2px;margin-bottom:6px;">API KEY</div>
       <input class="mob-finp" id="prof-t212" type="password" placeholder="Your Trading 212 API key..." value="${T212_KEY||''}" style="margin-bottom:8px;display:block;">
       <div style="font-size:11px;color:var(--t4);margin-bottom:12px;line-height:1.6;">Get your key: <b>Trading 212 app → Settings → API (Beta) → Generate API key</b></div>
