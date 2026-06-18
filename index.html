@@ -2634,7 +2634,7 @@ async function fetchT212Positions(){
     : t212Host+'/api/v0/equity/positions';
   try{
     const r = await fetch(endpoint,{
-      headers:{'Authorization': T212_KEY},
+      headers: useProxy ? {'X-T212-Key': T212_KEY} : {'Authorization': T212_KEY},
       signal: AbortSignal.timeout(12000)
     });
     if(r.status===401){toastError('Trading 212: Invalid key. Check (1) Live vs Demo account match, (2) key not revoked, (3) API scope enabled.');return null;}
