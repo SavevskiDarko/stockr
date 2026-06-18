@@ -331,9 +331,9 @@ input,button,select{font-family:'Montserrat',sans-serif;}
     bottom:calc(60px + env(safe-area-inset-bottom,0px));
     left:0;right:0;
     padding:8px 14px;
-    background:rgba(255,255,255,0.95);
+    background:var(--card);
     backdrop-filter:blur(8px);
-    border-top:1px solid #e2e8f0;
+    border-top:1px solid var(--b);
     z-index:49;gap:8px;
   }
   .mob-analyze-bar.visible{display:flex;}
@@ -2187,8 +2187,10 @@ function renderPORT(){
   const existingBar=document.getElementById('mob-analyze-bar');
   if(existingBar)existingBar.remove();
   if(!isDesktop&&pos.length){
+    // Only show if the Portfolio tab is the one currently on screen
+    const ptVisible=document.getElementById('pt')&&getComputedStyle(document.getElementById('pt')).display!=='none';
     const bar=document.createElement('div');
-    bar.id='mob-analyze-bar';bar.className='mob-analyze-bar visible';
+    bar.id='mob-analyze-bar';bar.className='mob-analyze-bar'+(ptVisible?' visible':'');
     bar.innerHTML=`<button class="abig" onclick="anzAll()" style="margin:0;flex:1;padding:11px;font-size:12px;border-radius:12px;box-shadow:none;">🔍 Analyze ${port.name}</button>`;
     document.body.appendChild(bar);
   }
