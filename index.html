@@ -1546,6 +1546,7 @@ async function fetchPriceHistory(ticker){
   const enc=encodeURIComponent(sym);
   const base=`https://query1.finance.yahoo.com/v8/finance/chart/${enc}?interval=1d&range=1y`;
   const urls=[];
+  if(PROXY_URL&&PROXY_URL.startsWith('http'))urls.push(`${PROXY_URL.replace(/\/$/,'')}/yahoo?t=${enc}&range=1y`);
   if(YAHOO_PROXY)urls.push(`${YAHOO_PROXY}?t=${enc}&range=1y`);
   urls.push(
     `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(base)}`,
@@ -2040,6 +2041,40 @@ function sortPositions(arr){
 }
 
 // ── PORTFOLIO ANALYTICS: allocation donut ──
+// ── PERIOD RETURNS — performance over time from snapshots ──
+function periodReturnsStrip(portId,currentValue){
+  const data=getPortfolioChartData(portId);
+  if(data.length<2)return ''; // need history
+  const now=new Date();
+  const daysAgo=n=>{const d=new Date(now);d.setDate(d.getDate()-n);return d.toISOString().split('T')[0];};
+  // Find the snapshot value at-or-before a target date
+  const valueAt=dateStr=>{
+    let best=null;
+    for(const s of data){if(s.d<=dateStr)best=s;else break;}
+    return best?best.v:(data[0]?data[0].v:null);
+  };
+  const periods=[
+    {label:'Today',from:valueAt(daysAgo(1))},
+    {label:'1W',from:valueAt(daysAgo(7))},
+    {label:'1M',from:valueAt(daysAgo(30))},
+    {label:'1Y',from:valueAt(daysAgo(365))},
+    {label:'All',from:data[0].v}
+  ];
+  const cells=periods.map(p=>{
+    if(p.from==null||p.from<=0||currentValue==null)return null;
+    const pct=(currentValue/p.from-1)*100;
+    // Skip periods where the start point equals now (no real data span)
+    if(Math.abs(pct)<0.001&&p.label!=='Today')return null;
+    const col=pct>=0?'#16b981':'#f24d6a';
+    return `<div style="flex:1;min-width:54px;text-align:center;padding:7px 4px;">
+      <div style="font-size:9px;font-weight:700;color:var(--t4);letter-spacing:0.5px;margin-bottom:2px;">${p.label}</div>
+      <div style="font-size:12.5px;font-weight:800;color:${col};">${pct>=0?'+':''}${pct.toFixed(2)}%</div>
+    </div>`;
+  }).filter(Boolean);
+  if(cells.length<2)return '';
+  return `<div style="display:flex;background:var(--card);border:1px solid var(--b);border-radius:14px;margin-bottom:12px;box-shadow:var(--sh-sm);overflow:hidden;">${cells.join('<div style="width:1px;background:var(--b);"></div>')}</div>`;
+}
+
 function allocationDonut(portId){
   const port=PORTFOLIOS.find(p=>p.id===portId);
   if(!port||!port.positions.length)return '';
@@ -2211,6 +2246,7 @@ function renderPORT(){
   let centerH='';
   if(pos.length){
     centerH+=chartSection;
+    centerH+=periodReturnsStrip(port.id,lT>0?lT:null);
     centerH+=allocationDonut(port.id);
     // Search/filter box (shows when 8+ positions)
     if(posRaw.length>=8){
@@ -2589,9 +2625,13 @@ function t212Ticker(raw){
 
 async function fetchT212Positions(){
   if(!T212_KEY){toastError('Add your Trading 212 API key in Profile first.');return null;}
-  const base = 'https://live.trading212.com';
+  // Use the proxy if configured (required — T212 blocks direct browser calls via CORS)
+  const useProxy=PROXY_URL&&PROXY_URL.startsWith('http');
+  const endpoint=useProxy
+    ? PROXY_URL.replace(/\/$/,'')+'/t212/api/v0/equity/positions'
+    : 'https://live.trading212.com/api/v0/equity/positions';
   try{
-    const r = await fetch(`${base}/api/v0/equity/positions`,{
+    const r = await fetch(endpoint,{
       headers:{'Authorization': T212_KEY},
       signal: AbortSignal.timeout(12000)
     });
@@ -2601,7 +2641,11 @@ async function fetchT212Positions(){
     return await r.json();
   }catch(e){
     if(e.message.includes('CORS')||e.message.includes('Failed to fetch')){
-      toastError('Trading 212 API blocked by CORS. Try the Cloudflare Worker solution.');
+      if(useProxy){
+        toastError('Proxy unreachable. Check your Proxy URL in Profile and that the Worker is deployed.');
+      }else{
+        toastError('Trading 212 blocked by CORS. Set up the Proxy URL in Profile (Cloudflare Worker) to enable import.');
+      }
     } else {
       toastError('Trading 212 connection failed: '+e.message);
     }
@@ -2677,6 +2721,17 @@ function savePolygonKey(){
   if(!val){toastError('Please enter your Polygon.io API key.');return;}
   POLYGON_KEY=val;LS.set('st_polygon',POLYGON_KEY);
   renderProfile();toastSuccess('Polygon.io connected!');
+}
+
+function saveProxyUrl(){
+  const inp=document.getElementById('proxy-url-inp');
+  if(!inp)return;
+  let url=inp.value.trim().replace(/\/$/,'');
+  if(url&&!url.startsWith('http')){toastError('Proxy URL must start with https://');return;}
+  PROXY_URL=url;
+  LS.set('st_proxy',url);
+  toastSuccess(url?'Proxy URL saved!':'Proxy URL cleared.');
+  renderProfile();
 }
 
 function saveT212Key(){
@@ -2924,7 +2979,8 @@ function saveTCache(){localStorage.setItem('st_ticker_cache',JSON.stringify(TICK
 const EURO_SUFFIXES=['.L','.AS','.PA','.DE','.MI','.MC','.ST','.OL','.SW','.HE','.CO','.BR','.LS','.VI','.F','.BE','.SG'];
 
 // Optional: Cloudflare Worker URL for Yahoo Finance proxy
-const YAHOO_PROXY = '';
+let PROXY_URL = LS.get('st_proxy') || '';
+const YAHOO_PROXY = ''; // legacy; PROXY_URL is used now
 
 // ── POLYGON.IO — US STOCKS (primary, requires free API key) ──
 async function fetchPolygon(ticker){
@@ -2962,6 +3018,7 @@ async function yahooFetch(symbol){
   const base1='https://query1.finance.yahoo.com/v8/finance/chart/'+enc+'?interval=1d&range=1d';
   const base2='https://query2.finance.yahoo.com/v8/finance/chart/'+enc+'?interval=1d&range=1d';
   const attempts=[];
+  if(PROXY_URL&&PROXY_URL.startsWith('http')) attempts.push(PROXY_URL.replace(/\/$/,'')+'/yahoo?t='+enc);
   if(YAHOO_PROXY) attempts.push(YAHOO_PROXY+'?t='+enc);
   if(location.protocol==='https:'){
     attempts.push(
@@ -4640,6 +4697,16 @@ function renderProfile(){
 
   // ── Trading 212 ──
   html+=`<div style="font-size:10px;font-weight:700;color:var(--t3);letter-spacing:2px;margin:14px 2px 8px;">BROKER INTEGRATION</div>`;
+  // Proxy URL card (required for T212 import + reliable EU/history prices)
+  html+=`<div style="background:var(--card);border-radius:14px;padding:14px 16px;margin-bottom:10px;box-shadow:var(--sh-sm);">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+      <div style="width:32px;height:32px;border-radius:9px;background:${PROXY_URL?'#ecfdf5':'#f8fafc'};border:1px solid ${PROXY_URL?'#a7f3d0':'var(--b)'};display:flex;align-items:center;justify-content:center;font-size:16px;">🔌</div>
+      <div style="flex:1;"><div style="font-size:13px;font-weight:700;color:var(--t);">Proxy URL</div><div style="font-size:11px;color:${PROXY_URL?'#10b981':'var(--t4)'};">${PROXY_URL?'Connected — T212 import & EU prices enabled':'Needed for Trading 212 import'}</div></div>
+    </div>
+    <input id="proxy-url-inp" class="mob-finp" style="width:100%;margin-bottom:8px;" placeholder="https://stockr-proxy.you.workers.dev" value="${PROXY_URL||''}">
+    <button onclick="saveProxyUrl()" class="bigbtn" style="width:100%;padding:10px;font-size:13px;">Save Proxy URL</button>
+    <div style="font-size:10px;color:var(--t4);margin-top:8px;line-height:1.5;">Deploy the free <strong>stockr-proxy-worker.js</strong> to Cloudflare Workers, then paste its URL here. This lets the app import your Trading 212 positions (brokers block direct browser calls).</div>
+  </div>`;
   html+=`<div style="background:var(--card);border-radius:14px;overflow:hidden;margin-bottom:10px;box-shadow:var(--sh-sm);">
     <div style="padding:14px 16px;display:flex;align-items:center;gap:12px;cursor:pointer;" onclick="toggleService('t212-panel')">
       <div style="width:36px;height:36px;border-radius:10px;background:${T212_KEY?'#ecfdf5':'#f8fafc'};border:1px solid ${T212_KEY?'#a7f3d0':'#e2e8f0'};display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">📱</div>
