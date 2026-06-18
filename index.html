@@ -1340,6 +1340,7 @@ async function pullFromFirebase(){
   if(cfg){
     if(cfg.claudeKey&&!CK){CK=cfg.claudeKey;LS.set('st_ck',CK);}
     if(cfg.finnhubKey&&cfg.finnhubKey!==FK){FK=cfg.finnhubKey;}
+    if(cfg.userTickers){USER_TICKER_MAP={...USER_TICKER_MAP,...cfg.userTickers};LS.set('st_user_tickers',USER_TICKER_MAP);}
   }
   const portData=await fbRead(p('portfolios'));
   if(portData?.portfolios?.length){
@@ -2634,6 +2635,8 @@ const T212_TICKER_FIXES={
 function t212Ticker(raw){
   // Convert "AAPL_US_EQ" → "AAPL", "VUAA_EQ" → "VUAA", "AIR_PA_EQ" → "AIR.PA"
   if(!raw) return raw;
+  // Check user's manual corrections against the RAW T212 ticker first
+  if(typeof USER_TICKER_MAP!=='undefined'&&USER_TICKER_MAP[raw.toUpperCase()])return USER_TICKER_MAP[raw.toUpperCase()];
   let t = raw.replace(/_EQ$/, '').replace(/_US$/, '');
   // T212 sometimes appends a lowercase letter to ETF tickers (VUAAl → VUAA)
   t = t.replace(/([A-Z]{3,})l$/, '$1');
@@ -2694,11 +2697,16 @@ async function importFromT212(){
   if(!positions)return;
   if(!positions.length){toastWarning('Trading 212: No open positions found.');return;}
 
-  const mapped=positions.map(p=>({
-    ticker:t212Ticker(p.ticker||p.instrument?.ticker||''),
-    shares:parseFloat((p.quantity||0).toFixed(6)),
-    cost:parseFloat((p.averagePricePaid||0).toFixed(4)),
-  })).filter(p=>p.ticker&&p.shares>0&&p.cost>0);
+  const mapped=positions.map(p=>{
+    const raw=p.ticker||p.instrument?.ticker||'';
+    return{
+      ticker:t212Ticker(raw),
+      shares:parseFloat((p.quantity||0).toFixed(6)),
+      cost:parseFloat((p.averagePricePaid||0).toFixed(4)),
+      _t212raw:raw,
+      _name:(p.instrument?.name||p.name||'').trim()
+    };
+  }).filter(p=>p.ticker&&p.shares>0&&p.cost>0);
 
   if(!mapped.length){toastWarning('No valid positions found to import.');return;}
 
@@ -2747,11 +2755,29 @@ function showT212ImportChoice(mapped,pricesUpdated,port){
   };
   document.getElementById('t212-merge-btn').onclick=()=>{
     if(port){
+      let added=0,updated=0;
       mapped.forEach(p=>{
-        const i=port.positions.findIndex(x=>normalizeTicker(x.ticker)===normalizeTicker(p.ticker));
-        if(i>=0)port.positions[i]={...p};else port.positions.push(p);
+        // 1) Match by normalized ticker
+        let i=port.positions.findIndex(x=>normalizeTicker(x.ticker)===normalizeTicker(p.ticker));
+        // 2) Fall back to matching by stored company name (catches already-renamed tickers)
+        if(i<0&&p._name){
+          i=port.positions.findIndex(x=>x._name&&x._name.toLowerCase()===p._name.toLowerCase());
+          if(i>=0){
+            // Found by name — the user had manually renamed this. Learn the alias.
+            addUserTickerAlias(p._t212raw,port.positions[i].ticker);
+            addUserTickerAlias(p.ticker,port.positions[i].ticker);
+          }
+        }
+        if(i>=0){
+          // Keep the user's chosen ticker, update shares/cost, store name for next time
+          const keepTicker=port.positions[i].ticker;
+          port.positions[i]={...p,ticker:keepTicker,_name:p._name||port.positions[i]._name};
+          updated++;
+        }else{
+          port.positions.push(p);added++;
+        }
       });
-      toastSuccess('✓ Imported '+mapped.length+' positions ('+pricesUpdated+' prices updated)');
+      toastSuccess(`✓ Synced: ${updated} updated, ${added} new`);
     }
     overlay.remove();finishT212Import();
   };
@@ -2944,6 +2970,8 @@ async function saveEdit(i){
       return;
     }
     port.positions[i].ticker=newTicker;
+    // Remember this correction so future T212 syncs of the old ticker map to the new one
+    addUserTickerAlias(oldTicker,newTicker);
     toastSuccess(`✓ ${newTicker} found at ${formatCurrency(q.c)}`);
   }
 
@@ -3413,10 +3441,21 @@ const TICKER_ALIASES={
   AIRBNB:'ABNB',SPOTIFY:'SPOT',SHOPIFY:'SHOP',SNOWFLAKE:'SNOW',
   SPACEX:'SPCX',MARVELL:'MRVL',MICRON:'MU',FEDEX:'FDX'
 };
+// User's own manual ticker corrections (learned from edits): {FROM: TO}
+let USER_TICKER_MAP=LS.get('st_user_tickers')||{};
+function addUserTickerAlias(from,to){
+  if(!from||!to||from===to)return;
+  USER_TICKER_MAP[from.toUpperCase()]=to.toUpperCase();
+  LS.set('st_user_tickers',USER_TICKER_MAP);
+  if(FB_ACTIVE)fbWrite(userPath('config'),{userTickers:USER_TICKER_MAP,updatedAt:Date.now()}).catch(()=>{});
+}
+
 function normalizeTicker(raw){
   let t=(raw||'').trim().toUpperCase().replace(/\s+/g,'');
   // Strip common suffixes people add
   t=t.replace(/\b(INC|CORP|CO|LTD|PLC)\.?$/,'');
+  // User's manual corrections take priority (learned from edits)
+  if(typeof USER_TICKER_MAP!=='undefined'&&USER_TICKER_MAP[t])return USER_TICKER_MAP[t];
   // Apply T212 renames (FB→META etc) if that map exists
   if(typeof T212_TICKER_FIXES!=='undefined'){
     if(T212_TICKER_FIXES[t])t=T212_TICKER_FIXES[t];
