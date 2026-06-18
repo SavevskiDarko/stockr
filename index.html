@@ -2271,6 +2271,10 @@ function renderPORT(){
         <div class="pr-edit-panel hide" id="pr-edit-${i}">
           <div class="pr-edit-inner">
             <div class="pr-edit-title">Edit ${p.ticker}</div>
+            <div class="pr-edit-field" style="margin-bottom:8px;">
+              <div class="pr-edit-lbl">TICKER SYMBOL</div>
+              <input class="pr-edit-inp" id="pe-ticker-${i}" type="text" value="${p.ticker}" placeholder="e.g. QBTS or VUAA.L" onkeydown="if(event.key==='Enter')saveEdit(${i})" style="text-transform:uppercase;">
+            </div>
             <div class="pr-edit-row">
               <div class="pr-edit-field">
                 <div class="pr-edit-lbl">SHARES</div>
@@ -2901,13 +2905,48 @@ function toggleEdit(i){
   }
 }
 
-function saveEdit(i){
+async function saveEdit(i){
   const port=activePort();if(!port)return;
   const shares=parseFloat(document.getElementById(`pe-shares-${i}`).value);
   const cost=parseFloat(document.getElementById(`pe-cost-${i}`).value);
+  const tickerInput=document.getElementById(`pe-ticker-${i}`);
+  const newTicker=tickerInput?normalizeTicker(tickerInput.value):port.positions[i].ticker;
   if(!shares||!cost||shares<=0||cost<=0){
     toastError('Please enter valid shares and cost values.');return;
   }
+  if(!newTicker){toastError('Please enter a valid ticker symbol.');return;}
+
+  const oldTicker=port.positions[i].ticker;
+  const tickerChanged=newTicker!==oldTicker;
+
+  // If ticker changed, validate it resolves to a real price before committing
+  if(tickerChanged){
+    const saveBtn=document.querySelector(`#pr-edit-${i} .pr-save-btn`);
+    if(saveBtn){saveBtn.disabled=true;saveBtn.textContent='⟳ Checking '+newTicker+'...';}
+    const q=await fetchPrice(newTicker).catch(()=>null);
+    if(saveBtn){saveBtn.disabled=false;saveBtn.textContent='✓ Save';}
+    if(!q||!q.c||q.c<=0){
+      toastError(`Couldn't find a price for "${newTicker}". Check the symbol (e.g. QBTS, VUAA.L) — position not changed.`);
+      return;
+    }
+    // Merge if the new ticker already exists elsewhere in the portfolio
+    const dupIdx=port.positions.findIndex((x,xi)=>xi!==i&&normalizeTicker(x.ticker)===newTicker);
+    if(dupIdx>=0){
+      port.positions[dupIdx]=mergeLots(
+        {...port.positions[dupIdx],ticker:newTicker},
+        {ticker:newTicker,shares,cost}
+      );
+      port.positions.splice(i,1);
+      toastSuccess(`✓ ${newTicker} found at ${formatCurrency(q.c)} — merged with existing position`);
+      document.getElementById('pscr')?.removeAttribute('data-editing');
+      saveLocal();renderPORT();refresh('p');
+      if(FB_ACTIVE)fbWrite(userPath('portfolios'),{portfolios:PORTFOLIOS,updatedAt:Date.now()}).catch(()=>{});
+      return;
+    }
+    port.positions[i].ticker=newTicker;
+    toastSuccess(`✓ ${newTicker} found at ${formatCurrency(q.c)}`);
+  }
+
   port.positions[i].shares=shares;
   port.positions[i].cost=cost;
   document.getElementById('pscr')?.removeAttribute('data-editing');
