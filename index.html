@@ -201,7 +201,15 @@ input,button,select{font-family:'Montserrat',sans-serif;}
 
 /* PORTFOLIO & WATCHLIST */
 #pt,#wt{display:none;flex-direction:column;flex:1;min-height:0;}
-.pbar{display:flex;align-items:center;justify-content:space-between;padding:7px 12px;background:var(--bg);border-bottom:1px solid var(--b);flex-shrink:0;}
+.pbar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 14px;background:var(--bg);border-bottom:1px solid var(--b);flex-shrink:0;flex-wrap:wrap;}
+  .pbar-actions{display:flex;align-items:center;gap:7px;flex-wrap:wrap;}
+  .pbtn{display:inline-flex;align-items:center;justify-content:center;gap:5px;background:var(--card);border:1px solid var(--b);color:var(--t2);font-size:12px;font-weight:600;padding:8px 13px;min-height:36px;border-radius:11px;cursor:pointer;font-family:inherit;white-space:nowrap;transition:all 0.15s;-webkit-tap-highlight-color:transparent;}
+  .pbtn:hover{border-color:var(--p);color:var(--p);}
+  .pbtn:active{transform:scale(0.96);}
+  .pbtn-select{padding:8px 10px;}
+  .pbtn-primary{background:var(--p);border-color:var(--p);color:#fff;font-weight:700;}
+  .pbtn-primary:hover{background:var(--pd);border-color:var(--pd);color:#fff;}
+  .pbtn .ri{font-size:14px;line-height:1;}
 .pbar-ts{font-size:10px;font-weight:600;color:var(--t4);}
 .pbar-ts b{color:var(--g);}
 .rbtn{display:flex;align-items:center;gap:5px;background:var(--card);border:1px solid var(--b);color:var(--p);font-size:11px;font-weight:600;padding:7px 13px;border-radius:20px;cursor:pointer;font-family:inherit;}
@@ -314,6 +322,10 @@ input,button,select{font-family:'Montserrat',sans-serif;}
 
 @media(max-width:899px){
   html,body{overflow-x:hidden;max-width:100vw;}
+  .pbar{padding:10px 12px;}
+  .pbar-actions{width:100%;justify-content:flex-start;}
+  .pbtn{flex:1;min-width:0;padding:9px 8px;font-size:11px;}
+  .pbtn-primary{flex:1.3;}
   #app,#pt,#wt,#ct,#rpt,#dtt,#mpt,#prt{max-width:100vw;overflow-x:hidden;}
   body{background:var(--bg);}
   #top-tabs{display:none;}
@@ -875,8 +887,8 @@ button:active{transform:scale(0.97);}
       <div class="port-switcher" id="port-switcher"></div>
       <div class="pbar">
         <div class="pbar-ts" id="p-ts">Prices not loaded</div>
-        <div style="display:flex;gap:6px;align-items:center;">
-          <select id="port-sort" onchange="setPortSort(this.value)" class="rbtn" style="background:none;border:1px solid var(--b);color:var(--t3);font-size:10px;padding:5px 6px;cursor:pointer;font-family:inherit;">
+        <div class="pbar-actions">
+          <select id="port-sort" onchange="setPortSort(this.value)" class="pbtn pbtn-select">
             <option value="custom">↕ Manual</option>
             <option value="name">A–Z Name</option>
             <option value="gain-desc">▼ Gain $</option>
@@ -885,10 +897,10 @@ button:active{transform:scale(0.97);}
             <option value="pct-asc">▲ Gain %</option>
             <option value="value-desc">▼ Value</option>
           </select>
-          <button onclick="showRealizedHistory()" class="rbtn" style="background:none;border:1px solid var(--b);color:var(--t3);font-size:10px;" title="Realized gains history">💰 Realized</button>
-          <button onclick="cleanupDuplicates()" class="rbtn" style="background:none;border:1px solid var(--b);color:var(--t3);font-size:10px;" title="Merge duplicate tickers">⊕ Dedupe</button>
-          <button onclick="exportPortfolioCSV()" class="rbtn" style="background:none;border:1px solid var(--b);color:var(--t3);font-size:10px;" title="Export CSV">⬇ CSV</button>
-          <button class="rbtn" id="p-rb" onclick="refresh('p')"><span class="ri">↻</span> Refresh</button>
+          <button onclick="showRealizedHistory()" class="pbtn" title="Realized gains history">💰 <span>Realized</span></button>
+          <button onclick="cleanupDuplicates()" class="pbtn" title="Merge duplicate tickers">⊕ <span>Dedupe</span></button>
+          <button onclick="exportPortfolioCSV()" class="pbtn" title="Export CSV">⬇ <span>CSV</span></button>
+          <button class="pbtn pbtn-primary" id="p-rb" onclick="refresh('p')"><span class="ri">↻</span> <span>Refresh</span></button>
         </div>
       </div>
       <div class="pt-center-scr" id="pscr"></div>
@@ -3722,7 +3734,7 @@ function showDailyReport(idx){
     </div>
     ${verifySection}
     <!-- Full report -->
-    <div class="rp-body">${parseMarkdown(p.content)}</div>
+    <div class="rp-body">${prepCards(p.content)}</div>
   </div>`;
 }
 
@@ -4117,7 +4129,7 @@ function showReport(idx){
         <button onclick="deleteReport(${idx})" style="background:#fee2e2;border:none;color:var(--r);font-size:11px;font-weight:700;padding:7px 12px;border-radius:9px;cursor:pointer;font-family:inherit;">${t('delete_report')}</button>
       </div>
     </div>
-    <div class="rp-body">${parseMarkdown(r.content)}</div>
+    <div class="rp-body">${prepCards(r.content)}</div>
   </div>`;
   document.querySelectorAll('#rp-sidebar > div').forEach((el,i)=>{el.style.background=i===idx?'var(--pl)':'#fff';});
 }
@@ -4175,7 +4187,7 @@ async function generateWeeklyReport(){
   const portContext=PORTFOLIOS.map(p=>`${p.name}: ${p.positions.map(x=>`${x.ticker}(${x.shares}sh@$${x.cost})`).join(', ')}`).join(' | ');
   const watchContext=WATCH.map(w=>w.ticker).join(', ');
   const today=new Date();
-  const weekOf=today.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+  const weekOf='ending '+today.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
 
   // Build historical context from last 3 reports
   loadReports();
@@ -4192,6 +4204,8 @@ async function generateWeeklyReport(){
     : 'No previous predictions available.';
 
   const prompt=`You are an Adaptive AI Market Strategist with Recursive Memory. Your goal is to provide a weekly market analysis that evolves by learning from previous weeks' data and your own past predictions.
+
+OUTPUT RULE: Output ONLY the finished report in markdown, starting directly with the first heading. NEVER include meta-commentary about searching or compiling (no "I'll search...", "Let me gather...", "Now I have the data"). Cross-check figures across sources and stay internally consistent.
 
 CURRENT WEEK: ${weekOf}
 USER PORTFOLIO: ${portContext||'No positions yet'}
@@ -4282,7 +4296,10 @@ CRITICAL: After the report, output your key predictions as JSON wrapped EXACTLY 
         predictions={bullish:pj.bullish||'',bearish:pj.bearish||'',probability:String(pj.probability||''),levels:pj.levels||'',trend:pj.trend||''};
       }catch(e){predictions=null;}
     }
-    const text=rawText.replace(/<<<JSON>>>[\s\S]*?<<<END>>>/,'').trim();
+    let text=rawText.replace(/<<<JSON>>>[\s\S]*?<<<END>>>/,'').trim();
+    // Strip any leaked meta-preamble before the first heading
+    const _fh=text.search(/(^|\n)#{1,3}\s/);
+    if(_fh>0&&_fh<400)text=text.slice(_fh).replace(/^\n+/,'');
     if(!predictions){
       predictions={
         bullish:(text.match(/[Bb]ull(?:ish)?[^\n:]*[:\s][^\n]*([\s\S]*?)(?=\n[-*🐻]|\n##|$)/)||['',''])[0].replace(/[#*`]/g,'').slice(0,300).trim(),
