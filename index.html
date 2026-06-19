@@ -748,6 +748,7 @@ button:active{transform:scale(0.97);}
       <div class="hdr-sub" id="hdr-sub">Local storage</div>
     </div>
     <div class="hdr-right">
+      <button class="hdr-btn" id="privacy-hdr-btn" onclick="togglePrivacy()" title="Hide/show values" style="padding:4px 10px;">👁</button>
       <div class="sync-pill local" id="sync-pill">☁ Local</div>
       <button class="hdr-btn sync-action" id="sync-btn" onclick="manualSync()" title="Sync everything to Firebase">↑ Sync</button>
       <button class="hist-btn" onclick="toggleSB()">☰</button>
@@ -3120,6 +3121,27 @@ const EURO_SUFFIXES=['.L','.AS','.PA','.DE','.MI','.MC','.ST','.OL','.SW','.HE',
 // Optional: Cloudflare Worker URL for Yahoo Finance proxy
 let PROXY_URL = LS.get('st_proxy') || '';
 const YAHOO_PROXY = ''; // legacy; PROXY_URL is used now
+// Price source toggles — default both on. Stored as 'on'/'off'.
+let SRC_YAHOO = LS.get('st_src_yahoo')!==false;
+let SRC_FINNHUB = LS.get('st_src_finnhub')!==false;
+let PRIVACY_MODE = LS.get('st_privacy')===true;
+function toggleSource(src){
+  if(src==='yahoo'){SRC_YAHOO=!SRC_YAHOO;LS.set('st_src_yahoo',SRC_YAHOO);}
+  if(src==='finnhub'){SRC_FINNHUB=!SRC_FINNHUB;LS.set('st_src_finnhub',SRC_FINNHUB);}
+  renderProfile();
+}
+
+function applyPrivacyMode(){
+  if(PRIVACY_MODE)document.body.setAttribute('data-privacy','on');
+  else document.body.removeAttribute('data-privacy');
+}
+function togglePrivacy(){
+  PRIVACY_MODE=!PRIVACY_MODE;
+  LS.set('st_privacy',PRIVACY_MODE);
+  applyPrivacyMode();
+  const b=document.getElementById('privacy-hdr-btn');if(b)b.textContent=PRIVACY_MODE?'🙈':'👁';
+  toastSuccess(PRIVACY_MODE?'🙈 Privacy mode ON — values hidden':'👁 Privacy mode OFF');
+}
 
 // ── POLYGON.IO — US STOCKS (primary, requires free API key) ──
 async function fetchPolygon(ticker){
@@ -3195,32 +3217,36 @@ async function fetchYahoo(t){
 async function fetchPrice(t){
   const resolved=TICKER_CACHE[t];
   if(resolved&&resolved!==t){
-    const r=resolved.includes('.')?await fetchYahoo(resolved):(await fetchPolygon(resolved)||await fetchFinnhub(resolved)||await fetchYahoo(resolved));
+    const r=resolved.includes('.')?(SRC_YAHOO?await fetchYahoo(resolved):null):(await fetchPolygon(resolved)||(SRC_FINNHUB?await fetchFinnhub(resolved):null)||(SRC_YAHOO?await fetchYahoo(resolved):null));
     if(r) return r;
     delete TICKER_CACHE[t];saveTCache();
   }
 
-  // European ticker (has exchange suffix) → Yahoo only
+  // European ticker (has exchange suffix) → Yahoo only (if enabled)
   if(t.includes('.')){
+    if(!SRC_YAHOO)return null;
     const r=await fetchYahoo(t);
     if(r){TICKER_CACHE[t]=t;saveTCache();}
     return r;
   }
 
-  // US ticker: Polygon → Finnhub → Yahoo
+  // US ticker: Polygon → Finnhub → Yahoo (respecting toggles)
   const poly=await fetchPolygon(t);
   if(poly){TICKER_CACHE[t]=t;saveTCache();return poly;}
 
-  const finn=await fetchFinnhub(t);
-  if(finn){TICKER_CACHE[t]=t;saveTCache();return finn;}
+  if(SRC_FINNHUB){
+    const finn=await fetchFinnhub(t);
+    if(finn){TICKER_CACHE[t]=t;saveTCache();return finn;}
+  }
 
-  const direct=await fetchYahoo(t);
-  if(direct){TICKER_CACHE[t]=t;saveTCache();return direct;}
-
-  // Probe European suffixes
-  for(const sfx of EURO_SUFFIXES){
-    const r=await fetchYahoo(t+sfx);
-    if(r){TICKER_CACHE[t]=t+sfx;saveTCache();return r;}
+  if(SRC_YAHOO){
+    const direct=await fetchYahoo(t);
+    if(direct){TICKER_CACHE[t]=t;saveTCache();return direct;}
+    // Probe European suffixes
+    for(const sfx of EURO_SUFFIXES){
+      const r=await fetchYahoo(t+sfx);
+      if(r){TICKER_CACHE[t]=t+sfx;saveTCache();return r;}
+    }
   }
   return null;
 }
@@ -3248,7 +3274,15 @@ function startRefreshCountdown(tab,seconds=300){
 async function refresh(tab){
   const btn=document.getElementById(tab+'-rb');
   btn.classList.add('spin');btn.disabled=true;
-  const tks=(tab==='p'?(activePort()?.positions||[]):WATCH).map(x=>x.ticker);
+  const port=activePort();
+  const isT212Port=tab==='p'&&port&&/trading\s*212/i.test(port.name||'')&&T212_KEY&&T212_SECRET;
+  // For the Trading 212 portfolio, pull live prices from T212 in one batched call
+  if(isT212Port){
+    const t212prices=await fetchT212Prices().catch(()=>null);
+    if(t212prices)Object.assign(PC,t212prices);
+  }
+  // Fetch remaining tickers (or all, if not a T212 portfolio) via Polygon/Finnhub/Yahoo
+  const tks=(tab==='p'?(port?.positions||[]):WATCH).map(x=>x.ticker).filter(tk=>!PC[tk]||!isT212Port);
   if(tks.length){const p=await fetchAll(tks);Object.assign(PC,p);}
   startRefreshCountdown(tab,300);
   btn.classList.remove('spin');btn.disabled=false;
@@ -3258,6 +3292,22 @@ async function refresh(tab){
   if(tab==='p')setTimeout(()=>{
     PORTFOLIOS.forEach(p=>{if(!_activeChartRange[p.id])_activeChartRange[p.id]='1m';renderFullChart(p.id);});
   },100);
+}
+
+// Fetch all T212 holding prices in ONE call (efficient, respects rate limits)
+async function fetchT212Prices(){
+  const data=await fetchT212Positions();
+  if(!Array.isArray(data))return null;
+  const prices={};
+  data.forEach(p=>{
+    const raw=p.ticker||p.instrument?.ticker||'';
+    const tk=t212Ticker(raw);
+    if(tk&&p.currentPrice>0){
+      const prev=p.currentPrice;
+      prices[tk]={c:p.currentPrice,d:0,dp:0,pc:p.currentPrice,src:'t212',currency:p.currency||p.instrument?.currency||'USD'};
+    }
+  });
+  return Object.keys(prices).length?prices:null;
 }
 const f2=n=>n!=null?n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}):'—';
 const fchg=n=>n!=null?(n>=0?'+':'')+f2(n):'';
@@ -4275,7 +4325,23 @@ function exportMarketPrepPDF(idx){
     ul{padding-left:20px;}li{margin-bottom:4px;}
     .foot{margin-top:32px;padding-top:14px;border-top:1px solid #ddd;color:#999;font-size:11px;text-align:center;}
     @media print{body{padding:20px;}}
-  </style></head><body>
+  
+/* ── PRIVACY MODE — blur sensitive money values ── */
+[data-privacy="on"] .sval,
+[data-privacy="on"] .pr-pnl,
+[data-privacy="on"] .pr-px,
+[data-privacy="on"] [id^="pchart-val-"],
+[data-privacy="on"] [id^="pchart-chg-"],
+[data-privacy="on"] .pswitch-val,
+[data-privacy="on"] .pr-pv,
+[data-privacy="on"] .pr-pp{
+  filter:blur(8px);
+  user-select:none;
+  pointer-events:none;
+  transition:filter 0.15s;
+}
+[data-privacy="on"] .sval:hover{filter:blur(8px);}
+</style></head><body>
     <div class="hdr"><h1>📋 DAILY MARKET PREP</h1><div class="sub">Pre-market briefing · Generated ${p.date}</div></div>
     ${bodyHtml}
     <div class="foot">Stockr · Educational content, not financial advice · ${p.date}</div>
@@ -4768,11 +4834,21 @@ function renderProfile(){
     '<button onclick="savePolygonKey()" class="mob-add-btn" style="font-size:13px;padding:12px;">'+(polyOk?'Update Key':'Connect Polygon')+'</button>'
   );
 
-  // ── Real-time prices ──
-  html+=`<div style="background:var(--card);border-radius:14px;padding:14px 16px;margin-bottom:10px;box-shadow:var(--sh-sm);display:flex;align-items:center;gap:12px;">
-    <div style="width:36px;height:36px;border-radius:10px;background:#ecfdf5;border:1px solid #a7f3d0;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">📈</div>
-    <div style="flex:1;"><div style="font-size:13px;font-weight:700;color:var(--t);">Price Sources</div><div style="font-size:11px;color:#10b981;margin-top:1px;">${polyOk?'Polygon.io (US) + Finnhub + Yahoo (EU)':'Finnhub (US) + Yahoo Finance (EU)'}</div></div>
-    <div style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;background:#dcfce7;color:#047857;">ON</div>
+  // ── Real-time prices (separate source toggles) ──
+  html+=`<div style="background:var(--card);border-radius:14px;padding:14px 16px;margin-bottom:10px;box-shadow:var(--sh-sm);">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+      <div style="width:36px;height:36px;border-radius:10px;background:#ecfdf5;border:1px solid #a7f3d0;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">📈</div>
+      <div style="flex:1;"><div style="font-size:13px;font-weight:700;color:var(--t);">Price Sources</div><div style="font-size:11px;color:var(--t4);margin-top:1px;">${polyOk?'Polygon (US) active · ':''}Toggle the fallback sources below</div></div>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-top:1px solid var(--b);">
+      <div><div style="font-size:12px;font-weight:700;color:var(--t);">Finnhub</div><div style="font-size:10px;color:var(--t4);">US stocks, 60/min free</div></div>
+      <button onclick="toggleSource('finnhub')" style="background:${SRC_FINNHUB?'var(--p)':'var(--bg)'};border:1px solid ${SRC_FINNHUB?'var(--p)':'var(--b)'};color:${SRC_FINNHUB?'#fff':'var(--t3)'};font-size:11px;font-weight:700;padding:5px 14px;border-radius:20px;cursor:pointer;font-family:inherit;">${SRC_FINNHUB?'ON':'OFF'}</button>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-top:1px solid var(--b);">
+      <div><div style="font-size:12px;font-weight:700;color:var(--t);">Yahoo Finance</div><div style="font-size:10px;color:var(--t4);">US + European stocks</div></div>
+      <button onclick="toggleSource('yahoo')" style="background:${SRC_YAHOO?'var(--p)':'var(--bg)'};border:1px solid ${SRC_YAHOO?'var(--p)':'var(--b)'};color:${SRC_YAHOO?'#fff':'var(--t3)'};font-size:11px;font-weight:700;padding:5px 14px;border-radius:20px;cursor:pointer;font-family:inherit;">${SRC_YAHOO?'ON':'OFF'}</button>
+    </div>
+    ${(!SRC_YAHOO&&!SRC_FINNHUB&&!polyOk)?`<div style="font-size:10px;color:var(--r);margin-top:8px;">⚠️ All sources off — prices won't load. Enable at least one.</div>`:''}
   </div>`;
 
   // ── Firebase Sync ──
@@ -4941,6 +5017,8 @@ document.addEventListener('DOMContentLoaded',async()=>{
   POLYGON_KEY=LS.get('st_polygon')||'';
   BASE_CURRENCY=LS.get('st_currency')||'USD';
   const savedDark=LS.get('st_dark');if(savedDark)applyDarkMode(true);
+  applyPrivacyMode();
+  if(PRIVACY_MODE){const pb=document.getElementById('privacy-hdr-btn');if(pb)pb.textContent='🙈';}
   await fetchFXRates();
   LANG=LS.get('st_lang')||'en';
   applyLang();
