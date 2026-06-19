@@ -540,7 +540,7 @@ input,button,select{font-family:'Montserrat',sans-serif;}
   /* Portfolio — left 260px | center flex | right 260px */
   #pt{display:none;flex-direction:row;flex:1;min-height:0;}
   #pt[style*="flex"]{display:flex;}
-  .pt-left{display:none!important;}
+  .pt-left{width:260px;flex-shrink:0;background:var(--card);border-right:1px solid var(--b);display:flex;flex-direction:column;overflow-y:auto;}
   .pt-center{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--bg);}
   .pt-center .port-switcher{padding:12px 16px;background:#fff;border-bottom:1px solid var(--b);}
   .pt-center .pbar{padding:8px 16px;background:#fff;}
@@ -2220,7 +2220,7 @@ function renderPORT(){
 
   // Mobile top bar: just portfolio name (add is via FAB)
   const mobileNameBar=`
-  <div style="padding:12px 14px;background:#fff;border-radius:14px;box-shadow:0 1px 4px rgba(0,0,0,0.05);margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;" onclick="mobileRenamePort()">
+  <div style="padding:12px 14px;background:var(--card);border-radius:14px;box-shadow:var(--sh-sm);margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;" onclick="mobileRenamePort()">
     <div>
       <div style="font-size:9px;font-weight:700;color:var(--p);letter-spacing:2px;margin-bottom:3px;">${t('portfolio_name')}</div>
       <div style="font-size:16px;font-weight:800;color:var(--t);">${port.name}</div>
