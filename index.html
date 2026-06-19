@@ -1347,6 +1347,7 @@ async function manualSync(){
   try{
     await pullFromFirebase();
     setSyncPill('cloud',t('synced'));
+    {const hs=document.getElementById('hdr-sub');if(hs)hs.textContent=USER_EMAIL||'Cloud synced';}
     btn.textContent=t('sync_done');
     setTimeout(()=>{btn.textContent=t('sync_btn');btn.disabled=false;},2000);
   }catch(e){
@@ -1830,9 +1831,11 @@ async function startApp(){
         setSyncPill('syncing',t('syncing'));
         await pullFromFirebase();
         setSyncPill('cloud',t('synced'));
+        {const hs=document.getElementById('hdr-sub');if(hs)hs.textContent=USER_EMAIL||'Cloud synced';}
         startAutoSync();
       }catch(e){
         FB_ACTIVE=false;setSyncPill('local',t('local'));
+        {const hs=document.getElementById('hdr-sub');if(hs)hs.textContent='Local storage';}
         console.warn('Firebase unavailable:',e.message);
       }
     }
