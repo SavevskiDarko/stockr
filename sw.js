@@ -1,74 +1,84 @@
-// ── STOCKR SERVICE WORKER ──────────────────────────
-// Bump this version on EVERY deploy — this is the cache-buster
-const VERSION = 'stockr-v47';
-const CACHE = `stockr-${VERSION}`;
+**
+ * Stockr Service Worker
+ * ─────────────────────
+ * Provides offline support and app-like loading for the PWA.
+ *
+ * IMPORTANT: bump VERSION on EVERY deploy so users get the new code.
+ * The old cache is deleted automatically when VERSION changes.
+ */
+const VERSION = 'stockr-v1.0.0';
+const CACHE = VERSION;
 
-// Files to pre-cache on install
-const PRECACHE = ['./', './manifest.json', './icon-192.png', './icon-512.png'];
+// App shell — the files needed to load the app offline.
+const SHELL = [
+  './',
+  './index.html',
+  './manifest.json',
+  './icon-192.png',
+  './icon-512.png',
+  './icon-maskable-192.png',
+  './icon-maskable-512.png',
+  './apple-touch-icon.png'
+];
 
-// ── INSTALL ──
-self.addEventListener('install', e => {
-  self.skipWaiting();
+// Network-first for these (always want fresh data when online)
+const NETWORK_FIRST = [
+  'finnhub.io',
+  'trading212.com',
+  'workers.dev',
+  'yahoo.com',
+  'firestore.googleapis.com',
+  'api.anthropic.com',
+  'polygon.io'
+];
+
+self.addEventListener('install', (e) => {
   e.waitUntil(
-    caches.open(CACHE).then(c => c.addAll(PRECACHE)).catch(() => {})
+    caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting())
   );
 });
 
-// ── ACTIVATE: delete old caches + notify clients ──
-self.addEventListener('activate', e => {
+self.addEventListener('activate', (e) => {
   e.waitUntil(
-    caches.keys()
-      .then(keys => Promise.all(
-        keys.filter(k => k !== CACHE).map(k => caches.delete(k))
-      ))
-      .then(() => clients.claim())
-      .then(() => self.clients.matchAll({ type: 'window' }))
-      .then(allClients => {
-        allClients.forEach(client =>
-          client.postMessage({ type: 'SW_UPDATED', version: VERSION })
-        );
-      })
+    caches.keys().then((keys) =>
+      Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))
+    ).then(() => self.clients.claim())
   );
 });
 
-// ── FETCH: only intercept same-origin requests ──
-self.addEventListener('fetch', e => {
+self.addEventListener('fetch', (e) => {
   const url = e.request.url;
 
-  // Never intercept external API calls (Yahoo, Firebase, Anthropic, etc.)
-  if (!url.startsWith(self.location.origin)) return;
+  // Only handle GET
   if (e.request.method !== 'GET') return;
 
-  // HTML navigation — network first, fall back to cache
-  const isHTML = e.request.mode === 'navigate' ||
-    (e.request.headers.get('accept') || '').includes('text/html');
-
-  if (isHTML) {
+  // API / live-data requests → network-first, fall back to cache if offline
+  if (NETWORK_FIRST.some((host) => url.includes(host))) {
     e.respondWith(
-      fetch(e.request)
-        .then(res => {
-          if (res && res.status === 200) {
-            const clone = res.clone(); // clone BEFORE returning
-            caches.open(CACHE).then(c => c.put(e.request, clone));
-          }
-          return res;
-        })
-        .catch(() => caches.match(e.request))
+      fetch(e.request).catch(() => caches.match(e.request))
     );
     return;
   }
 
-  // Static assets (icons, manifest) — cache first, update in background
+  // App shell & static assets → cache-first, update in background
   e.respondWith(
-    caches.match(e.request).then(cached => {
-      const networkFetch = fetch(e.request).then(res => {
-        if (res && res.status === 200) {
-          const clone = res.clone(); // clone BEFORE returning
-          caches.open(CACHE).then(c => c.put(e.request, clone));
-        }
-        return res;
-      }).catch(() => cached);
-      return cached || networkFetch;
+    caches.match(e.request).then((cached) => {
+      const fetchPromise = fetch(e.request)
+        .then((res) => {
+          // Cache same-origin successful responses
+          if (res && res.status === 200 && url.startsWith(self.location.origin)) {
+            const copy = res.clone();
+            caches.open(CACHE).then((c) => c.put(e.request, copy));
+          }
+          return res;
+        })
+        .catch(() => cached);
+      return cached || fetchPromise;
     })
   );
+});
+
+// Allow the page to trigger an immediate update
+self.addEventListener('message', (e) => {
+  if (e.data === 'skipWaiting') self.skipWaiting();
 });
