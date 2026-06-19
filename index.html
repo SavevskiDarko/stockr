@@ -672,6 +672,21 @@ button:active{transform:scale(0.97);}
 [data-theme="dark"] .pr-cancel-btn{background:#23252f;border-color:var(--b);color:var(--t);}
 [data-theme="dark"] .scr{background:var(--card);}
 [data-theme="dark"] .pt-left,[data-theme="dark"] .pt-right,[data-theme="dark"] .wt-left{background:var(--card);}
+
+/* ── PRIVACY MODE — blur sensitive money values ── */
+[data-privacy="on"] .sval,
+[data-privacy="on"] .pr-pnl,
+[data-privacy="on"] .pr-px,
+[data-privacy="on"] [id^="pchart-val-"],
+[data-privacy="on"] [id^="pchart-chg-"],
+[data-privacy="on"] .pswitch-val,
+[data-privacy="on"] .pr-pv,
+[data-privacy="on"] .pr-pp,
+[data-privacy="on"] .sc2 .sval{
+  filter:blur(9px)!important;
+  user-select:none;
+  pointer-events:none;
+}
 </style>
 </head>
 
@@ -4325,23 +4340,7 @@ function exportMarketPrepPDF(idx){
     ul{padding-left:20px;}li{margin-bottom:4px;}
     .foot{margin-top:32px;padding-top:14px;border-top:1px solid #ddd;color:#999;font-size:11px;text-align:center;}
     @media print{body{padding:20px;}}
-  
-/* ── PRIVACY MODE — blur sensitive money values ── */
-[data-privacy="on"] .sval,
-[data-privacy="on"] .pr-pnl,
-[data-privacy="on"] .pr-px,
-[data-privacy="on"] [id^="pchart-val-"],
-[data-privacy="on"] [id^="pchart-chg-"],
-[data-privacy="on"] .pswitch-val,
-[data-privacy="on"] .pr-pv,
-[data-privacy="on"] .pr-pp{
-  filter:blur(8px);
-  user-select:none;
-  pointer-events:none;
-  transition:filter 0.15s;
-}
-[data-privacy="on"] .sval:hover{filter:blur(8px);}
-</style></head><body>
+  </style></head><body>
     <div class="hdr"><h1>📋 DAILY MARKET PREP</h1><div class="sub">Pre-market briefing · Generated ${p.date}</div></div>
     ${bodyHtml}
     <div class="foot">Stockr · Educational content, not financial advice · ${p.date}</div>
