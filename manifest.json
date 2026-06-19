@@ -1,26 +1,26 @@
 {
   "name": "Stockr — AI Stock Analyst",
   "short_name": "Stockr",
-  "description": "AI-powered stock analysis with real-time prices and portfolio tracking",
-  "start_url": "./",
+  "description": "AI-powered stock analyst with real-time prices, portfolio tracking, daily trade prep, and market briefings.",
+  "start_url": "./index.html",
+  "scope": "./",
   "display": "standalone",
-  "background_color": "#f8fafc",
-  "theme_color": "#6366f1",
+  "display_override": ["window-controls-overlay", "standalone"],
   "orientation": "portrait-primary",
+  "background_color": "#0f1019",
+  "theme_color": "#5b5bf0",
+  "lang": "en",
+  "dir": "ltr",
+  "categories": ["finance", "productivity", "business"],
   "icons": [
-    {
-      "src": "icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
-    }
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ],
-  "categories": ["finance", "utilities"],
-  "lang": "en"
+  "shortcuts": [
+    { "name": "Portfolio", "short_name": "Portfolio", "description": "View your portfolio", "url": "./index.html?tab=p" },
+    { "name": "Daily Prep", "short_name": "Daily Prep", "description": "Today's market briefing", "url": "./index.html?tab=mp" },
+    { "name": "Daily Trade", "short_name": "Daily Trade", "description": "Analyze a stock", "url": "./index.html?tab=dt" }
+  ]
 }
