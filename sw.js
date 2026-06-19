@@ -1,4 +1,4 @@
-**
+/**
  * Stockr Service Worker
  * ─────────────────────
  * Provides offline support and app-like loading for the PWA.
@@ -6,7 +6,7 @@
  * IMPORTANT: bump VERSION on EVERY deploy so users get the new code.
  * The old cache is deleted automatically when VERSION changes.
  */
-const VERSION = 'stockr-v1.0.2';
+const VERSION = 'stockr-v1.0.3';
 const CACHE = VERSION;
 
 // App shell — the files needed to load the app offline.
@@ -34,7 +34,10 @@ const NETWORK_FIRST = [
 
 self.addEventListener('install', (e) => {
   e.waitUntil(
-    caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting())
+    caches.open(CACHE).then((c) => c.addAll(SHELL))
+    // NOTE: no skipWaiting() here — we let the new worker WAIT so the app
+    // can show the "New version available" prompt. The user taps it, which
+    // posts 'skipWaiting' (handled below) to activate the update.
   );
 });
 
