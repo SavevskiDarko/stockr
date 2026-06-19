@@ -29,20 +29,11 @@ if('serviceWorker' in navigator && !location.hostname.includes('claudeuserconten
         bar.textContent='🔄 New version available — tap to update';
         bar.onclick=()=>{worker.postMessage('skipWaiting');bar.remove();};
         document.body.appendChild(bar);
-        setTimeout(()=>bar.remove(),15000);
+        setTimeout(()=>bar.remove(),20000);
       };
       // Case 1: a new worker is ALREADY waiting (deployed before this load)
       if(reg.waiting&&navigator.serviceWorker.controller)showUpdateBar(reg.waiting);
-      // Check for updates when the app regains focus
-      document.addEventListener('visibilitychange',()=>{
-        if(document.visibilityState==='visible') reg.update();
-      });
-      // When a new worker takes over, a fresh version is live → reload
-      let _reloading=false;
-      navigator.serviceWorker.addEventListener('controllerchange',()=>{
-        if(_reloading)return;_reloading=true;window.location.reload();
-      });
-      // Case 2: a new worker is found and installs while app is open
+      // Case 2: a worker is found & installs while running (covers both browser + PWA)
       reg.addEventListener('updatefound',()=>{
         const nw=reg.installing;
         if(!nw)return;
@@ -51,6 +42,20 @@ if('serviceWorker' in navigator && !location.hostname.includes('claudeuserconten
             showUpdateBar(nw);
           }
         });
+      });
+      // Force an update check on launch — installed PWAs don't auto-check,
+      // so without this the prompt never appears in the installed app.
+      reg.update();
+      // And re-check whenever the app regains focus
+      document.addEventListener('visibilitychange',()=>{
+        if(document.visibilityState==='visible') reg.update();
+      });
+      // Periodic check while open (every 60s) — catches deploys mid-session
+      setInterval(()=>reg.update(),60000);
+      // When a new worker takes over, a fresh version is live → reload once
+      let _reloading=false;
+      navigator.serviceWorker.addEventListener('controllerchange',()=>{
+        if(_reloading)return;_reloading=true;window.location.reload();
       });
     }).catch(e=>console.warn('SW:',e));
   });
@@ -1291,7 +1296,7 @@ const COLS=["#6366f1","#10b981","#f59e0b","#ef4444","#8b5cf6","#0ea5e9","#ec4899
 const LL=["Searching live markets...","Fetching prices...","Scanning news...","Running analysis...","Almost done..."];
 
 // ── STORAGE ──
-const APP_VERSION='1.0.0';
+const APP_VERSION='1.0.3';
 const LS={
   get:k=>{try{return JSON.parse(localStorage.getItem(k));}catch{return null;}},
   set:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch{}},
@@ -4381,6 +4386,34 @@ function exportMarketPrepPDF(idx){
 }
 
 // ── WEEKLY MARKET REPORTS ─────────────────────────
+function exportWeeklyReportPDF(idx){
+  loadReports();
+  const r=weeklyReports[idx];if(!r)return;
+  const w=window.open('','_blank');
+  if(!w){toastError('Allow popups to export PDF.');return;}
+  const bodyHtml=prepCards(r.content);
+  const label=r.weekOf||r.date||'';
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Stockr Weekly Report — ${label}</title>
+  <style>
+    :root{--p:#5b5bf0;--pl:#eeeefe;--bg:#f5f5fb;--card:#fff;--t:#13152b;--t2:#3a3e5c;--t3:#6c7193;--b:#eaeaf4;--rad:18px;}
+    body{font-family:-apple-system,'Segoe UI',Roboto,sans-serif;max-width:760px;margin:0 auto;padding:40px 32px;color:#1a1a2e;line-height:1.6;}
+    .hdr{border-bottom:3px solid #5b5bf0;padding-bottom:16px;margin-bottom:24px;}
+    .hdr h1{margin:0;font-size:24px;color:#4a45e0;letter-spacing:1px;}
+    .hdr .sub{color:#666;font-size:13px;margin-top:4px;}
+    h2{font-size:17px;color:#4a45e0;margin-top:24px;margin-bottom:8px;border-left:3px solid #5b5bf0;padding-left:10px;}
+    strong{color:#1a1a2e;}
+    ul{padding-left:20px;}li{margin-bottom:4px;}
+    .foot{margin-top:32px;padding-top:14px;border-top:1px solid #ddd;color:#999;font-size:11px;text-align:center;}
+    @media print{body{padding:20px;}}
+  </style></head><body>
+    <div class="hdr"><h1>📊 WEEKLY MARKET REPORT</h1><div class="sub">Week ${label} · Generated ${r.date||''}</div></div>
+    ${bodyHtml}
+    <div class="foot">Stockr · Educational content, not financial advice · ${r.date||''}</div>
+  </body></html>`);
+  w.document.close();
+  setTimeout(()=>{w.print();},400);
+}
+
 let weeklyReports=[];
 function loadReports(){weeklyReports=LS.get('st_reports')||[];}
 function saveReports(){
@@ -4438,6 +4471,7 @@ function showReport(idx){
       </div>
       <div style="display:flex;gap:6px;">
         ${canCompare?`<button onclick="compareReports(${idx})" style="background:var(--pl);border:1px solid var(--p);color:var(--p);font-size:11px;font-weight:700;padding:7px 12px;border-radius:9px;cursor:pointer;font-family:inherit;">⇄ Compare</button>`:''}
+        <button onclick="exportWeeklyReportPDF(${idx})" style="background:var(--pl);border:1px solid var(--p);color:var(--p);font-size:11px;font-weight:700;padding:7px 12px;border-radius:9px;cursor:pointer;font-family:inherit;">⬇ PDF</button>
         <button onclick="deleteReport(${idx})" style="background:#fee2e2;border:none;color:var(--r);font-size:11px;font-weight:700;padding:7px 12px;border-radius:9px;cursor:pointer;font-family:inherit;">${t('delete_report')}</button>
       </div>
     </div>
