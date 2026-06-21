@@ -741,7 +741,7 @@ button:active{transform:scale(0.97);}
 
     <!-- Mode toggle -->
     <div style="display:flex;background:#f1f5f9;border-radius:12px;padding:4px;margin-bottom:20px;">
-      <button id="auth-login-tab" onclick="showAuthMode('login')" style="flex:1;padding:9px;border:none;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;background:var(--p);color:#fff;transition:all 0.2s;" id="auth-login-tab-static">Sign In</button>
+      <button id="auth-login-tab" onclick="showAuthMode('login')" style="flex:1;padding:9px;border:none;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;background:var(--p);color:#fff;transition:all 0.2s;">Sign In</button>
       <button id="auth-reg-tab" onclick="showAuthMode('register')" style="flex:1;padding:9px;border:none;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;background:transparent;color:var(--t3);transition:all 0.2s;">Create Account</button>
     </div>
 
@@ -4721,20 +4721,34 @@ function ST(t){
 
 function showAuthMode(mode){
   const isReg=mode==='register';
+  AUTH_MODE=isReg?'register':'login';
+  // Remove the biometric "Welcome back" gate if present, and restore the normal form
+  const sc=document.querySelector('#auth-screen .sc');
+  if(sc){
+    const gate=document.getElementById('bio-gate');
+    if(gate)gate.remove();
+    // Un-hide the standard login form fields (biometric gate may have hidden them)
+    sc.querySelectorAll('.inp,.lbl,.bigbtn,.auth-switch').forEach(el=>{
+      if(el.id!=='auth-confirm'&&el.id!=='auth-confirm-lbl')el.style.display='';
+    });
+  }
   const on=`flex:1;padding:9px;border:none;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;background:var(--p);color:#fff;transition:all 0.2s;`;
   const off=`flex:1;padding:9px;border:none;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;background:transparent;color:var(--t3);transition:all 0.2s;`;
   document.getElementById('auth-login-tab').style.cssText=isReg?off:on;
   document.getElementById('auth-reg-tab').style.cssText=isReg?on:off;
   document.getElementById('auth-mode-label').textContent=isReg?'CREATE YOUR ACCOUNT':'SIGN IN TO YOUR ACCOUNT';
-  document.getElementById('auth-submit-btn').textContent=isReg?t('auth_register'):t('auth_signin');
-  document.getElementById('auth-submit-btn').onclick=isReg?authRegister:authLogin;
+  const sb=document.getElementById('auth-submit-btn');
+  sb.textContent=isReg?t('auth_register'):t('auth_signin');
+  sb.onclick=authSubmit;
+  showErr('auth-err','');
   // Show/hide confirm password field
   const cl=document.getElementById('auth-confirm-lbl');
   const cf=document.getElementById('auth-confirm');
   if(cl)cl.style.display=isReg?'block':'none';
   if(cf){cf.style.display=isReg?'block':'none';cf.value='';}
 }
-function authSubmit(){const btn=document.getElementById('auth-submit-btn');if(btn.textContent==='Create Account')authRegister();else authLogin();}
+let AUTH_MODE='login';
+function authSubmit(){if(AUTH_MODE==='register')authRegister();else authLogin();}
 
 async function authLogin(){
   const email=(document.getElementById('auth-email').value||'').trim().toLowerCase();
@@ -4761,8 +4775,9 @@ async function authRegister(){
   if(!email||!pass){showErr('auth-err',t('auth_err_empty'));return;}
   if(!email.includes('@')){showErr('auth-err',t('auth_err_email'));return;}
   if(pass.length<6){showErr('auth-err',t('auth_err_pass'));return;}
-  const confirm=document.getElementById('auth-confirm')?.value;
-  if(confirm!==undefined&&confirm!==pass){showErr('auth-err','Passwords do not match.');return;}
+  const cf=document.getElementById('auth-confirm');
+  const confirm=(cf&&cf.style.display!=='none')?cf.value:null;
+  if(confirm!==null&&confirm!==pass){showErr('auth-err','Passwords do not match.');return;}
   const btn=document.getElementById('auth-submit-btn');btn.disabled=true;btn.textContent=t('auth_creating');
   try{
     const key=emailToKey(email);
@@ -5098,6 +5113,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
     // Hide the normal login form, show only the biometric gate
     if(sc)sc.querySelectorAll('.inp,.lbl,.bigbtn,.auth-switch,#auth-confirm,#auth-confirm-lbl').forEach(el=>el.style.display='none');
     const gate=document.createElement('div');
+    gate.id='bio-gate';
     gate.style.cssText='text-align:center;';
     gate.innerHTML=`<div style="font-size:46px;margin-bottom:10px;">🔐</div>
       <div style="font-size:16px;font-weight:800;color:var(--t);margin-bottom:4px;">Welcome back</div>
