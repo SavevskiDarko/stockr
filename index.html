@@ -1296,7 +1296,7 @@ const COLS=["#6366f1","#10b981","#f59e0b","#ef4444","#8b5cf6","#0ea5e9","#ec4899
 const LL=["Searching live markets...","Fetching prices...","Scanning news...","Running analysis...","Almost done..."];
 
 // ── STORAGE ──
-const APP_VERSION='1.0.6';
+const APP_VERSION='1.0.7';
 const LS={
   get:k=>{try{return JSON.parse(localStorage.getItem(k));}catch{return null;}},
   set:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch{}},
@@ -4052,6 +4052,7 @@ function showDailyReport(idx){
       </div>
       <div style="display:flex;gap:8px;align-items:center;">
         <span style="background:${biasColor}22;color:${biasColor};font-size:13px;font-weight:700;padding:6px 14px;border-radius:20px;border:1px solid ${biasColor}44;">${biasIcon} ${p.bias}</span>
+        <button onclick="exportDailyReportPDF(${idx})" style="background:var(--pl);border:1px solid var(--p);color:var(--p);font-size:11px;font-weight:700;padding:7px 12px;border-radius:9px;cursor:pointer;font-family:inherit;">⬇ PDF</button>
         <button onclick="deleteDailyReport(${idx})" style="background:#fee2e2;border:none;color:var(--r);font-size:11px;font-weight:700;padding:7px 12px;border-radius:9px;cursor:pointer;font-family:inherit;">🗑</button>
       </div>
     </div>
@@ -4417,6 +4418,36 @@ Be concise but data-rich. Use real current numbers from your searches. Today is 
   }
 }
 
+// Branded Stockr logo (inline SVG) for PDF/report headers — brand awareness
+function stockrPdfLogo(size){
+  const s=size||40;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" style="width:${s}px;height:${s}px;border-radius:9px;flex-shrink:0;">
+    <defs>
+      <linearGradient id="pdfBg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#6d6df5"/><stop offset="100%" stop-color="#4a3fd0"/></linearGradient>
+      <linearGradient id="pdfGrn" x1="0%" y1="100%" x2="100%" y2="0%"><stop offset="0%" stop-color="#2bd96e"/><stop offset="100%" stop-color="#38EF7D"/></linearGradient>
+    </defs>
+    <rect width="160" height="160" rx="34" fill="url(#pdfBg)"/>
+    <rect x="34" y="92" width="18" height="34" rx="6" fill="white" opacity="0.92"/>
+    <rect x="60" y="74" width="18" height="52" rx="6" fill="white" opacity="0.96"/>
+    <rect x="86" y="56" width="18" height="70" rx="6" fill="white"/>
+    <path d="M44 90 L72 68 L94 84 L118 50" fill="none" stroke="url(#pdfGrn)" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M104 44 L126 41 L123 64 Z" fill="url(#pdfGrn)"/>
+  </svg>`;
+}
+// Branded header band for PDF exports
+function stockrPdfHeader(title,subtitle){
+  return `<div class="hdr" style="display:flex;align-items:center;gap:14px;">
+    ${stockrPdfLogo(44)}
+    <div style="flex:1;">
+      <div style="display:flex;align-items:baseline;gap:8px;">
+        <span style="font-size:22px;font-weight:800;color:#13152b;letter-spacing:0.5px;">Stock<span style="color:#2bd96e;">r</span></span>
+        <span style="font-size:13px;font-weight:700;color:#5b5bf0;letter-spacing:1px;">${title}</span>
+      </div>
+      <div class="sub">${subtitle}</div>
+    </div>
+  </div>`;
+}
+
 function exportMarketPrepPDF(idx){
   loadMarketPreps();
   const p=marketPreps[idx];if(!p)return;
@@ -4437,7 +4468,7 @@ function exportMarketPrepPDF(idx){
     .foot{margin-top:32px;padding-top:14px;border-top:1px solid #ddd;color:#999;font-size:11px;text-align:center;}
     @media print{body{padding:20px;}}
   </style></head><body>
-    <div class="hdr"><h1>📋 DAILY MARKET PREP</h1><div class="sub">Pre-market briefing · Generated ${p.date}</div></div>
+    ${stockrPdfHeader('DAILY MARKET PREP','Pre-market briefing · Generated '+p.date)}
     ${bodyHtml}
     <div class="foot">Stockr · Educational content, not financial advice · ${p.date}</div>
   </body></html>`);
@@ -4446,6 +4477,38 @@ function exportMarketPrepPDF(idx){
 }
 
 // ── WEEKLY MARKET REPORTS ─────────────────────────
+function exportDailyReportPDF(idx){
+  loadDailyPredictions();
+  const p=dailyPredictions[idx];if(!p)return;
+  const w=window.open('','_blank');
+  if(!w){toastError('Allow popups to export PDF.');return;}
+  const bodyHtml=prepCards(p.content||'');
+  const setup=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px;">
+    <div style="background:#eeeefe;border-radius:12px;padding:12px;"><div style="font-size:10px;font-weight:700;color:#6c7193;letter-spacing:1px;">ENTRY ZONE</div><div style="font-size:18px;font-weight:800;color:#5b5bf0;">${p.entryZone||'\u2014'}</div></div>
+    <div style="background:#fef2f2;border-radius:12px;padding:12px;"><div style="font-size:10px;font-weight:700;color:#6c7193;letter-spacing:1px;">STOP LOSS</div><div style="font-size:18px;font-weight:800;color:#f24d6a;">${p.stopLoss||'\u2014'}</div></div>
+    <div style="background:#ecfdf5;border-radius:12px;padding:12px;"><div style="font-size:10px;font-weight:700;color:#6c7193;letter-spacing:1px;">TARGET</div><div style="font-size:18px;font-weight:800;color:#16b981;">${p.target||'\u2014'}</div></div>
+    <div style="background:#f5f5fb;border-radius:12px;padding:12px;"><div style="font-size:10px;font-weight:700;color:#6c7193;letter-spacing:1px;">ACTION</div><div style="font-size:18px;font-weight:800;color:#13152b;">${p.action||p.bias||'\u2014'}</div></div>
+  </div>`;
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Stockr Daily Trade \u2014 ${p.ticker}</title>
+  <style>
+    :root{--p:#5b5bf0;--pl:#eeeefe;--bg:#f5f5fb;--card:#fff;--t:#13152b;--t2:#3a3e5c;--t3:#6c7193;--b:#eaeaf4;--rad:18px;}
+    body{font-family:-apple-system,'Segoe UI',Roboto,sans-serif;max-width:760px;margin:0 auto;padding:40px 32px;color:#1a1a2e;line-height:1.6;}
+    .hdr{border-bottom:3px solid #5b5bf0;padding-bottom:16px;margin-bottom:24px;}
+    .hdr .sub{color:#666;font-size:13px;margin-top:4px;}
+    h2{font-size:17px;color:#4a45e0;margin-top:24px;margin-bottom:8px;border-left:3px solid #5b5bf0;padding-left:10px;}
+    strong{color:#1a1a2e;}ul{padding-left:20px;}li{margin-bottom:4px;}
+    .foot{margin-top:32px;padding-top:14px;border-top:1px solid #ddd;color:#999;font-size:11px;text-align:center;}
+    @media print{body{padding:20px;}}
+  </style></head><body>
+    ${stockrPdfHeader('DAILY TRADE PREP',p.ticker+' \u00b7 '+p.date)}
+    ${setup}
+    ${bodyHtml}
+    <div class="foot">Stockr \u00b7 Educational content, not financial advice \u00b7 ${p.date}</div>
+  </body></html>`);
+  w.document.close();
+  setTimeout(()=>{w.print();},400);
+}
+
 function exportWeeklyReportPDF(idx){
   loadReports();
   const r=weeklyReports[idx];if(!r)return;
@@ -4466,7 +4529,7 @@ function exportWeeklyReportPDF(idx){
     .foot{margin-top:32px;padding-top:14px;border-top:1px solid #ddd;color:#999;font-size:11px;text-align:center;}
     @media print{body{padding:20px;}}
   </style></head><body>
-    <div class="hdr"><h1>📊 WEEKLY MARKET REPORT</h1><div class="sub">Week ${label} · Generated ${r.date||''}</div></div>
+    ${stockrPdfHeader('WEEKLY MARKET REPORT','Week '+label+' · Generated '+(r.date||''))}
     ${bodyHtml}
     <div class="foot">Stockr · Educational content, not financial advice · ${r.date||''}</div>
   </body></html>`);
