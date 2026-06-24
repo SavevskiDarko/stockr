@@ -1297,7 +1297,7 @@ const COLS=["#6366f1","#10b981","#f59e0b","#ef4444","#8b5cf6","#0ea5e9","#ec4899
 const LL=["Searching live markets...","Fetching prices...","Scanning news...","Running analysis...","Almost done..."];
 
 // ── STORAGE ──
-const APP_VERSION='1.3.0';
+const APP_VERSION='1.3.1';
 const LS={
   get:k=>{try{return JSON.parse(localStorage.getItem(k));}catch{return null;}},
   set:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch{}},
@@ -4402,7 +4402,7 @@ async function generateMarketPrep(){
   const prompt=`You are a professional pre-market analyst writing today's DAILY MARKET PREP briefing for ${today}. Use web search to get CURRENT, accurate market data — index levels, news, economic events, earnings. This is a general US market briefing (not about any single portfolio).
 
 CRITICAL OUTPUT RULES:
-- Output ONLY the finished briefing in markdown. NEVER include meta-commentary such as "I'll search for...", "Let me compile...", "Now I have the data", or any description of your research process. Start directly with the first heading.
+- Output ONLY the finished briefing in markdown. NEVER include meta-commentary such as "I'll search for...", "Let me compile...", "Now I have the data", "Let me synthesize the confirmed figures", or any description of your research process. Do NOT output a summary of figures followed by "---" before the report. Your VERY FIRST characters must be the first section heading. Any preamble is a failure.
 - Cross-check key figures (index closing levels, yields, oil) across your search results. If sources disagree, use the most recent/authoritative value and do not contradict yourself between sections. The closing level you state in the Overview must match the one in Key Levels.
 - Use real current numbers only. Do not invent or estimate levels.
 
@@ -4448,13 +4448,36 @@ Be concise but data-rich. Use real current numbers from your searches. Today is 
     if(!res.ok||data.error)throw new Error(data.error?.message||`API error ${res.status}`);
     let text=(data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('\n');
     if(!text)throw new Error('No text in response.');
-    // Safety net: strip any meta-preamble before the first markdown heading or the title
-    const firstHeading=text.search(/(^|\n)#{1,3}\s/);
-    const titleIdx=text.indexOf('📋');
-    let cut=-1;
-    if(titleIdx>=0&&titleIdx<400)cut=titleIdx;
-    else if(firstHeading>=0&&firstHeading<400)cut=firstHeading;
-    if(cut>0)text=text.slice(cut).replace(/^\n+/,'');
+    // Safety net: strip any meta-preamble (model "thinking out loud") before the real report.
+    // Handles cases the heading-search misses: long preambles, numbered headings, "---" separators.
+    (function stripPreamble(){
+      let t=text;
+      // 1) If there's a "thinking" preamble that ends with a --- separator near the top, cut everything up to and including it.
+      const sep=t.search(/\n?\s*-{3,}\s*\n/);
+      if(sep>=0&&sep<1200){
+        // only treat as preamble if the text before the --- looks like meta-commentary
+        const head=t.slice(0,sep).toLowerCase();
+        if(/\b(now i have|let me|i'?ll|i will|i have all the data|synthesize|compile|here'?s the|let's compile|gather|confirmed figures)\b/.test(head)){
+          t=t.slice(t.indexOf('\n',sep)>=0?sep:0).replace(/^[\s\S]*?-{3,}\s*\n/,'');
+        }
+      }
+      // 2) Find the first real heading: markdown #, OR a numbered "1." item, OR a known section emoji.
+      const mdHeading=t.search(/(^|\n)#{1,3}\s/);
+      const numHeading=t.search(/(^|\n)\s*1[.)]\s*[📊📈📋🗞️⚡🎯]/);
+      const emojiHeading=t.search(/[📋📊](?=\s*(Market|Daily|Today))/);
+      const cands=[mdHeading,numHeading,emojiHeading].filter(x=>x>=0);
+      if(cands.length){
+        const cut=Math.min(...cands);
+        // only cut if there's meaningful preamble before it (avoid trimming a legit short intro)
+        if(cut>0&&cut<1400){
+          const before=t.slice(0,cut).toLowerCase();
+          if(/\b(now i have|let me|i'?ll|i will|synthesize|compile|gather|confirmed figures|all the data)\b/.test(before)||before.replace(/\s/g,'').length>40){
+            t=t.slice(cut).replace(/^\n+/,'');
+          }
+        }
+      }
+      text=t.trim();
+    })();
 
     const prep={
       id:'mp_'+Date.now(),
