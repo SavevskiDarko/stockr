@@ -141,7 +141,7 @@ input,button,select{font-family:'Montserrat',sans-serif;}
 .hdr{background:linear-gradient(125deg,#4a45e0 0%,#5b5bf0 50%,#8b6cf6 100%);padding:15px 18px;display:flex;align-items:center;gap:11px;flex-shrink:0;box-shadow:0 4px 28px rgba(91,91,240,0.28);position:relative;z-index:5;}
 .hdr-dot{width:8px;height:8px;border-radius:50%;background:#a5f3fc;box-shadow:0 0 8px rgba(165,243,252,0.9);animation:lp 2s infinite;flex-shrink:0;}
 @keyframes lp{0%,100%{opacity:1}50%{opacity:0.4}}
-.hdr-title{font-size:16px;font-weight:800;color:#fff;letter-spacing:0.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.hdr-title{font-size:17px;font-weight:800;color:#fff;letter-spacing:0.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .hdr-sub{font-size:9px;color:rgba(255,255,255,0.55);font-weight:500;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .hdr-right{margin-left:auto;display:flex;gap:5px;align-items:center;flex-shrink:0;}
 .sync-pill{font-size:9px;font-weight:700;padding:3px 9px;border-radius:20px;border:1px solid;cursor:pointer;white-space:nowrap;}
@@ -795,8 +795,7 @@ button:active{transform:scale(0.97);}
     </div>
     <div class="hdr-right">
       <button class="hdr-btn" id="privacy-hdr-btn" onclick="togglePrivacy()" title="Hide/show values" style="padding:4px 10px;">👁</button>
-      <div class="sync-pill local" id="sync-pill">☁ Local</div>
-      <button class="hdr-btn sync-action" id="sync-btn" onclick="manualSync()" title="Sync everything to Firebase">↑ Sync</button>
+      <div class="sync-pill local" id="sync-pill" onclick="manualSync()" title="Auto-syncs. Tap to sync now." style="cursor:pointer;">☁ Local</div>
       <button class="hist-btn" onclick="toggleSB()">☰</button>
     </div>
   </div>
@@ -1298,7 +1297,7 @@ const COLS=["#6366f1","#10b981","#f59e0b","#ef4444","#8b5cf6","#0ea5e9","#ec4899
 const LL=["Searching live markets...","Fetching prices...","Scanning news...","Running analysis...","Almost done..."];
 
 // ── STORAGE ──
-const APP_VERSION='1.2.4';
+const APP_VERSION='1.2.5';
 const LS={
   get:k=>{try{return JSON.parse(localStorage.getItem(k));}catch{return null;}},
   set:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch{}},
@@ -1359,17 +1358,16 @@ function setSyncPill(state,text){
 async function manualSync(){
   if(!FB_ACTIVE){openFbModal();return;}
   const btn=document.getElementById('sync-btn');
-  btn.disabled=true;btn.textContent='⟳ Syncing...';
+  if(btn){btn.disabled=true;btn.textContent='⟳ Syncing...';}
   setSyncPill('syncing',t('syncing'));
   try{
     await pullFromFirebase();
     setSyncPill('cloud',t('synced'));
     {const hs=document.getElementById('hdr-sub');if(hs)hs.textContent=USER_EMAIL||'Cloud synced';}
-    btn.textContent=t('sync_done');
-    setTimeout(()=>{btn.textContent=t('sync_btn');btn.disabled=false;},2000);
+    if(btn){btn.textContent=t('sync_done');setTimeout(()=>{btn.textContent=t('sync_btn');btn.disabled=false;},2000);}
   }catch(e){
     setSyncPill('error',t('sync_error'));
-    btn.textContent=t('sync_btn');btn.disabled=false;
+    if(btn){btn.textContent=t('sync_btn');btn.disabled=false;}
     toastError('Sync failed: '+e.message);
   }
 }
