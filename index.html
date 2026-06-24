@@ -1297,7 +1297,7 @@ const COLS=["#6366f1","#10b981","#f59e0b","#ef4444","#8b5cf6","#0ea5e9","#ec4899
 const LL=["Searching live markets...","Fetching prices...","Scanning news...","Running analysis...","Almost done..."];
 
 // ── STORAGE ──
-const APP_VERSION='1.2.5';
+const APP_VERSION='1.3.0';
 const LS={
   get:k=>{try{return JSON.parse(localStorage.getItem(k));}catch{return null;}},
   set:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch{}},
@@ -3926,7 +3926,15 @@ CRITICAL: After the report above, output the key trade parameters as a JSON obje
 <<<JSON>>>
 {"bias":"BULLISH|BEARISH|NEUTRAL","action":"BUY|SELL|HOLD|AVOID","entryLow":number_or_null,"entryHigh":number_or_null,"stopLoss":number_or_null,"target":number_or_null,"confidence":"High|Medium|Low"}
 <<<END>>>
-Use plain numbers (no $ or commas). If a value is unknown, use null.`;
+Use plain numbers (no $ or commas). If a value is unknown, use null.
+
+CONSISTENCY RULES (MANDATORY — the JSON must be internally coherent):
+- bias and action MUST agree: BULLISH↔BUY, BEARISH↔SELL, NEUTRAL↔HOLD or AVOID. Never mix (e.g. never BEARISH with HOLD-as-buy, never SELL action with a bullish setup).
+- For a BUY/BULLISH setup: stopLoss MUST be BELOW entryLow, and target MUST be ABOVE entryHigh.
+- For a SELL/BEARISH setup: stopLoss MUST be ABOVE entryHigh, and target MUST be BELOW entryLow.
+- For HOLD or AVOID: set entryLow, entryHigh, stopLoss, and target to null (no directional levels — there is no trade to enter).
+- The direction implied by your price levels MUST match both bias and action. Do not output a bullish level structure with a bearish/sell label, or vice-versa.
+- If you are genuinely uncertain of direction, use NEUTRAL + HOLD with null levels rather than emitting a contradictory mix.`;
 
   try{
     const res=await fetch('https://api.anthropic.com/v1/messages',{
@@ -3986,6 +3994,43 @@ Use plain numbers (no $ or commas). If a value is unknown, use null.`;
       target=target1Match?cn(target1Match[1]):null;
       confidence='';
     }
+
+    // ── CONSISTENCY GUARD ──────────────────────────────────────────
+    // The bias, action, and price levels must tell ONE coherent story.
+    // The levels are the most concrete signal, so we derive the true
+    // direction from them and reconcile any contradictory labels.
+    (function reconcile(){
+      const e = (entryLow!=null&&entryHigh!=null)?(entryLow+entryHigh)/2:(entryLow??entryHigh);
+      let levelDir=null; // 'BUY' | 'SELL' from the geometry of the levels
+      if(e!=null&&stopLoss!=null&&target!=null){
+        const stopBelow=stopLoss<e, targetAbove=target>e;
+        const stopAbove=stopLoss>e, targetBelow=target<e;
+        if(stopBelow&&targetAbove)levelDir='BUY';
+        else if(stopAbove&&targetBelow)levelDir='SELL';
+        // else: levels are inconsistent among themselves → leave null
+      }
+      const dirOfAction = action==='BUY'?'BUY':action==='SELL'?'SELL':null;
+      const dirOfBias   = bias==='BUY'?'BUY':bias==='SELL'?'SELL':null;
+
+      if(action==='HOLD'||action==='AVOID'){
+        // No trade — strip directional levels so we never show buy/sell levels under HOLD/AVOID
+        entryLow=entryHigh=stopLoss=target=null;
+        bias='NEUTRAL';
+      } else if(levelDir){
+        // We have a clear geometric direction from the levels → make everything match it
+        action=levelDir;
+        bias=levelDir;
+      } else if(dirOfAction&&dirOfBias&&dirOfAction!==dirOfBias){
+        // Labels disagree and levels can't arbitrate → fall back to NEUTRAL/HOLD, drop levels
+        action='HOLD';bias='NEUTRAL';
+        entryLow=entryHigh=stopLoss=target=null;
+      } else if(dirOfAction&&!dirOfBias){
+        bias=dirOfAction;
+      } else if(dirOfBias&&!dirOfAction){
+        action=dirOfBias;
+      }
+    })();
+    // ───────────────────────────────────────────────────────────────
 
     const fmt=n=>n!=null?`$${n}`:'—';
     const prediction={
