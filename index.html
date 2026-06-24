@@ -3,13 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-<title>ChartForge — Stock Analyst</title>
+<title>ElaksAI — Stock Analyst</title>
 <meta name="description" content="AI-powered stock analyst with real-time prices and portfolio tracking">
 <meta name="theme-color" content="#5b5bf0">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="ChartForge">
+<meta name="apple-mobile-web-app-title" content="ElaksAI">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='b' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%236d6df5'/%3E%3Cstop offset='1' stop-color='%234a3fd0'/%3E%3C/linearGradient%3E%3ClinearGradient id='a' x1='0' y1='1' x2='1' y2='0'%3E%3Cstop offset='0' stop-color='%232bd96e'/%3E%3Cstop offset='1' stop-color='%2338EF7D'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='100' height='100' rx='22' fill='url(%23b)'/%3E%3Crect x='20' y='60' width='10' height='20' rx='3' fill='white' opacity='0.92'/%3E%3Crect x='34' y='49' width='10' height='31' rx='3' fill='white' opacity='0.96'/%3E%3Crect x='48' y='38' width='10' height='42' rx='3' fill='white'/%3E%3Crect x='62' y='52' width='10' height='28' rx='3' fill='white' opacity='0.9'/%3E%3Cpath d='M26 62 L43 49 L57 58 L75 30' fill='none' stroke='url(%23a)' stroke-width='6.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M67 27 L80 24 L78 38 Z' fill='url(%23a)'/%3E%3C/svg%3E">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -737,7 +737,7 @@ button:active{transform:scale(0.97);}
   <rect x="118" y="90" width="20" height="60" rx="6" fill="url(#logoPurple2)" opacity="0.8"/>
   <path d="M44 104 L82 78 L114 96 L150 48" fill="none" stroke="url(#logoGreen2)" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>
   <path d="M134 40 L162 36 L158 64 Z" fill="url(#logoGreen2)"/>
-  <text x="180" y="128" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif" font-size="68" font-weight="800" fill="#1A1A1A" letter-spacing="-2">Chart<tspan fill="url(#logoGreen2)">Forge</tspan></text>
+  <text x="180" y="128" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif" font-size="68" font-weight="800" fill="#1A1A1A" letter-spacing="-2">Elaks<tspan fill="url(#logoGreen2)">AI</tspan></text>
 </svg></div>
 
     <!-- Mode toggle -->
@@ -790,7 +790,7 @@ button:active{transform:scale(0.97);}
   <path d="M110 42 L130 38 L127 60 Z" fill="url(#icoGreen)"/>
 </svg>
     <div style="flex:1;min-width:0">
-      <div class="hdr-title">Chart<span style="color:#38EF7D;font-weight:800">Forge</span></div>
+      <div class="hdr-title">Elaks<span style="color:#38EF7D;font-weight:800">AI</span></div>
       <div class="hdr-sub" id="hdr-sub">Local storage</div>
     </div>
     <div class="hdr-right">
@@ -1298,7 +1298,7 @@ const COLS=["#6366f1","#10b981","#f59e0b","#ef4444","#8b5cf6","#0ea5e9","#ec4899
 const LL=["Searching live markets...","Fetching prices...","Scanning news...","Running analysis...","Almost done..."];
 
 // ── STORAGE ──
-const APP_VERSION='1.1.0';
+const APP_VERSION='1.2.0';
 const LS={
   get:k=>{try{return JSON.parse(localStorage.getItem(k));}catch{return null;}},
   set:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch{}},
@@ -1390,6 +1390,7 @@ async function pullFromFirebase(){
     if(cfg.claudeKey&&!CK){CK=cfg.claudeKey;LS.set('st_ck',CK);}
     if(cfg.finnhubKey&&cfg.finnhubKey!==FK){FK=cfg.finnhubKey;}
     if(cfg.userTickers){USER_TICKER_MAP={...USER_TICKER_MAP,...cfg.userTickers};LS.set('st_user_tickers',USER_TICKER_MAP);}
+    if(cfg.proxyUrl!==undefined&&cfg.proxyUrl!==PROXY_URL){PROXY_URL=cfg.proxyUrl;LS.set('st_proxy',PROXY_URL);}
   }
   const portData=await fbRead(p('portfolios'));
   if(portData?.portfolios?.length){
@@ -1503,7 +1504,7 @@ async function launch(){
       FB_ACTIVE=false;FB_PID='';FB_KEY='';
       LS.del('st_fbcfg');
       showErr('setup-err','Firebase failed: '+e.message+'. Check your Project ID and Web API Key, or leave blank to use locally.');
-      btn.disabled=false;btn.textContent='🚀 Launch ChartForge';
+      btn.disabled=false;btn.textContent='🚀 Launch ElaksAI';
       return;
     }
   }
@@ -1511,12 +1512,12 @@ async function launch(){
   // Validate keys (may have been loaded from Firebase above)
   if(!CK||!CK.startsWith('sk-ant')){
     showErr('setup-err','Claude key must start with sk-ant-api03-… If you have Firebase set up, your key may already be stored there — just enter your Firebase credentials and leave the API key blank.');
-    btn.disabled=false;btn.textContent='🚀 Launch ChartForge';
+    btn.disabled=false;btn.textContent='🚀 Launch ElaksAI';
     return;
   }
 
   document.getElementById('setup').classList.add('hide');
-  btn.textContent='🚀 Launch ChartForge';
+  btn.textContent='🚀 Launch ElaksAI';
   startApp();
 }
 
@@ -2495,7 +2496,7 @@ async function requestNotificationPermission(){
   const perm=await Notification.requestPermission();
   if(perm==='granted'){
     toastSuccess('Push notifications enabled!');
-    sendPushNotification('ChartForge Notifications On','Alerts will fire when your price targets hit.');
+    sendPushNotification('ElaksAI Notifications On','Alerts will fire when your price targets hit.');
   }else{
     toastError('Notifications blocked. Enable them in your browser settings.');
   }
@@ -2603,8 +2604,8 @@ async function registerBiometric(){
   try{
     const challenge=new Uint8Array(32);crypto.getRandomValues(challenge);
     const cred=await navigator.credentials.create({publicKey:{
-      challenge,rp:{name:'ChartForge',id:location.hostname},
-      user:{id:new TextEncoder().encode(USER_ID||'guest'),name:USER_EMAIL||'user',displayName:USER_EMAIL||'ChartForge User'},
+      challenge,rp:{name:'ElaksAI',id:location.hostname},
+      user:{id:new TextEncoder().encode(USER_ID||'guest'),name:USER_EMAIL||'user',displayName:USER_EMAIL||'ElaksAI User'},
       pubKeyCredParams:[{alg:-7,type:'public-key'},{alg:-257,type:'public-key'}],
       authenticatorSelection:{userVerification:'required'},
       timeout:60000
@@ -2882,6 +2883,7 @@ function saveProxyUrl(){
   if(url&&!url.startsWith('http')){toastError('Proxy URL must start with https://');return;}
   PROXY_URL=url;
   LS.set('st_proxy',url);
+  if(FB_ACTIVE)fbWrite(userPath('config'),{proxyUrl:url,updatedAt:Date.now()}).catch(e=>console.warn('FB:',e?.message||e));
   toastSuccess(url?'Proxy URL saved!':'Proxy URL cleared.');
   renderProfile();
 }
@@ -3907,7 +3909,7 @@ Confidence: High/Medium/Low — one sentence reason.
 **One-line summary:** [single most important insight for today]
 
 ---
-*ChartForge Adaptive Daily · ${today} · ${ticker} · ${pastForTicker.length} past analyses · ${accuracy!==null?accuracy+'% accuracy on this ticker':'no verified data yet'}*
+*ElaksAI Adaptive Daily · ${today} · ${ticker} · ${pastForTicker.length} past analyses · ${accuracy!==null?accuracy+'% accuracy on this ticker':'no verified data yet'}*
 *⚠️ Educational only — not financial advice.*
 
 CRITICAL: After the report above, output the key trade parameters as a JSON object on its own, wrapped EXACTLY in these markers (no markdown, no code fence):
@@ -4420,7 +4422,7 @@ Be concise but data-rich. Use real current numbers from your searches. Today is 
   }
 }
 
-// Branded ChartForge logo (inline SVG) for PDF/report headers — brand awareness
+// Branded ElaksAI logo (inline SVG) for PDF/report headers — brand awareness
 function stockrPdfLogo(size){
   const s=size||40;
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" style="width:${s}px;height:${s}px;border-radius:9px;flex-shrink:0;">
@@ -4443,7 +4445,7 @@ function stockrPdfHeader(title,subtitle){
     ${stockrPdfLogo(44)}
     <div style="flex:1;">
       <div style="display:flex;align-items:baseline;gap:8px;">
-        <span style="font-size:22px;font-weight:800;color:#13152b;letter-spacing:0.5px;">Chart<span style="color:#2bd96e;">Forge</span></span>
+        <span style="font-size:22px;font-weight:800;color:#13152b;letter-spacing:0.5px;">Elaks<span style="color:#2bd96e;">AI</span></span>
         <span style="font-size:13px;font-weight:700;color:#5b5bf0;letter-spacing:1px;">${title}</span>
       </div>
       <div class="sub">${subtitle}</div>
@@ -4473,7 +4475,7 @@ function exportMarketPrepPDF(idx){
   </style></head><body>
     ${stockrPdfHeader('DAILY MARKET PREP','Pre-market briefing · Generated '+p.date)}
     ${bodyHtml}
-    <div class="foot">ChartForge · chartforge.ai · Educational content, not financial advice · ${p.date}</div>
+    <div class="foot">ElaksAI · elaks.ai · Educational content, not financial advice · ${p.date}</div>
   </body></html>`);
   w.document.close();
   setTimeout(()=>{w.print();},400);
@@ -4492,7 +4494,7 @@ function exportDailyReportPDF(idx){
     <div style="background:#ecfdf5;border-radius:12px;padding:12px;"><div style="font-size:10px;font-weight:700;color:#6c7193;letter-spacing:1px;">TARGET</div><div style="font-size:18px;font-weight:800;color:#16b981;">${p.target||'\u2014'}</div></div>
     <div style="background:#f5f5fb;border-radius:12px;padding:12px;"><div style="font-size:10px;font-weight:700;color:#6c7193;letter-spacing:1px;">ACTION</div><div style="font-size:18px;font-weight:800;color:#13152b;">${p.action||p.bias||'\u2014'}</div></div>
   </div>`;
-  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>ChartForge Daily Trade \u2014 ${p.ticker}</title>
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>ElaksAI Daily Trade \u2014 ${p.ticker}</title>
   <style>
     :root{--p:#5b5bf0;--pl:#eeeefe;--bg:#f5f5fb;--card:#fff;--t:#13152b;--t2:#3a3e5c;--t3:#6c7193;--b:#eaeaf4;--rad:18px;}
     body{font-family:-apple-system,'Segoe UI',Roboto,sans-serif;max-width:760px;margin:0 auto;padding:40px 32px;color:#1a1a2e;line-height:1.6;}
@@ -4506,7 +4508,7 @@ function exportDailyReportPDF(idx){
     ${stockrPdfHeader('DAILY TRADE PREP',p.ticker+' \u00b7 '+p.date)}
     ${setup}
     ${bodyHtml}
-    <div class="foot">ChartForge \u00b7 chartforge.ai \u00b7 Educational content, not financial advice \u00b7 ${p.date}</div>
+    <div class="foot">ElaksAI \u00b7 elaks.ai \u00b7 Educational content, not financial advice \u00b7 ${p.date}</div>
   </body></html>`);
   w.document.close();
   setTimeout(()=>{w.print();},400);
@@ -4519,7 +4521,7 @@ function exportWeeklyReportPDF(idx){
   if(!w){toastError('Allow popups to export PDF.');return;}
   const bodyHtml=prepCards(r.content);
   const label=r.weekOf||r.date||'';
-  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>ChartForge Weekly Report — ${label}</title>
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>ElaksAI Weekly Report — ${label}</title>
   <style>
     :root{--p:#5b5bf0;--pl:#eeeefe;--bg:#f5f5fb;--card:#fff;--t:#13152b;--t2:#3a3e5c;--t3:#6c7193;--b:#eaeaf4;--rad:18px;}
     body{font-family:-apple-system,'Segoe UI',Roboto,sans-serif;max-width:760px;margin:0 auto;padding:40px 32px;color:#1a1a2e;line-height:1.6;}
@@ -4534,7 +4536,7 @@ function exportWeeklyReportPDF(idx){
   </style></head><body>
     ${stockrPdfHeader('WEEKLY MARKET REPORT','Week '+label+' · Generated '+(r.date||''))}
     ${bodyHtml}
-    <div class="foot">ChartForge · chartforge.ai · Educational content, not financial advice · ${r.date||''}</div>
+    <div class="foot">ElaksAI · elaks.ai · Educational content, not financial advice · ${r.date||''}</div>
   </body></html>`);
   w.document.close();
   setTimeout(()=>{w.print();},400);
@@ -4739,7 +4741,7 @@ For each holding:
 - What each level means: support/resistance/breakout trigger
 
 ---
-*ChartForge Adaptive AI Report · ${weekOf} · Model: ${CLAUDE_MODEL}*
+*ElaksAI Adaptive AI Report · ${weekOf} · Model: ${CLAUDE_MODEL}*
 
 IMPORTANT: Be specific with numbers and percentages. Show your reasoning. The Accuracy Audit is the most important section — honest self-assessment of past predictions improves future accuracy. Keep each section concise but data-rich.
 
@@ -4966,7 +4968,7 @@ function clearAllLocalData(){
 }
 
 function authLogout(){
-  if(!confirm('Sign out of ChartForge?'))return;
+  if(!confirm('Sign out of ElaksAI?'))return;
   clearAllLocalData();
   USER_ID='';USER_EMAIL='';IS_GUEST=false;
   FB_ACTIVE=false;FB_PID=APP_FB_PID;FB_KEY=APP_FB_KEY;
@@ -5178,7 +5180,7 @@ function renderProfile(){
   }
 
   // App version footer
-  html+=`<div style="text-align:center;padding:18px 0 8px;color:var(--t4);font-size:11px;">ChartForge v${APP_VERSION}</div>`;
+  html+=`<div style="text-align:center;padding:18px 0 8px;color:var(--t4);font-size:11px;">ElaksAI v${APP_VERSION}</div>`;
 
   el.innerHTML=html;
 }

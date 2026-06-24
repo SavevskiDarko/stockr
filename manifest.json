@@ -1,6 +1,6 @@
 {
-  "name": "ChartForge \u2014 AI Stock Analyst",
-  "short_name": "ChartForge",
+  "name": "ElaksAI \u2014 AI Stock Analyst",
+  "short_name": "ElaksAI",
   "description": "AI-powered stock analyst with real-time prices, portfolio tracking, daily trade prep, and market briefings.",
   "start_url": "./index.html",
   "scope": "./",
