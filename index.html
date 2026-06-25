@@ -1314,7 +1314,7 @@ const COLS=["#6366f1","#10b981","#f59e0b","#ef4444","#8b5cf6","#0ea5e9","#ec4899
 const LL=["Searching live markets...","Fetching prices...","Scanning news...","Running analysis...","Almost done..."];
 
 // ── STORAGE ──
-const APP_VERSION='1.4.2';
+const APP_VERSION='1.4.3';
 const LS={
   get:k=>{try{return JSON.parse(localStorage.getItem(k));}catch{return null;}},
   set:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch{}},
@@ -1642,7 +1642,16 @@ async function fetchPriceHistory(ticker){
 
 function getPortfolioChartData(portId){
   const snapshots=LS.get('st_snapshots')||{};
-  return (snapshots[portId]||[]).sort((a,b)=>a.d.localeCompare(b.d));
+  let series=(snapshots[portId]||[]).slice().sort((a,b)=>a.d.localeCompare(b.d));
+  if(series.length<2)return series;
+  // ── Sanity filter: drop corrupt snapshots whose value is an implausibly small
+  // fraction of the typical value (these blow up % return, e.g. +386073%). ──
+  const vals=series.map(s=>s.v).filter(v=>v>0).sort((a,b)=>a-b);
+  const median=vals[Math.floor(vals.length/2)]||0;
+  if(median>0){
+    series=series.filter(s=>s.v>=median*0.10); // keep only points within a sane band of the median
+  }
+  return series;
 }
 
 // Filter snapshot data by time range
@@ -1740,7 +1749,10 @@ function renderFullChart(portId){
   const values=data.map(d=>d.v);
   const first=values[0],last=values[values.length-1];
   const change=last-first;
-  const changePct=first>0?(change/first*100):0;
+  let changePct=first>0?(change/first*100):0;
+  // Safety net: an implausibly large % means corrupt history — suppress rather than show nonsense
+  const pctReliable=Math.abs(changePct)<10000;
+  if(!pctReliable)changePct=0;
   const isUp=change>=0;
   const col=isUp?'#16b981':'#f24d6a';
 
@@ -1748,8 +1760,8 @@ function renderFullChart(portId){
   const modeBtn=document.getElementById(`pchart-mode-${portId}`);
   if(modeBtn)modeBtn.textContent=_chartMode==='percent'?'% RETURN':'$ VALUE';
 
-  if(valEl)valEl.textContent=_chartMode==='percent'?`${isUp?'+':''}${changePct.toFixed(2)}%`:formatCurrency(last);
-  if(chgEl)chgEl.innerHTML=`<span style="color:${col};font-weight:700;font-size:13px;">${isUp?'↗':'↘'} ${isUp?'+':''}${formatCurrency(Math.abs(change))} (${isUp?'+':''}${changePct.toFixed(2)}%)</span> <span style="color:var(--t4);font-size:11px;">${range.toUpperCase()}</span>`;
+  if(valEl)valEl.textContent=_chartMode==='percent'?(pctReliable?`${isUp?'+':''}${changePct.toFixed(2)}%`:formatCurrency(last)):formatCurrency(last);
+  if(chgEl)chgEl.innerHTML=`<span style="color:${col};font-weight:700;font-size:13px;">${isUp?'↗':'↘'} ${isUp?'+':''}${formatCurrency(Math.abs(change))}${pctReliable?` (${isUp?'+':''}${changePct.toFixed(2)}%)`:''}</span> <span style="color:var(--t4);font-size:11px;">${range.toUpperCase()}</span>`;
 
   const ctx=canvas.getContext('2d');
   const dpr=window.devicePixelRatio||1;
