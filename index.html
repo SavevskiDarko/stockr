@@ -714,6 +714,9 @@ button:active{transform:scale(0.97);}
   pointer-events:none;
 }
 </style>
+<!-- Firebase Auth SDK (compat) — for Google Sign-In -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 </head>
 
 <body>
@@ -761,8 +764,17 @@ button:active{transform:scale(0.97);}
     <div class="err" id="auth-err"></div>
     <button class="btn pri" id="auth-submit-btn" onclick="authSubmit()">Sign In</button>
 
+    <div style="display:flex;align-items:center;gap:10px;margin:16px 0 14px;">
+      <div style="flex:1;height:1px;background:var(--b);"></div>
+      <div style="font-size:11px;color:var(--t3);font-weight:600;">OR</div>
+      <div style="flex:1;height:1px;background:var(--b);"></div>
+    </div>
+    <button onclick="googleSignIn()" id="google-signin-btn" style="width:100%;background:#fff;border:1.5px solid #dadce0;color:#3c4043;padding:12px;border-radius:13px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:14px;">
+      <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+      Continue with Google
+    </button>
+
     <div style="text-align:center;">
-      <button onclick="guestMode()" style="background:none;border:none;color:var(--t3);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;text-decoration:underline;text-underline-offset:3px;">Continue as Guest (local only)</button>
     </div>
   </div>
 </div>
@@ -798,6 +810,11 @@ button:active{transform:scale(0.97);}
       <div class="sync-pill local" id="sync-pill" onclick="manualSync()" title="Auto-syncs. Tap to sync now." style="cursor:pointer;">☁ Local</div>
       <button class="hist-btn" onclick="toggleSB()">☰</button>
     </div>
+  </div>
+
+  <div class="regime-bar" id="regime-bar" style="display:none;align-items:center;gap:10px;padding:7px 16px;background:linear-gradient(90deg,rgba(91,91,240,0.08),rgba(43,217,110,0.06));border-bottom:1px solid var(--b);font-size:11px;overflow-x:auto;white-space:nowrap;">
+    <span id="regime-label" style="font-weight:800;letter-spacing:0.5px;">●</span>
+    <span id="regime-detail" style="color:var(--t3);font-weight:600;"></span>
   </div>
 
   <div class="sync-banner hide" id="sync-banner">
@@ -1297,7 +1314,7 @@ const COLS=["#6366f1","#10b981","#f59e0b","#ef4444","#8b5cf6","#0ea5e9","#ec4899
 const LL=["Searching live markets...","Fetching prices...","Scanning news...","Running analysis...","Almost done..."];
 
 // ── STORAGE ──
-const APP_VERSION='1.3.1';
+const APP_VERSION='1.4.0';
 const LS={
   get:k=>{try{return JSON.parse(localStorage.getItem(k));}catch{return null;}},
   set:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch{}},
@@ -1644,6 +1661,11 @@ function filterChartRange(data,range){
 
 let _activeChartRange={};
 let _showSpy=false;
+let _chartMode='value'; // 'value' | 'percent'
+function toggleChartMode(portId){
+  _chartMode=_chartMode==='value'?'percent':'value';
+  renderFullChart(portId);
+}
 async function toggleSpyBenchmark(portId){
   // Need at least 2 days of portfolio history to compare
   const allData=getPortfolioChartData(portId);
@@ -1722,7 +1744,11 @@ function renderFullChart(portId){
   const isUp=change>=0;
   const col=isUp?'#16b981':'#f24d6a';
 
-  if(valEl)valEl.textContent=formatCurrency(last);
+  // Sync chart-mode button label
+  const modeBtn=document.getElementById(`pchart-mode-${portId}`);
+  if(modeBtn)modeBtn.textContent=_chartMode==='percent'?'% RETURN':'$ VALUE';
+
+  if(valEl)valEl.textContent=_chartMode==='percent'?`${isUp?'+':''}${changePct.toFixed(2)}%`:formatCurrency(last);
   if(chgEl)chgEl.innerHTML=`<span style="color:${col};font-weight:700;font-size:13px;">${isUp?'↗':'↘'} ${isUp?'+':''}${formatCurrency(Math.abs(change))} (${isUp?'+':''}${changePct.toFixed(2)}%)</span> <span style="color:var(--t4);font-size:11px;">${range.toUpperCase()}</span>`;
 
   const ctx=canvas.getContext('2d');
@@ -1734,12 +1760,14 @@ function renderFullChart(portId){
   ctx.scale(dpr,dpr);
   ctx.clearRect(0,0,w,ht);
 
-  const mn=Math.min(...values),mx=Math.max(...values);
+  // Plot values: raw $ or % return from first point, depending on mode
+  const plotVals=_chartMode==='percent'?values.map(v=>first>0?((v-first)/first*100):0):values;
+  const mn=Math.min(...plotVals),mx=Math.max(...plotVals);
   const range_v=mx-mn||1;
   const padX=4,padTop=10,padBot=20;
   const pts=data.map((d,i)=>({
     x:padX+(i/(data.length-1))*(w-padX*2),
-    y:padTop+(1-(d.v-mn)/range_v)*(ht-padTop-padBot),
+    y:padTop+(1-(plotVals[i]-mn)/range_v)*(ht-padTop-padBot),
     v:d.v,d:d.d
   }));
 
@@ -1804,6 +1832,7 @@ function portfolioChartCard(portId){
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;">
       <div style="font-size:9px;font-weight:700;color:var(--t3);letter-spacing:2px;">PORTFOLIO VALUE</div>
       <div style="display:flex;gap:5px;">
+        <button id="pchart-mode-${portId}" onclick="toggleChartMode('${portId}')" style="background:var(--pl);border:1px solid var(--p);color:var(--p);font-size:9px;font-weight:700;padding:4px 9px;border-radius:7px;cursor:pointer;font-family:inherit;letter-spacing:0.5px;">${_chartMode==='percent'?'% RETURN':'$ VALUE'}</button>
         <button id="pchart-spy-${portId}" onclick="toggleSpyBenchmark('${portId}')" style="background:${_showSpy?'var(--p)':'var(--pl)'};border:1px solid var(--p);color:${_showSpy?'#fff':'var(--p)'};font-size:9px;font-weight:700;padding:4px 9px;border-radius:7px;cursor:pointer;font-family:inherit;letter-spacing:0.5px;">vs S&P 500</button>
         <button id="pchart-load-${portId}" onclick="backfillPortfolioHistory('${portId}')" style="background:var(--pl);border:1px solid var(--p);color:var(--p);font-size:9px;font-weight:700;padding:4px 9px;border-radius:7px;cursor:pointer;font-family:inherit;letter-spacing:0.5px;">↺ LOAD HISTORY</button>
       </div>
@@ -1827,6 +1856,7 @@ async function startApp(){
   document.getElementById('auth-screen').style.display='none';
   document.getElementById('app').style.display='flex';
   initUI();
+  startRegimeBar();
 
   // If Firebase already connected (login flow set it up)
   if(FB_ACTIVE && USER_ID){
@@ -2292,7 +2322,7 @@ function renderPORT(){
     const ptVisible=document.getElementById('pt')&&getComputedStyle(document.getElementById('pt')).display!=='none';
     const bar=document.createElement('div');
     bar.id='mob-analyze-bar';bar.className='mob-analyze-bar'+(ptVisible?' visible':'');
-    bar.innerHTML=`<button class="abig" onclick="anzAll()" style="margin:0;flex:1;padding:11px;font-size:12px;border-radius:12px;box-shadow:none;">🔍 Analyze ${port.name}</button>`;
+    bar.innerHTML=`<button class="abig" onclick="anzAll()" style="margin:0;flex:1;padding:11px;font-size:12px;border-radius:12px;box-shadow:none;">🔍 Analyze ${port.name}</button><button class="abig" onclick="portfolioHealthCheck()" style="margin:0;flex:1;padding:11px;font-size:12px;border-radius:12px;box-shadow:none;background:linear-gradient(135deg,#2bd96e,#1fb55a);">🩺 Health Check</button>`;
     document.body.appendChild(bar);
   }
 
@@ -3278,6 +3308,38 @@ async function fetchYahoo(t){
   }catch{return null;}
 }
 
+// ── MARKET REGIME BANNER ── (VIX level + S&P 500 day move → plain-English regime)
+let _regimeTimer=null;
+async function updateRegimeBar(){
+  const bar=document.getElementById('regime-bar');
+  if(!bar)return;
+  try{
+    const [spx,vix]=await Promise.all([fetchYahoo('^GSPC'),fetchYahoo('^VIX')]);
+    if(!spx||!vix){bar.style.display='none';return;}
+    const vixLevel=vix.c, spyChg=spx.dp;
+    // Regime logic: VIX bands + S&P direction
+    let label,color;
+    if(vixLevel>=28){label='RISK-OFF — High Volatility';color='#ef4444';}
+    else if(vixLevel>=20){label=spyChg>=0?'CAUTIOUS — Elevated Volatility':'DEFENSIVE — Elevated Volatility';color='#f59e0b';}
+    else if(vixLevel>=14){label=spyChg>=0?'NEUTRAL — Steady':'NEUTRAL — Mild Risk';color='#eab308';}
+    else{label='RISK-ON — Low Volatility';color='#2bd96e';}
+    const lblEl=document.getElementById('regime-label');
+    const detEl=document.getElementById('regime-detail');
+    if(lblEl){lblEl.style.color=color;lblEl.textContent='● '+label;}
+    if(detEl){
+      const spyArrow=spyChg>=0?'▲':'▼';
+      const spyCol=spyChg>=0?'#16b981':'#f24d6a';
+      detEl.innerHTML=`<span style="color:var(--t4);">VIX</span> <strong style="color:var(--t2);">${vixLevel.toFixed(1)}</strong> &nbsp;·&nbsp; <span style="color:var(--t4);">S&P</span> <strong style="color:${spyCol};">${spyArrow} ${spyChg>=0?'+':''}${spyChg.toFixed(2)}%</strong>`;
+    }
+    bar.style.display='flex';
+  }catch(e){bar.style.display='none';}
+}
+function startRegimeBar(){
+  updateRegimeBar();
+  clearInterval(_regimeTimer);
+  _regimeTimer=setInterval(updateRegimeBar,300000); // refresh every 5 min
+}
+
 // ── MAIN FETCH: Polygon (US) → Finnhub (US fallback) → Yahoo (European) ──
 async function fetchPrice(t){
   const resolved=TICKER_CACHE[t];
@@ -3471,8 +3533,102 @@ async function anzAll(){
   setTimeout(()=>doSend(prompt),150);
 }
 
+async function portfolioHealthCheck(){
+  const port=activePort();
+  if(!port||!port.positions.length){toastWarning('Add some positions first.');return;}
+  if(!CK||!CK.startsWith('sk-ant')){toastError('Add your Claude API key in Profile to use AI Health Check.');return;}
+  const rows=port.positions.map(p=>{
+    const q=PC[p.ticker];const price=q?q.c:p.cost;
+    const value=price*p.shares;const costBasis=p.cost*p.shares;
+    const pnl=value-costBasis;const pnlPct=costBasis>0?(pnl/costBasis*100):0;
+    return {ticker:p.ticker,shares:p.shares,cost:p.cost,price,value,costBasis,pnl,pnlPct};
+  });
+  const totalValue=rows.reduce((s,r)=>s+r.value,0)||1;
+  rows.forEach(r=>r.weight=r.value/totalValue*100);
+  rows.sort((a,b)=>b.weight-a.weight);
+  const totalCost=rows.reduce((s,r)=>s+r.costBasis,0);
+  const totalPnlPct=totalCost>0?((totalValue-totalCost)/totalCost*100):0;
+  const top=rows[0];
+  const concentration=rows.slice(0,3).reduce((s,r)=>s+r.weight,0);
+  const statsText=rows.map(r=>`${r.ticker}: ${r.weight.toFixed(1)}% of portfolio, ${r.shares}sh @ $${r.cost} (now $${r.price.toFixed(2)}), P&L ${r.pnlPct>=0?'+':''}${r.pnlPct.toFixed(1)}%`).join('\n');
+  showHealthModal('loading');
+  try{
+    const prompt=`You are a professional portfolio risk analyst. Analyze this portfolio and return a STRUCTURED health assessment.
+
+PORTFOLIO: "${port.name}" — total value $${totalValue.toFixed(0)}, total P&L ${totalPnlPct>=0?'+':''}${totalPnlPct.toFixed(1)}%
+POSITIONS (by weight):
+${statsText}
+
+Top holding: ${top.ticker} at ${top.weight.toFixed(1)}%. Top-3 concentration: ${concentration.toFixed(1)}%.
+
+Use web search for current context on these holdings. Then output ONLY this exact structure in markdown, NO preamble:
+
+## 🩺 Health Score
+A single grade A–F and one sentence why.
+
+## ⚖️ Diversification
+2-3 sentences: concentration risk, sector/correlation exposure, is it too concentrated?
+
+## ⚠️ Top Risks
+3 bullet points — the most important risks in THIS portfolio right now (specific to the holdings).
+
+## ✅ What's Working
+2 bullet points — strengths or good positions.
+
+## 🎯 Suggestions
+2-3 specific, actionable rebalancing or risk-management suggestions. Educational only, not financial advice.
+
+Be direct and specific to these actual holdings. Keep it tight.`;
+    const res=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':CK,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify({model:CLAUDE_MODEL,max_tokens:1500,tools:[{type:'web_search_20250305',name:'web_search'}],messages:[{role:'user',content:prompt}]})
+    });
+    const data=await res.json();
+    if(data.error)throw new Error(data.error.message||'API error');
+    let reply=(data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('')||'No response.';
+    showHealthModal(reply,{totalValue,totalPnlPct,concentration,top,count:rows.length});
+  }catch(e){
+    let msg=e.message;if(msg==='Failed to fetch')msg='Connection failed.';
+    showHealthModal('error',{msg});
+  }
+}
+
+function showHealthModal(content,stats){
+  let m=document.getElementById('health-modal');
+  if(!m){
+    m=document.createElement('div');m.id='health-modal';
+    m.style.cssText='position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.6);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:16px;';
+    m.onclick=(e)=>{if(e.target===m)m.remove();};
+    document.body.appendChild(m);
+  }
+  if(content==='loading'){
+    m.innerHTML=`<div style="background:var(--card);border-radius:20px;padding:40px;max-width:420px;width:100%;text-align:center;box-shadow:var(--sh-lg);"><div style="font-size:40px;margin-bottom:14px;">🩺</div><div style="font-size:16px;font-weight:700;color:var(--t);margin-bottom:8px;">Running Health Check…</div><div style="font-size:13px;color:var(--t3);">Analyzing your portfolio with current market data.</div></div>`;
+    return;
+  }
+  if(content==='error'){
+    m.innerHTML=`<div style="background:var(--card);border-radius:20px;padding:32px;max-width:420px;width:100%;box-shadow:var(--sh-lg);"><div style="font-size:16px;font-weight:700;color:var(--t);margin-bottom:10px;">⚠ Health Check failed</div><div style="font-size:13px;color:var(--t3);margin-bottom:18px;">${stats?.msg||'Something went wrong.'}</div><button class="btn pri" style="width:100%;" onclick="document.getElementById('health-modal').remove()">Close</button></div>`;
+    return;
+  }
+  const body=parseMarkdown(content);
+  const s=stats||{};
+  const statBar=s.totalValue?`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">
+    <div style="flex:1;min-width:90px;background:var(--bg);border-radius:10px;padding:8px 10px;"><div style="font-size:9px;color:var(--t4);font-weight:700;letter-spacing:0.5px;">VALUE</div><div style="font-size:14px;font-weight:800;color:var(--t);">$${s.totalValue.toLocaleString(undefined,{maximumFractionDigits:0})}</div></div>
+    <div style="flex:1;min-width:90px;background:var(--bg);border-radius:10px;padding:8px 10px;"><div style="font-size:9px;color:var(--t4);font-weight:700;letter-spacing:0.5px;">P&L</div><div style="font-size:14px;font-weight:800;color:${s.totalPnlPct>=0?'#2bd96e':'#ef4444'};">${s.totalPnlPct>=0?'+':''}${s.totalPnlPct.toFixed(1)}%</div></div>
+    <div style="flex:1;min-width:90px;background:var(--bg);border-radius:10px;padding:8px 10px;"><div style="font-size:9px;color:var(--t4);font-weight:700;letter-spacing:0.5px;">TOP 3</div><div style="font-size:14px;font-weight:800;color:${s.concentration>70?'#f59e0b':'var(--t)'};">${s.concentration.toFixed(0)}%</div></div>
+  </div>`:'';
+  m.innerHTML=`<div style="background:var(--card);border-radius:20px;max-width:560px;width:100%;max-height:88vh;display:flex;flex-direction:column;box-shadow:var(--sh-lg);overflow:hidden;">
+    <div style="padding:18px 22px;border-bottom:1px solid var(--b);display:flex;align-items:center;justify-content:space-between;">
+      <div style="font-size:16px;font-weight:800;color:var(--t);">🩺 Portfolio Health Check</div>
+      <button onclick="document.getElementById('health-modal').remove()" style="background:none;border:none;font-size:22px;color:var(--t3);cursor:pointer;line-height:1;">×</button>
+    </div>
+    <div style="padding:18px 22px;overflow-y:auto;">${statBar}<div class="health-body" style="font-size:14px;line-height:1.6;color:var(--t2);">${body}</div>
+      <div style="font-size:10px;color:var(--t4);margin-top:16px;text-align:center;">Educational content, not financial advice.</div>
+    </div>
+  </div>`;
+}
+
 async function anzOne(ticker){
-  // Deep analysis of a single watchlist stock
   if(!ticker)return;
   ST('c');
   const prompt=`Give me a deep analysis of ${ticker}: current price action, recent news and catalysts, technical setup (support/resistance, RSI, moving averages), analyst sentiment, and whether it looks like a buy, hold, or avoid right now. Use current market data.`;
@@ -4551,9 +4707,9 @@ function exportMarketPrepPDF(idx){
     .foot{margin-top:32px;padding-top:14px;border-top:1px solid #ddd;color:#999;font-size:11px;text-align:center;}
     @media print{body{padding:20px;}}
   </style></head><body>
-    ${stockrPdfHeader('DAILY MARKET PREP','Pre-market briefing · Generated '+p.date)}
+    ${stockrPdfHeader('DAILY MARKET PREP',p.date)}
     ${bodyHtml}
-    <div class="foot">ElaksInsights · elaks.ai · Educational content, not financial advice · ${p.date}</div>
+    <div class="foot">ElaksInsights</div>
   </body></html>`);
   w.document.close();
   setTimeout(()=>{w.print();},400);
@@ -4586,7 +4742,7 @@ function exportDailyReportPDF(idx){
     ${stockrPdfHeader('DAILY TRADE PREP',p.ticker+' \u00b7 '+p.date)}
     ${setup}
     ${bodyHtml}
-    <div class="foot">ElaksInsights \u00b7 elaks.ai \u00b7 Educational content, not financial advice \u00b7 ${p.date}</div>
+    <div class="foot">ElaksInsights</div>
   </body></html>`);
   w.document.close();
   setTimeout(()=>{w.print();},400);
@@ -4612,9 +4768,9 @@ function exportWeeklyReportPDF(idx){
     .foot{margin-top:32px;padding-top:14px;border-top:1px solid #ddd;color:#999;font-size:11px;text-align:center;}
     @media print{body{padding:20px;}}
   </style></head><body>
-    ${stockrPdfHeader('WEEKLY MARKET REPORT','Week '+label+' · Generated '+(r.date||''))}
+    ${stockrPdfHeader('WEEKLY MARKET REPORT',(r.date||''))}
     ${bodyHtml}
-    <div class="foot">ElaksInsights · elaks.ai · Educational content, not financial advice · ${r.date||''}</div>
+    <div class="foot">ElaksInsights</div>
   </body></html>`);
   w.document.close();
   setTimeout(()=>{w.print();},400);
@@ -4955,6 +5111,46 @@ function showAuthMode(mode){
 }
 let AUTH_MODE='login';
 function authSubmit(){if(AUTH_MODE==='register')authRegister();else authLogin();}
+
+async function googleSignIn(){
+  const btn=document.getElementById('google-signin-btn');
+  // Lazy-init Firebase Auth (SDK loaded in <head>)
+  if(typeof firebase==='undefined'||!firebase.auth){
+    showErr('auth-err','Google sign-in is loading — please try again in a moment.');
+    return;
+  }
+  try{
+    if(!firebase.apps||!firebase.apps.length){
+      firebase.initializeApp({apiKey:APP_FB_KEY,authDomain:`${APP_FB_PID}.firebaseapp.com`,projectId:APP_FB_PID});
+    }
+  }catch(e){/* already initialized */}
+  if(btn){btn.disabled=true;btn.style.opacity='0.6';}
+  showErr('auth-err','');
+  try{
+    const provider=new firebase.auth.GoogleAuthProvider();
+    const result=await firebase.auth().signInWithPopup(provider);
+    const gEmail=(result.user?.email||'').trim().toLowerCase();
+    if(!gEmail)throw new Error('Could not read your Google email.');
+    const key=emailToKey(gEmail);
+    // Map into existing account structure: same email = same account & data.
+    // Ensure an account record exists (create a lightweight one for new Google users).
+    let userData=null;
+    try{userData=await fbRead(`stockr_accounts/${key}`);}catch(e){userData=null;}
+    if(!userData){
+      // New Google user — create an account record (no password; Google-managed)
+      await fbWrite(`stockr_accounts/${key}`,{email:gEmail,provider:'google',createdAt:Date.now()});
+    }
+    USER_ID=key;USER_EMAIL=gEmail;IS_GUEST=false;FB_ACTIVE=true;
+    LS.set('st_auth',{uid:key,email:gEmail,ts:Date.now(),provider:'google'});
+    await startApp();
+  }catch(e){
+    const msg=(e&&e.code==='auth/popup-closed-by-user')?'Sign-in cancelled.':
+              (e&&e.code==='auth/unauthorized-domain')?'This domain isn\'t authorized in Firebase yet.':
+              (e&&e.message)||'Google sign-in failed.';
+    showErr('auth-err',msg);
+    if(btn){btn.disabled=false;btn.style.opacity='1';}
+  }
+}
 
 async function authLogin(){
   const email=(document.getElementById('auth-email').value||'').trim().toLowerCase();
