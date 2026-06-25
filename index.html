@@ -1081,12 +1081,12 @@ let CK='', FK=APP_FK;
 let T212_KEY='';
 let T212_SECRET='';
 let POLYGON_KEY='';
-let CLAUDE_MODEL='claude-sonnet-4-5';
+let CLAUDE_MODEL='claude-sonnet-4-6';
 
 const CLAUDE_MODELS=[
-  {id:'claude-sonnet-4-5', label:'Sonnet 4.5', desc:'Fast · Best value'},
-  {id:'claude-sonnet-4-6', label:'Sonnet 4.6', desc:'Smarter · Recommended'},
-  {id:'claude-opus-4-6',   label:'Opus 4.6',   desc:'Most capable · Slower'},
+  {id:'claude-sonnet-4-6', label:'Sonnet 4.6', desc:'Fast · Best value'},
+  {id:'claude-opus-4-7',   label:'Opus 4.7',   desc:'Powerful · Deep analysis'},
+  {id:'claude-opus-4-8',   label:'Opus 4.8',   desc:'Most capable · Deepest reports'},
 ];
 // ══════════════════════════════════════════════════
 // ── TRANSLATIONS ──────────────────────────────────
@@ -1314,7 +1314,7 @@ const COLS=["#6366f1","#10b981","#f59e0b","#ef4444","#8b5cf6","#0ea5e9","#ec4899
 const LL=["Searching live markets...","Fetching prices...","Scanning news...","Running analysis...","Almost done..."];
 
 // ── STORAGE ──
-const APP_VERSION='1.4.3';
+const APP_VERSION='1.5.0';
 const LS={
   get:k=>{try{return JSON.parse(localStorage.getItem(k));}catch{return null;}},
   set:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch{}},
@@ -5499,7 +5499,10 @@ function closeSB(){document.getElementById('sb').classList.remove('open');docume
 
 // ── BOOT ──
 document.addEventListener('DOMContentLoaded',async()=>{
-  CLAUDE_MODEL=LS.get('st_model')||'claude-sonnet-4-5';
+  CLAUDE_MODEL=LS.get('st_model')||'claude-sonnet-4-6';
+  // Migrate users off retired/removed model IDs to current equivalents
+  const _modelMigrate={'claude-sonnet-4-5':'claude-sonnet-4-6','claude-opus-4-6':'claude-opus-4-8','claude-opus-4-5':'claude-opus-4-8'};
+  if(_modelMigrate[CLAUDE_MODEL]){CLAUDE_MODEL=_modelMigrate[CLAUDE_MODEL];LS.set('st_model',CLAUDE_MODEL);}
   T212_KEY=LS.get('st_t212')||'';
   T212_SECRET=LS.get('st_t212_secret')||'';
   POLYGON_KEY=LS.get('st_polygon')||'';
