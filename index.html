@@ -1314,7 +1314,7 @@ const COLS=["#6366f1","#10b981","#f59e0b","#ef4444","#8b5cf6","#0ea5e9","#ec4899
 const LL=["Searching live markets...","Fetching prices...","Scanning news...","Running analysis...","Almost done..."];
 
 // ── STORAGE ──
-const APP_VERSION='1.5.0';
+const APP_VERSION='1.6.2';
 const LS={
   get:k=>{try{return JSON.parse(localStorage.getItem(k));}catch{return null;}},
   set:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch{}},
@@ -3180,6 +3180,7 @@ function renderWATCH(){
         </div>
         <div class="wacts">
           <button class="wab" onclick="anzOne('${w.ticker}')">${t('deep_analysis')}</button>
+          <button class="wab" onclick="showFundamentals('${w.ticker}')" style="background:#eef2ff;color:#4f46e5;border-color:#c7d2fe;">📊 Fundamentals</button>
           <button class="wab" onclick="showAlertsModal('${w.ticker}')" style="background:#fffbeb;color:#b45309;border-color:#fde68a;">🔔 Alert</button>
           <button class="wdel" onclick="delW(${i})">${t('remove')}</button>
         </div>
@@ -3641,6 +3642,140 @@ function showHealthModal(content,stats){
   </div>`;
 }
 
+// ── FUNDAMENTALS (Finnhub metrics + AI verdict) ──
+const _fundCache={};
+async function showFundamentals(ticker){
+  if(!ticker)return;
+  ticker=ticker.toUpperCase();
+  showFundModal('loading',ticker);
+  try{
+    // Cache for 6h to avoid hammering Finnhub rate limits
+    const cached=_fundCache[ticker];
+    let metric,profile;
+    if(cached&&(Date.now()-cached.ts<21600000)){metric=cached.metric;profile=cached.profile;}
+    else{
+      const [mRes,pRes]=await Promise.all([
+        fetch(`https://finnhub.io/api/v1/stock/metric?symbol=${ticker}&metric=all&token=${FK}`,{signal:AbortSignal.timeout(8000)}),
+        fetch(`https://finnhub.io/api/v1/stock/profile2?symbol=${ticker}&token=${FK}`,{signal:AbortSignal.timeout(8000)})
+      ]);
+      metric=mRes.ok?await mRes.json():null;
+      profile=pRes.ok?await pRes.json():null;
+      _fundCache[ticker]={metric,profile,ts:Date.now()};
+    }
+    if(!metric||!metric.metric){showFundModal('error',ticker,{msg:'No fundamentals available for this ticker (may be an ETF, index, or non-US stock).'});return;}
+    showFundModal('data',ticker,{metric:metric.metric,profile:profile||{}});
+  }catch(e){
+    let msg=e.message;if(msg==='Failed to fetch'||msg.includes('aborted'))msg='Connection failed or timed out.';
+    showFundModal('error',ticker,{msg});
+  }
+}
+
+function fundFmt(v,opts={}){
+  if(v==null||v===''||isNaN(v))return '—';
+  const{pct,money,dec=2}=opts;
+  let n=Number(v);
+  if(money){
+    const abs=Math.abs(n);
+    if(abs>=1e12)return '$'+(n/1e12).toFixed(2)+'T';
+    if(abs>=1e9)return '$'+(n/1e9).toFixed(2)+'B';
+    if(abs>=1e6)return '$'+(n/1e6).toFixed(2)+'M';
+    return '$'+n.toFixed(0);
+  }
+  if(pct)return n.toFixed(dec)+'%';
+  return n.toFixed(dec);
+}
+
+function showFundModal(state,ticker,data){
+  let m=document.getElementById('fund-modal');
+  if(!m){
+    m=document.createElement('div');m.id='fund-modal';
+    m.style.cssText='position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.6);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:16px;';
+    m.onclick=(e)=>{if(e.target===m)m.remove();};
+    document.body.appendChild(m);
+  }
+  if(state==='loading'){
+    m.innerHTML=`<div style="background:var(--card);border-radius:20px;padding:40px;max-width:420px;width:100%;text-align:center;box-shadow:var(--sh-lg);"><div style="font-size:40px;margin-bottom:14px;">📊</div><div style="font-size:16px;font-weight:700;color:var(--t);">Loading ${ticker} fundamentals…</div></div>`;
+    return;
+  }
+  if(state==='error'){
+    m.innerHTML=`<div style="background:var(--card);border-radius:20px;padding:32px;max-width:420px;width:100%;box-shadow:var(--sh-lg);"><div style="font-size:16px;font-weight:700;color:var(--t);margin-bottom:10px;">📊 ${ticker} — no data</div><div style="font-size:13px;color:var(--t3);margin-bottom:18px;">${data?.msg||'Unavailable.'}</div><button class="btn pri" style="width:100%;" onclick="document.getElementById('fund-modal').remove()">Close</button></div>`;
+    return;
+  }
+  const M=data.metric, P=data.profile;
+  // Pull the most useful metrics (Finnhub field names)
+  const metrics=[
+    ['Market Cap', fundFmt((P.marketCapitalization||M['marketCapitalization'])*1e6,{money:true})],
+    ['P/E (TTM)', fundFmt(M['peTTM']||M['peBasicExclExtraTTM'])],
+    ['P/S (TTM)', fundFmt(M['psTTM'])],
+    ['P/B', fundFmt(M['pb'])],
+    ['EPS (TTM)', fundFmt(M['epsTTM'],{money:true})],
+    ['Revenue Growth (YoY)', fundFmt(M['revenueGrowthTTMYoy'],{pct:true})],
+    ['Profit Margin', fundFmt(M['netProfitMarginTTM'],{pct:true})],
+    ['ROE (TTM)', fundFmt(M['roeTTM'],{pct:true})],
+    ['Debt/Equity', fundFmt(M['totalDebt/totalEquityQuarterly'])],
+    ['Dividend Yield', fundFmt(M['currentDividendYieldTTM'],{pct:true})],
+    ['52W High', fundFmt(M['52WeekHigh'],{money:true})],
+    ['52W Low', fundFmt(M['52WeekLow'],{money:true})],
+  ];
+  const rowsH=metrics.map(([k,v])=>`<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--b);"><span style="color:var(--t3);font-size:13px;">${k}</span><span style="color:var(--t);font-weight:700;font-size:13px;">${v}</span></div>`).join('');
+  const name=P.name?`${P.name}`:ticker;
+  const sector=P.finnhubIndustry?`<div style="font-size:12px;color:var(--t3);margin-top:2px;">${P.finnhubIndustry}</div>`:'';
+  m.innerHTML=`<div style="background:var(--card);border-radius:20px;max-width:520px;width:100%;max-height:88vh;display:flex;flex-direction:column;box-shadow:var(--sh-lg);overflow:hidden;">
+    <div style="padding:18px 22px;border-bottom:1px solid var(--b);display:flex;align-items:center;justify-content:space-between;">
+      <div><div style="font-size:16px;font-weight:800;color:var(--t);">📊 ${ticker} Fundamentals</div><div style="font-size:12px;color:var(--t3);">${name}</div>${sector}</div>
+      <button onclick="document.getElementById('fund-modal').remove()" style="background:none;border:none;font-size:22px;color:var(--t3);cursor:pointer;line-height:1;">×</button>
+    </div>
+    <div style="padding:18px 22px;overflow-y:auto;">
+      ${rowsH}
+      <button class="btn pri" id="fund-verdict-btn" style="width:100%;margin-top:16px;" onclick="fundamentalsVerdict('${ticker}')">🤖 Get AI Verdict</button>
+      <div id="fund-verdict" style="margin-top:14px;"></div>
+      <div style="font-size:10px;color:var(--t4);margin-top:16px;text-align:center;">Data: Finnhub · Educational content, not financial advice.</div>
+    </div>
+  </div>`;
+}
+
+async function fundamentalsVerdict(ticker){
+  if(!CK||!CK.startsWith('sk-ant')){toastError('Add your Claude API key in Profile for the AI verdict.');return;}
+  const c=_fundCache[ticker];
+  if(!c||!c.metric?.metric){toastError('Fundamentals not loaded.');return;}
+  const btn=document.getElementById('fund-verdict-btn');
+  const out=document.getElementById('fund-verdict');
+  if(btn){btn.disabled=true;btn.textContent='🤖 Analyzing…';}
+  const M=c.metric.metric, P=c.profile||{};
+  const facts=`Company: ${P.name||ticker} (${P.finnhubIndustry||'n/a'})
+P/E TTM: ${M['peTTM']??'n/a'}, P/S: ${M['psTTM']??'n/a'}, P/B: ${M['pb']??'n/a'}
+EPS TTM: ${M['epsTTM']??'n/a'}, Revenue growth YoY: ${M['revenueGrowthTTMYoy']??'n/a'}%
+Net margin: ${M['netProfitMarginTTM']??'n/a'}%, ROE: ${M['roeTTM']??'n/a'}%
+Debt/Equity: ${M['totalDebt/totalEquityQuarterly']??'n/a'}, Dividend yield: ${M['currentDividendYieldTTM']??'n/a'}%
+52W range: ${M['52WeekLow']??'n/a'} – ${M['52WeekHigh']??'n/a'}`;
+  try{
+    const prompt=`You are a fundamental equity analyst. Based on these fundamentals for ${ticker}, give a concise plain-English verdict.
+
+${facts}
+
+Output in markdown, NO preamble, this structure:
+**Valuation:** is it cheap/fair/expensive vs its growth and sector? (1-2 sentences)
+**Financial health:** margins, profitability, debt — healthy or concerning? (1-2 sentences)
+**Bottom line:** one honest sentence — what kind of investor/situation does this suit?
+
+Be specific to the numbers. Educational only, not financial advice.`;
+    const res=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':CK,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify({model:CLAUDE_MODEL,max_tokens:600,messages:[{role:'user',content:prompt}]})
+    });
+    const dt=await res.json();
+    if(dt.error)throw new Error(dt.error.message||'API error');
+    const reply=(dt.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('')||'No response.';
+    if(out)out.innerHTML=`<div style="background:var(--bg);border-radius:12px;padding:14px;font-size:13px;line-height:1.6;color:var(--t2);">${parseMarkdown(reply)}</div>`;
+    if(btn){btn.style.display='none';}
+  }catch(e){
+    if(btn){btn.disabled=false;btn.textContent='🤖 Get AI Verdict';}
+    toastError('Verdict failed: '+e.message);
+  }
+}
+
+// ── FUNDAMENTALS end ──
 async function anzOne(ticker){
   if(!ticker)return;
   ST('c');
@@ -3929,7 +4064,7 @@ function renderDailyHistoryList(){
   if(verified.length){
     const correct=verified.filter(p=>(p.outcome||(p.correct?'correct':'wrong'))==='correct').length;
     const partial=verified.filter(p=>p.outcome==='partial').length;
-    const pct=Math.round(correct/verified.length*100);
+    const pct=Math.round((correct+partial*0.5)/verified.length*100); // partials count as half credit
     const col=pct>=60?'#16b981':pct>=40?'#f7a83c':'#f24d6a';
     // Per-ticker accuracy
     const byTicker={};
@@ -3949,7 +4084,7 @@ function renderDailyHistoryList(){
         <div style="font-size:10px;font-weight:700;color:var(--t3);letter-spacing:1px;">AI ACCURACY</div>
         <div style="font-size:18px;font-weight:800;color:${col};">${pct}%</div>
       </div>
-      <div style="font-size:10px;color:var(--t3);margin-top:2px;">${correct} correct · ${partial} partial · ${verified.length-correct-partial} missed (of ${verified.length})</div>
+      <div style="font-size:10px;color:var(--t3);margin-top:2px;">${correct} correct · ${partial} partial · ${verified.length-correct-partial} missed (of ${verified.length})${partial>0?' · partials = ½ credit':''}</div>
       <div style="height:5px;background:${col}22;border-radius:5px;margin-top:6px;overflow:hidden;"><div style="height:100%;width:${pct}%;background:${col};border-radius:5px;"></div></div>
       ${tickerHTML}
     </div>`;
@@ -4015,7 +4150,7 @@ async function generateDailyReport(){
   loadDailyPredictions();
   const pastForTicker=dailyPredictions.filter(p=>normalizeTicker(p.ticker)===ticker).slice(0,10);
   const verifiedPast=pastForTicker.filter(p=>p.verified);
-  const accuracy=verifiedPast.length>0?Math.round(verifiedPast.filter(p=>p.correct).length/verifiedPast.length*100):null;
+  const accuracy=verifiedPast.length>0?Math.round((verifiedPast.filter(p=>p.outcome==='correct'||(p.correct&&!p.outcome)).length+verifiedPast.filter(p=>p.outcome==='partial').length*0.5)/verifiedPast.length*100):null;
 
   const learningCtx=pastForTicker.length>0?`
 PAST ANALYSES FOR ${ticker} (${pastForTicker.length} total, ${verifiedPast.length} verified):
@@ -4266,7 +4401,7 @@ function showDailyReport(idx){
         <div style="font-size:28px;">${cfg.icon}</div>
         <div style="flex:1;">
           <div style="font-size:13px;font-weight:800;color:${cfg.c};">${cfg.label}</div>
-          <div style="font-size:11px;color:${cfg.c2};margin-top:2px;">Predicted ${p.action} @ ${p.entryZone} · Close $${p.actualClose?.toFixed(2)||'—'} ${moveStr?`(${moveStr})`:''}</div>
+          <div style="font-size:11px;color:${cfg.c2};margin-top:2px;">Predicted ${p.action} @ ${p.entryZone} · Close $${p.actualClose?.toFixed(2)||'—'} ${moveStr?`(${moveStr})`:''}${p.verifyMethod==='intraday'&&p.dayHigh!=null?`<br><span style="opacity:0.8;">Day range $${p.dayLow?.toFixed(2)}–$${p.dayHigh?.toFixed(2)} · checked intraday</span>`:''}</div>
         </div>
         <button onclick="dailyPredictions[${idx}].verified=false;saveDailyPredictions();showDailyReport(${idx});" style="background:rgba(0,0,0,0.05);border:none;color:${cfg.c};font-size:10px;font-weight:600;padding:5px 9px;border-radius:7px;cursor:pointer;font-family:inherit;">Redo</button>
       </div>${pmHtml}`;
@@ -4302,6 +4437,7 @@ async function verifyPrediction(idx){
   const p=dailyPredictions[idx];if(!p)return;
   const input=document.getElementById(`dt-verify-price-${idx}`);
   let closePrice=input?parseFloat(input.value):null;
+  let dayHigh=null,dayLow=null; // intraday range (from auto-fetch) to detect targets/stops touched during the day
 
   // Auto-fetch if no manual price entered
   if(!closePrice||isNaN(closePrice)){
@@ -4309,7 +4445,7 @@ async function verifyPrediction(idx){
     if(btn){btn.disabled=true;btn.textContent='⟳ Fetching...';}
     const q=await fetchPrice(p.ticker).catch(()=>null);
     if(btn){btn.disabled=false;btn.textContent='⚡ Auto-fetch price';}
-    if(q&&q.c>0){closePrice=q.c;}
+    if(q&&q.c>0){closePrice=q.c;dayHigh=(q.h&&q.h>0)?q.h:null;dayLow=(q.l&&q.l>0)?q.l:null;}
     else{toastError('Could not auto-fetch. Enter the closing price manually.');return;}
   }
 
@@ -4322,25 +4458,30 @@ async function verifyPrediction(idx){
   // 3-tier outcome: correct / partial / wrong
   let outcome='wrong'; // 'correct' | 'partial' | 'wrong'
   const movePct=base>0?((closePrice-base)/base)*100:0;
+  // Use intraday extremes when available so a target/stop TOUCHED during the day counts,
+  // even if price reversed by close. Fall back to close when no range is available.
+  const hi=(dayHigh!=null)?dayHigh:closePrice;
+  const lo=(dayLow!=null)?dayLow:closePrice;
+  const haveRange=(dayHigh!=null&&dayLow!=null);
 
   if(p.bias==='BUY'||p.action==='BUY'){
-    // BUY: target is ABOVE entry, stop is BELOW. Correct = price rose to target.
-    if(stop&&closePrice<=stop)outcome='wrong';        // stopped out
-    else if(target&&closePrice>=target)outcome='correct'; // hit target
-    else if(closePrice>base)outcome='partial';        // rose but didn't reach target
+    // BUY: target ABOVE entry, stop BELOW. Stop checked first (risk before reward).
+    if(stop&&lo<=stop)outcome='wrong';                 // low touched stop → stopped out
+    else if(target&&hi>=target)outcome='correct';      // high reached target
+    else if(closePrice>base)outcome='partial';         // rose but didn't reach target
     else outcome='wrong';                              // fell
   }else if(p.bias==='SELL'||p.action==='SELL'){
-    // SELL: target is BELOW entry, stop is ABOVE. Correct = price FELL to target.
-    if(stop&&closePrice>=stop)outcome='wrong';        // stopped out (price rose against us)
-    else if(target&&closePrice<=target)outcome='correct'; // hit downside target
-    else if(closePrice<base)outcome='partial';        // fell but didn't reach target
+    // SELL: target BELOW entry, stop ABOVE. Stop checked first.
+    if(stop&&hi>=stop)outcome='wrong';                 // high touched stop → stopped out
+    else if(target&&lo<=target)outcome='correct';      // low reached downside target
+    else if(closePrice<base)outcome='partial';         // fell but didn't reach target
     else outcome='wrong';                              // rose
   }else{ // HOLD/NEUTRAL: correct if stayed roughly flat within range
     if(stop&&target)outcome=(closePrice>Math.min(stop,target)&&closePrice<Math.max(stop,target))?'correct':'partial';
     else outcome=Math.abs(movePct)<2?'correct':'partial';
   }
 
-  dailyPredictions[idx]={...p,verified:true,outcome,correct:outcome==='correct',actualClose:closePrice,movePct:parseFloat(movePct.toFixed(2))};
+  dailyPredictions[idx]={...p,verified:true,outcome,correct:outcome==='correct',actualClose:closePrice,dayHigh,dayLow,verifyMethod:haveRange?'intraday':'close',movePct:parseFloat(movePct.toFixed(2))};
   saveDailyPredictions();
   renderDailyHistoryList();
   showDailyReport(idx);
@@ -4397,8 +4538,9 @@ function renderAccuracyStats(){
   loadDailyPredictions();
   const verified=dailyPredictions.filter(p=>p.verified);
   if(!verified.length)return;
-  const correct=verified.filter(p=>p.correct).length;
-  const pct=Math.round(correct/verified.length*100);
+  const correct=verified.filter(p=>p.outcome==='correct'||(p.correct&&!p.outcome)).length;
+  const partialC=verified.filter(p=>p.outcome==='partial').length;
+  const pct=Math.round((correct+partialC*0.5)/verified.length*100); // partials = half credit
   // Could render in a stats section if desired
 }
 
