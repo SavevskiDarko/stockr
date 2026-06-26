@@ -1314,7 +1314,7 @@ const COLS=["#6366f1","#10b981","#f59e0b","#ef4444","#8b5cf6","#0ea5e9","#ec4899
 const LL=["Searching live markets...","Fetching prices...","Scanning news...","Running analysis...","Almost done..."];
 
 // ── STORAGE ──
-const APP_VERSION='1.6.2';
+const APP_VERSION='1.6.3';
 const LS={
   get:k=>{try{return JSON.parse(localStorage.getItem(k));}catch{return null;}},
   set:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch{}},
@@ -5295,6 +5295,7 @@ async function googleSignIn(){
       // New Google user — create an account record (no password; Google-managed)
       await fbWrite(`stockr_accounts/${key}`,{email:gEmail,provider:'google',createdAt:Date.now()});
     }
+    clearAllLocalData(); // prevent previous user's local data leaking into this Google account
     USER_ID=key;USER_EMAIL=gEmail;IS_GUEST=false;FB_ACTIVE=true;
     LS.set('st_auth',{uid:key,email:gEmail,ts:Date.now(),provider:'google'});
     await startApp();
@@ -5319,6 +5320,7 @@ async function authLogin(){
     if(!userData){throw new Error(t('auth_err_nouser'));}
     const hash=await sha256(pass+userData.salt);
     if(hash!==userData.passwordHash){throw new Error(t('auth_err_wrongpass'));}
+    clearAllLocalData(); // prevent any previous user's local data from leaking into this account
     USER_ID=key;USER_EMAIL=email;IS_GUEST=false;FB_ACTIVE=true;
     LS.set('st_auth',{uid:key,email,ts:Date.now()});
     await startApp();
@@ -5343,6 +5345,7 @@ async function authRegister(){
     const salt=Math.random().toString(36).slice(2)+Date.now().toString(36);
     const passwordHash=await sha256(pass+salt);
     await fbWrite(`stockr_accounts/${key}`,{email,passwordHash,salt,createdAt:Date.now()});
+    clearAllLocalData(); // wipe any previous user's local data so the new account starts clean
     USER_ID=key;USER_EMAIL=email;IS_GUEST=false;FB_ACTIVE=true;
     LS.set('st_auth',{uid:key,email,ts:Date.now()});
     await startApp();
@@ -5391,9 +5394,17 @@ async function authResetPassword(emailOverride){
 async function setAuthState(){} // no-op, kept for compatibility
 
 function clearAllLocalData(){
-  LS.del('st_ck');LS.del('st_portfolios');LS.del('st_watch');
-  LS.del('st_sessions');LS.del('st_active_port');LS.del('st_ticker_cache');LS.del('st_auth');
-  CK='';FK=APP_FK;T212_KEY='';POLYGON_KEY='';PORTFOLIOS=[];WATCH=[];sessions=[];curId=null;MSGS=[];PC={};ACTIVE_PORT_ID='';
+  // Clear ALL user-specific data so no data leaks between different accounts on the same device.
+  // (Device/UI prefs like dark mode, language, currency are intentionally NOT cleared.)
+  ['st_ck','st_portfolios','st_watch','st_sessions','st_active_port','st_ticker_cache','st_auth',
+   'st_alerts','st_daily','st_marketpreps','st_realized','st_reports','st_snapshots','st_user_tickers',
+   'st_t212','st_t212_secret','st_polygon','st_realized'].forEach(k=>LS.del(k));
+  CK='';FK=APP_FK;T212_KEY='';T212_SECRET='';POLYGON_KEY='';PORTFOLIOS=[];WATCH=[];sessions=[];curId=null;MSGS=[];PC={};ACTIVE_PORT_ID='';
+  if(typeof dailyPredictions!=='undefined')dailyPredictions=[];
+  if(typeof marketPreps!=='undefined')marketPreps=[];
+  if(typeof REPORTS!=='undefined')REPORTS=[];
+  if(typeof ALERTS!=='undefined')ALERTS=[];
+  if(typeof USER_TICKER_MAP!=='undefined')USER_TICKER_MAP={};
 }
 
 function authLogout(){
