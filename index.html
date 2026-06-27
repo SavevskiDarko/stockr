@@ -706,6 +706,7 @@ button:active{transform:scale(0.97);}
 [data-privacy="on"] [id^="pchart-val-"],
 [data-privacy="on"] [id^="pchart-chg-"],
 [data-privacy="on"] .pswitch-val,
+[data-privacy="on"] .port-tab-val,
 [data-privacy="on"] .pr-pv,
 [data-privacy="on"] .pr-pp,
 [data-privacy="on"] .sc2 .sval{
@@ -1314,7 +1315,7 @@ const COLS=["#6366f1","#10b981","#f59e0b","#ef4444","#8b5cf6","#0ea5e9","#ec4899
 const LL=["Searching live markets...","Fetching prices...","Scanning news...","Running analysis...","Almost done..."];
 
 // ── STORAGE ──
-const APP_VERSION='1.6.3';
+const APP_VERSION='1.6.5';
 const LS={
   get:k=>{try{return JSON.parse(localStorage.getItem(k));}catch{return null;}},
   set:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch{}},
@@ -4259,14 +4260,8 @@ CONSISTENCY RULES (MANDATORY — the JSON must be internally coherent):
     }
     // Strip the JSON block from the displayed report
     let text=rawText.replace(/<<<JSON>>>[\s\S]*?<<<END>>>/,'').trim();
-    // Strip any leaked meta-preamble before the first heading (e.g. "I'll gather... ---")
-    const _dh=text.search(/(^|\n)#{1,3}\s/);
-    const _dt=text.indexOf('⚡');
-    let _dcut=-1;
-    if(_dt>=0&&_dt<400)_dcut=_dt;
-    else if(_dh>=0&&_dh<400)_dcut=_dh;
-    if(_dcut>0)text=text.slice(_dcut).replace(/^\n+/,'');
-    text=text.replace(/^.*?---\s*\n/s,(m)=>m.length<300?'':m); // drop short preamble ending in ---
+    // Strip any leaked meta-preamble before the first heading (robust shared logic)
+    text=stripPreamble(text);
 
     const validActions=['BUY','SELL','HOLD','AVOID'];
     const validBias=['BULLISH','BEARISH','NEUTRAL'];
@@ -4761,34 +4756,7 @@ Be concise but data-rich. Use real current numbers from your searches. Today is 
     if(!text)throw new Error('No text in response.');
     // Safety net: strip any meta-preamble (model "thinking out loud") before the real report.
     // Handles cases the heading-search misses: long preambles, numbered headings, "---" separators.
-    (function stripPreamble(){
-      let t=text;
-      // 1) If there's a "thinking" preamble that ends with a --- separator near the top, cut everything up to and including it.
-      const sep=t.search(/\n?\s*-{3,}\s*\n/);
-      if(sep>=0&&sep<1200){
-        // only treat as preamble if the text before the --- looks like meta-commentary
-        const head=t.slice(0,sep).toLowerCase();
-        if(/\b(now i have|let me|i'?ll|i will|i have all the data|synthesize|compile|here'?s the|let's compile|gather|confirmed figures)\b/.test(head)){
-          t=t.slice(t.indexOf('\n',sep)>=0?sep:0).replace(/^[\s\S]*?-{3,}\s*\n/,'');
-        }
-      }
-      // 2) Find the first real heading: markdown #, OR a numbered "1." item, OR a known section emoji.
-      const mdHeading=t.search(/(^|\n)#{1,3}\s/);
-      const numHeading=t.search(/(^|\n)\s*1[.)]\s*[📊📈📋🗞️⚡🎯]/);
-      const emojiHeading=t.search(/[📋📊](?=\s*(Market|Daily|Today))/);
-      const cands=[mdHeading,numHeading,emojiHeading].filter(x=>x>=0);
-      if(cands.length){
-        const cut=Math.min(...cands);
-        // only cut if there's meaningful preamble before it (avoid trimming a legit short intro)
-        if(cut>0&&cut<1400){
-          const before=t.slice(0,cut).toLowerCase();
-          if(/\b(now i have|let me|i'?ll|i will|synthesize|compile|gather|confirmed figures|all the data)\b/.test(before)||before.replace(/\s/g,'').length>40){
-            t=t.slice(cut).replace(/^\n+/,'');
-          }
-        }
-      }
-      text=t.trim();
-    })();
+    text=stripPreamble(text);
 
     const prep={
       id:'mp_'+Date.now(),
@@ -5179,6 +5147,35 @@ CRITICAL: After the report, output your key predictions as JSON wrapped EXACTLY 
     btn.disabled=false;
     btn.innerHTML=`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg> ${t('generate_report')}`;
   }
+}
+
+// Robust shared preamble stripper — removes model "thinking out loud" before the real report.
+// Handles long preambles, numbered headings, "---" separators, and emoji/title headings.
+function stripPreamble(text){
+  let t=text||'';
+  // 1) "Thinking" preamble ending in a --- separator near the top
+  const sep=t.search(/\n?\s*-{3,}\s*\n/);
+  if(sep>=0&&sep<1500){
+    const head=t.slice(0,sep).toLowerCase();
+    if(/\b(now i have|let me|i'?ll|i will|i have all the data|i have strong|synthesize|compile|here'?s the|let's compile|gather|confirmed figures|enough to build|comprehensive data)\b/.test(head)){
+      t=t.replace(/^[\s\S]*?-{3,}\s*\n/,'');
+    }
+  }
+  // 2) First real heading: markdown #, numbered "1.", or a title heading led by a section emoji
+  const mdHeading=t.search(/(^|\n)#{1,3}\s/);
+  const numHeading=t.search(/(^|\n)\s*1[.)]\s*[📊📈📋🗞️⚡🎯]/);
+  const emojiHeading=t.search(/[📋📊📈🗞️⚡🎯](?=\s*\*{0,2}[A-Z][a-z])/);
+  const cands=[mdHeading,numHeading,emojiHeading].filter(x=>x>=0);
+  if(cands.length){
+    const cut=Math.min(...cands);
+    if(cut>0&&cut<1800){
+      const before=t.slice(0,cut).toLowerCase();
+      if(/\b(now i have|let me|i'?ll|i will|synthesize|compile|gather|confirmed figures|all the data|i have strong|enough to build|comprehensive data)\b/.test(before)||before.replace(/\s/g,'').length>40){
+        t=t.slice(cut).replace(/^\n+/,'');
+      }
+    }
+  }
+  return t.trim();
 }
 
 function parseMarkdown(md){
