@@ -1316,7 +1316,7 @@ const COLS=["#6366f1","#10b981","#f59e0b","#ef4444","#8b5cf6","#0ea5e9","#ec4899
 const LL=["Searching live markets...","Fetching prices...","Scanning news...","Running analysis...","Almost done..."];
 
 // ── STORAGE ──
-const APP_VERSION='1.7.0';
+const APP_VERSION='1.7.1';
 const LS={
   get:k=>{try{return JSON.parse(localStorage.getItem(k));}catch{return null;}},
   set:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch{}},
@@ -1673,6 +1673,27 @@ function filterChartRange(data,range){
 let _activeChartRange={};
 let _showSpy=false;
 let _showHiddenPorts=false;
+let _lpFired=false; // tracks if a long-press just fired (to suppress the click that follows)
+// Attach a long-press (≈600ms) listener that secretly toggles revealing hidden portfolios.
+function attachHiddenReveal(elm){
+  let timer=null;
+  const start=()=>{
+    timer=setTimeout(()=>{
+      _lpFired=true;
+      if(PORTFOLIOS.some(p=>p.hidden)){
+        _showHiddenPorts=!_showHiddenPorts;
+        renderPortSwitcher();
+      }
+    },600);
+  };
+  const cancel=()=>{ if(timer){clearTimeout(timer);timer=null;} };
+  elm.addEventListener('touchstart',start,{passive:true});
+  elm.addEventListener('touchend',cancel);
+  elm.addEventListener('touchmove',cancel,{passive:true});
+  elm.addEventListener('mousedown',start);
+  elm.addEventListener('mouseup',cancel);
+  elm.addEventListener('mouseleave',cancel);
+}
 let _chartMode='value'; // 'value' | 'percent'
 function toggleChartMode(portId){
   _chartMode=_chartMode==='value'?'percent':'value';
@@ -2089,19 +2110,11 @@ function renderPortSwitcher(){
     el.appendChild(wrap);
   });
 
-  // Toggle to reveal/hide hidden portfolios (only shown if there are any hidden)
-  if(hiddenCount>0){
-    const tg=document.createElement('button');
-    tg.style.cssText='background:none;border:1px dashed var(--b2);color:var(--t3);font-size:11px;cursor:pointer;padding:6px 12px;border-radius:18px;flex-shrink:0;font-family:inherit;font-weight:600;';
-    tg.textContent=_showHiddenPorts?`Hide ${hiddenCount} hidden`:`👁 Show ${hiddenCount} hidden`;
-    tg.onclick=()=>{_showHiddenPorts=!_showHiddenPorts;renderPortSwitcher();};
-    el.appendChild(tg);
-  }
-
-  // Add new portfolio button
+  // Add new portfolio button (long-press secretly reveals hidden portfolios — no visible trace)
   const addBtn=document.createElement('button');
   addBtn.className='port-add-btn';addBtn.title='New Portfolio';addBtn.textContent='+';
-  addBtn.onclick=createPortfolio;
+  addBtn.onclick=()=>{ if(_lpFired){_lpFired=false;return;} createPortfolio(); };
+  attachHiddenReveal(addBtn);
   el.appendChild(addBtn);
 }
 
