@@ -1317,7 +1317,7 @@ const COLS=["#6366f1","#10b981","#f59e0b","#ef4444","#8b5cf6","#0ea5e9","#ec4899
 const LL=["Searching live markets...","Fetching prices...","Scanning news...","Running analysis...","Almost done..."];
 
 // ── STORAGE ──
-const APP_VERSION='1.7.2';
+const APP_VERSION='1.8.0';
 const LS={
   get:k=>{try{return JSON.parse(localStorage.getItem(k));}catch{return null;}},
   set:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch{}},
@@ -1673,6 +1673,11 @@ function filterChartRange(data,range){
 
 let _activeChartRange={};
 let _showSpy=false;
+let _trPeriod='ALL'; // total-return headline period: 1W 1M 3M YTD 1Y ALL
+function setTotalReturnPeriod(p){
+  _trPeriod=p;
+  renderPORT();
+}
 let _showHiddenPorts=false;
 let _lpFired=false; // tracks if a long-press just fired (to suppress the click that follows)
 // Attach a long-press (≈600ms) listener that secretly toggles revealing hidden portfolios.
@@ -2353,6 +2358,7 @@ function renderPORT(){
   const chartSection=pos.length?portfolioChartCard(port.id):'';
   const rightH=summaryCards+(isDesktop&&pos.length?`
   <button class="abig" onclick="anzAll()">${t('analyze_portfolio')} ${port.name}</button>
+  <button class="abig" onclick="portfolioHealthCheck()" style="background:linear-gradient(135deg,#2bd96e,#1fb55a);margin-top:8px;">🩺 Health Check</button>
   ${PORTFOLIOS.length>1?`<button class="del-port-btn" onclick="deletePortfolio()">${t('delete_portfolio')} "${port.name}"</button>`:''}`:``);
 
   // Mobile sticky analyze bar
@@ -2370,6 +2376,53 @@ function renderPORT(){
   // ── Center / main: position rows ──
   let centerH='';
   if(pos.length){
+    // IB-style total return headline with selectable periods
+    if(hasPx){
+      const trData=getPortfolioChartData(port.id);
+      const now=new Date();
+      const daysAgo=n=>{const d=new Date(now);d.setDate(d.getDate()-n);return d.toISOString().split('T')[0];};
+      const ytdStart=`${now.getFullYear()}-01-01`;
+      const valueAt=dateStr=>{let best=null;for(const s of trData){if(s.d<=dateStr)best=s;else break;}return best?best.v:null;};
+      // Determine the "from" value for each period (null if no history covers it)
+      const periodDefs=[
+        {k:'1W',from:valueAt(daysAgo(7))},
+        {k:'1M',from:valueAt(daysAgo(30))},
+        {k:'3M',from:valueAt(daysAgo(90))},
+        {k:'YTD',from:valueAt(ytdStart)},
+        {k:'1Y',from:valueAt(daysAgo(365))},
+        {k:'ALL',from:null} // ALL uses cost basis (exact), handled below
+      ];
+      // Compute the displayed return for the active period
+      let trPct,trAbs,trLabel;
+      if(_trPeriod==='ALL'){
+        trPct=pnlP; trAbs=pnl; trLabel='Total return · all-time';
+      }else{
+        const pd=periodDefs.find(p=>p.k===_trPeriod);
+        if(pd&&pd.from!=null&&pd.from>0){
+          trPct=(lT/pd.from-1)*100; trAbs=lT-pd.from;
+          trLabel='Return · '+(_trPeriod==='YTD'?'year to date':_trPeriod);
+        }else{
+          // No history for this period → fall back to all-time
+          trPct=pnlP; trAbs=pnl; trLabel='Total return · all-time (no '+_trPeriod+' history)';
+        }
+      }
+      const trCol=trAbs>=0?'#16b981':'#ef4444';
+      // Period buttons (only show ones we have data for; ALL always shown)
+      const btns=periodDefs.map(p=>{
+        const hasData=p.k==='ALL'||(p.from!=null&&p.from>0);
+        if(!hasData)return null;
+        const active=_trPeriod===p.k;
+        return `<button onclick="setTotalReturnPeriod('${p.k}')" style="background:${active?'var(--p)':'transparent'};color:${active?'#fff':'var(--t3)'};border:none;font-size:10px;font-weight:700;padding:5px 9px;border-radius:8px;cursor:pointer;font-family:inherit;letter-spacing:0.3px;">${p.k}</button>`;
+      }).filter(Boolean).join('');
+      centerH+=`<div class="total-return-card" style="background:var(--card);border-radius:16px;padding:16px 20px;margin-bottom:12px;box-shadow:var(--sh-sm);">
+        <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;">
+          <div class="sval" style="font-size:32px;font-weight:800;color:${trCol};line-height:1;">${trAbs>=0?'+':''}${fpct(trPct)}</div>
+          <div class="sval" style="font-size:14px;font-weight:700;color:${trCol};">${trAbs>=0?'+':'-'}$${Math.abs(trAbs).toLocaleString('en',{maximumFractionDigits:0})}</div>
+        </div>
+        <div style="font-size:12px;color:var(--t3);margin-top:4px;font-weight:600;">${trLabel}</div>
+        <div style="display:flex;gap:4px;margin-top:10px;flex-wrap:wrap;">${btns}</div>
+      </div>`;
+    }
     centerH+=chartSection;
     centerH+=periodReturnsStrip(port.id,lT>0?lT:null);
     centerH+=allocationDonut(port.id);
@@ -4657,6 +4710,7 @@ function marketPrepBody(p,idx){
 
 // Split the briefing markdown into tight, bordered section cards
 function prepCards(md){
+  md=stripPreamble(md||''); // clean any preamble at display time too (covers reports saved before the fix)
   // Pull out the title line (first # or 📋 line)
   const lines=md.split('\n');
   let title='';
