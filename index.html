@@ -347,6 +347,12 @@ input,button,select{font-family:'Montserrat',sans-serif;}
 /* ── BOTTOM NAV (mobile only) ─────────────────────────────────── */
 .bnav{display:none;}
 
+
+/* tab-menu: global — the portfolio ⋯ menu must be styled on ALL layouts, not just mobile */
+.tab-menu-overlay{position:fixed;inset:0;z-index:150;}
+.tab-menu{position:absolute;background:#fff;border-radius:14px;padding:6px;box-shadow:0 8px 30px rgba(0,0,0,0.18);min-width:160px;z-index:151;}
+.tab-menu-item{display:flex;align-items:center;gap:10px;padding:11px 13px;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;border:none;background:none;width:100%;font-family:inherit;color:var(--t);}
+.tab-menu-item.danger{color:var(--r);}
 @media(max-width:899px){
   html,body{overflow-x:hidden;max-width:100vw;}
   .pbar{padding:10px 12px;}
@@ -1317,7 +1323,7 @@ const COLS=["#6366f1","#10b981","#f59e0b","#ef4444","#8b5cf6","#0ea5e9","#ec4899
 const LL=["Searching live markets...","Fetching prices...","Scanning news...","Running analysis...","Almost done..."];
 
 // ── STORAGE ──
-const APP_VERSION='1.12.0';
+const APP_VERSION='1.12.1';
 const LS={
   get:k=>{try{return JSON.parse(localStorage.getItem(k));}catch{return null;}},
   set:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch{}},
@@ -2484,16 +2490,16 @@ function showDepositBreakdown(){
     const pct=total>0?(dep/total*100).toFixed(1):0;
     const col=COLS[i%COLS.length];
     const barW=total>0?Math.max(4,(dep/total*100)):0;
-    rows+=`<div style="display:flex;flex-direction:column;gap:4px;padding:10px 0;border-bottom:1px solid #f1f5f9">
+    rows+=`<div style="display:flex;flex-direction:column;gap:4px;padding:10px 0;border-bottom:1px solid var(--b)">
       <div style="display:flex;align-items:center;justify-content:space-between">
         <div style="display:flex;align-items:center;gap:8px">
           <div style="width:10px;height:10px;border-radius:50%;background:${col};flex-shrink:0"></div>
-          <div style="font-weight:700;font-size:13px;color:#1e293b">${p.ticker}</div>
-          <div style="font-size:10px;color:#94a3b8">${p.shares} sh @ $${p.cost}</div>
+          <div style="font-weight:700;font-size:13px;color:var(--t)">${p.ticker}</div>
+          <div style="font-size:10px;color:var(--t3)">${p.shares} sh @ $${p.cost}</div>
         </div>
         <div style="text-align:right">
           <div style="font-weight:700;font-size:13px;color:var(--p)">$${dep.toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
-          <div style="font-size:10px;color:#94a3b8">${pct}%</div>
+          <div style="font-size:10px;color:var(--t3)">${pct}%</div>
         </div>
       </div>
       <div style="height:4px;background:var(--pl);border-radius:4px;overflow:hidden">
@@ -2504,14 +2510,14 @@ function showDepositBreakdown(){
   const modal=document.createElement('div');
   modal.style.cssText='position:fixed;inset:0;background:rgba(15,23,42,0.55);z-index:9999;display:flex;align-items:flex-end;justify-content:center';
   modal.innerHTML=`
-    <div style="background:#fff;border-radius:20px 20px 0 0;width:100%;max-width:480px;max-height:80vh;display:flex;flex-direction:column;padding:0 0 env(safe-area-inset-bottom,0px)">
-      <div style="padding:18px 18px 10px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between">
+    <div style="background:var(--card);border-radius:20px 20px 0 0;width:100%;max-width:480px;max-height:80vh;display:flex;flex-direction:column;padding:0 0 env(safe-area-inset-bottom,0px)">
+      <div style="padding:18px 18px 10px;border-bottom:1px solid var(--b);display:flex;align-items:center;justify-content:space-between">
         <div>
-          <div style="font-size:11px;font-weight:700;color:#6366f1;letter-spacing:2px">${t('deposit_breakdown')}</div>
-          <div style="font-size:18px;font-weight:800;color:#1e293b;margin-top:2px">$${total.toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
-          <div style="font-size:10px;color:#94a3b8;margin-top:1px">${port.name} · ${pos.length} position${pos.length!==1?'s':''}</div>
+          <div style="font-size:11px;font-weight:700;color:var(--p);letter-spacing:2px">${t('deposit_breakdown')}</div>
+          <div style="font-size:18px;font-weight:800;color:var(--t);margin-top:2px">$${total.toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
+          <div style="font-size:10px;color:var(--t3);margin-top:1px">${port.name} · ${pos.length} position${pos.length!==1?'s':''}</div>
         </div>
-        <button onclick="this.closest('[style*=fixed]').remove()" style="background:#f1f5f9;border:none;border-radius:50%;width:32px;height:32px;font-size:16px;cursor:pointer;color:#64748b">&#x2715;</button>
+        <button onclick="this.closest('[style*=fixed]').remove()" style="background:var(--pl);border:none;border-radius:50%;width:32px;height:32px;font-size:16px;cursor:pointer;color:var(--t3)">&#x2715;</button>
       </div>
       <div style="overflow-y:auto;padding:0 18px 18px">${rows}</div>
     </div>`;
@@ -4126,8 +4132,11 @@ function showPortMenu(e,portId){
   const menu=document.createElement('div');
   menu.className='tab-menu';
   menu.style.cssText=`top:${rect.bottom+6}px;left:${Math.min(rect.left,window.innerWidth-180)}px;`;
+  const _pi=PORTFOLIOS.findIndex(p=>p.id===portId);
   menu.innerHTML=`
     <button class="tab-menu-item" onclick="closePortMenu();promptRenamePort('${portId}')">✏️ Rename</button>
+    ${_pi>0?`<button class="tab-menu-item" onclick="closePortMenu();movePortfolio('${portId}',-1)">⬅️ Move left</button>`:''}
+    ${_pi<PORTFOLIOS.length-1?`<button class="tab-menu-item" onclick="closePortMenu();movePortfolio('${portId}',1)">➡️ Move right</button>`:''}
     <button class="tab-menu-item" onclick="closePortMenu();togglePortHidden('${portId}')">${port.hidden?'👁 Show portfolio':'🙈 Hide portfolio'}</button>
     ${PORTFOLIOS.length>1?`<button class="tab-menu-item danger" onclick="closePortMenu();deletePortfolioById('${portId}')">🗑 Delete portfolio</button>`:''}`;
   overlay.appendChild(menu);
@@ -4140,6 +4149,16 @@ function promptRenamePort(id){
   const name=prompt('Rename portfolio:',port.name);
   if(name&&name.trim()){port.name=name.trim();saveLocal();renderPortSwitcher();renderPORT();
     if(FB_ACTIVE)fbWrite(userPath('portfolios'),{portfolios:PORTFOLIOS,updatedAt:Date.now()}).catch(e=>console.warn('FB:',e?.message||e));}
+}
+
+function movePortfolio(id,dir){
+  const i=PORTFOLIOS.findIndex(p=>p.id===id);
+  const j=i+dir;
+  if(i<0||j<0||j>=PORTFOLIOS.length)return;
+  const [moved]=PORTFOLIOS.splice(i,1);
+  PORTFOLIOS.splice(j,0,moved);
+  saveLocal();renderPortSwitcher();
+  if(FB_ACTIVE)fbWrite(userPath('portfolios'),{portfolios:PORTFOLIOS,updatedAt:Date.now()}).catch(e=>console.warn('FB:',e?.message||e));
 }
 
 function togglePortHidden(id){
@@ -5644,6 +5663,12 @@ async function authLogin(){
     USER_ID=key;USER_EMAIL=email;IS_GUEST=false;FB_ACTIVE=true;
     LS.set('st_auth',{uid:key,email,ts:Date.now()});
     await startApp();
+    // WebAuthn credentials are per-device — offer enrollment on THIS device if none exists here
+    setTimeout(async()=>{try{
+      if(!LS.get('st_biometric')&&window.PublicKeyCredential&&await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()){
+        if(confirm('Enable fingerprint / face unlock on this device for faster sign-in?'))registerBiometric();
+      }
+    }catch(e){}},1200);
   }catch(e){showErr('auth-err',e.message);btn.disabled=false;btn.textContent=t('auth_signin');}
 }
 
