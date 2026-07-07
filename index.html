@@ -1323,7 +1323,7 @@ const COLS=["#6366f1","#10b981","#f59e0b","#ef4444","#8b5cf6","#0ea5e9","#ec4899
 const LL=["Searching live markets...","Fetching prices...","Scanning news...","Running analysis...","Almost done..."];
 
 // ── STORAGE ──
-const APP_VERSION='1.13.2';
+const APP_VERSION='1.13.3';
 const LS={
   get:k=>{try{return JSON.parse(localStorage.getItem(k));}catch{return null;}},
   set:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch{}},
@@ -2729,19 +2729,25 @@ function setCurrency(c){
 }
 
 
+// Pin the WebAuthn relying-party ID to the apex domain, so credentials work on both
+// elaks.ai and www.elaks.ai (a hostname mismatch fails AFTER the fingerprint passes).
+function bioRpId(){const hn=location.hostname;return hn.endsWith('elaks.ai')?'elaks.ai':hn;}
+
+let _bioAssertFailed=false; // set when a saved credential fails — triggers a re-enroll offer after password login
+
 async function registerBiometric(){
   if(!window.PublicKeyCredential){toastError('Biometric login not supported on this device.');return;}
   try{
     const challenge=new Uint8Array(32);crypto.getRandomValues(challenge);
     const cred=await navigator.credentials.create({publicKey:{
-      challenge,rp:{name:'ElaksInsights',id:location.hostname},
+      challenge,rp:{name:'ElaksInsights',id:bioRpId()},
       user:{id:new TextEncoder().encode(USER_ID||'guest'),name:USER_EMAIL||'user',displayName:USER_EMAIL||'ElaksInsights User'},
       pubKeyCredParams:[{alg:-7,type:'public-key'},{alg:-257,type:'public-key'}],
       authenticatorSelection:{userVerification:'required'},
       timeout:60000
     }});
     if(cred){
-      LS.set('st_biometric',{credId:btoa(String.fromCharCode(...new Uint8Array(cred.rawId))),uid:USER_ID,email:USER_EMAIL});
+      LS.set('st_biometric',{credId:btoa(String.fromCharCode(...new Uint8Array(cred.rawId))),uid:USER_ID,email:USER_EMAIL,rpId:bioRpId()});
       toastSuccess('Biometric login enabled!');renderProfile();
     }
   }catch(e){
@@ -2756,7 +2762,7 @@ async function loginWithBiometric(){
     const challenge=new Uint8Array(32);crypto.getRandomValues(challenge);
     const credIdArr=Uint8Array.from(atob(saved.credId),c=>c.charCodeAt(0));
     const assertion=await navigator.credentials.get({publicKey:{
-      challenge,allowCredentials:[{id:credIdArr,type:'public-key'}],
+      challenge,rpId:saved.rpId||bioRpId(),allowCredentials:[{id:credIdArr,type:'public-key'}],
       userVerification:'required',timeout:60000
     }});
     if(assertion){
@@ -2765,6 +2771,7 @@ async function loginWithBiometric(){
       await startApp();return true;
     }
   }catch(e){
+    _bioAssertFailed=true;
     if(e.name==='NotAllowedError')toastWarning('Biometric sign-in was cancelled or not accepted on this device. Use "Sign in with password" below.');
     else toastError('Biometric sign-in failed: '+(e.message||e.name)+'. Use password, then re-enable biometrics in Profile.');
     console.warn('Biometric:',e.name,e.message);
@@ -5831,8 +5838,9 @@ async function authLogin(){
     await startApp();
     // WebAuthn credentials are per-device — offer enrollment on THIS device if none exists here
     setTimeout(async()=>{try{
-      if(!LS.get('st_biometric')&&window.PublicKeyCredential&&await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()){
-        if(confirm('Enable fingerprint / face unlock on this device for faster sign-in?'))registerBiometric();
+      if((!LS.get('st_biometric')||_bioAssertFailed)&&window.PublicKeyCredential&&await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()){
+        const q=_bioAssertFailed?'Your saved fingerprint/face unlock stopped working on this device. Re-enable it now (recommended)?':'Enable fingerprint / face unlock on this device for faster sign-in?';
+        if(confirm(q)){_bioAssertFailed=false;registerBiometric();}
       }
     }catch(e){}},1200);
   }catch(e){showErr('auth-err',e.message);btn.disabled=false;btn.textContent=t('auth_signin');}
