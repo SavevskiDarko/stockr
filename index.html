@@ -1323,7 +1323,7 @@ const COLS=["#6366f1","#10b981","#f59e0b","#ef4444","#8b5cf6","#0ea5e9","#ec4899
 const LL=["Searching live markets...","Fetching prices...","Scanning news...","Running analysis...","Almost done..."];
 
 // ── STORAGE ──
-const APP_VERSION='1.13.0';
+const APP_VERSION='1.13.2';
 const LS={
   get:k=>{try{return JSON.parse(localStorage.getItem(k));}catch{return null;}},
   set:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch{}},
@@ -1407,6 +1407,18 @@ async function pushAllToFirebase(){
   await fbWrite(p('sessions'),{sessions:toSave,updatedAt:Date.now()});
 }
 
+// Write the COMPLETE per-user config in one shape, so partial writes can never clobber other keys
+function saveUserConfig(){
+  if(!FB_ACTIVE)return;
+  fbWrite(userPath('config'),{
+    claudeKey:CK,finnhubKey:FK,
+    userTickers:USER_TICKER_MAP,
+    t212Key:T212_KEY,t212Secret:T212_SECRET,t212Env:LS.get('st_t212_env')||'live',
+    polygonKey:POLYGON_KEY,
+    updatedAt:Date.now()
+  }).catch(e=>console.warn('FB config:',e?.message||e));
+}
+
 async function pullFromFirebase(){
   const p=userPath;
   const cfg=await fbRead(p('config'));
@@ -1414,6 +1426,10 @@ async function pullFromFirebase(){
     if(cfg.claudeKey&&!CK){CK=cfg.claudeKey;LS.set('st_ck',CK);}
     if(cfg.finnhubKey&&cfg.finnhubKey!==FK){FK=cfg.finnhubKey;}
     if(cfg.userTickers){USER_TICKER_MAP={...USER_TICKER_MAP,...cfg.userTickers};LS.set('st_user_tickers',USER_TICKER_MAP);}
+    if(cfg.t212Key&&!T212_KEY){T212_KEY=cfg.t212Key;LS.set('st_t212',T212_KEY);}
+    if(cfg.t212Secret&&!T212_SECRET){T212_SECRET=cfg.t212Secret;LS.set('st_t212_secret',T212_SECRET);}
+    if(cfg.t212Env&&!LS.get('st_t212_env')){LS.set('st_t212_env',cfg.t212Env);}
+    if(cfg.polygonKey&&!POLYGON_KEY){POLYGON_KEY=cfg.polygonKey;LS.set('st_polygon',POLYGON_KEY);}
   }
   const portData=await fbRead(p('portfolios'));
   if(portData?.portfolios?.length){
@@ -2983,12 +2999,12 @@ async function syncT212Prices(){
 function savePolygonKey(){
   const val=(document.getElementById('prof-polygon')?.value||'').trim();
   if(!val){toastError('Please enter your Polygon.io API key.');return;}
-  POLYGON_KEY=val;LS.set('st_polygon',POLYGON_KEY);
+  POLYGON_KEY=val;LS.set('st_polygon',POLYGON_KEY);saveUserConfig();
   renderProfile();toastSuccess('Polygon.io connected!');
 }
 
 function setT212Env(env){
-  LS.set('st_t212_env',env);
+  LS.set('st_t212_env',env);saveUserConfig();
   toastSuccess(env==='demo'?'Switched to Demo/Practice account':'Switched to Live account');
   renderProfile();
   setTimeout(()=>{const p=document.getElementById('t212-panel');if(p)p.style.display='block';},10);
@@ -3023,7 +3039,7 @@ function saveT212Key(){
   if(!sec){toastError('Please enter your Trading 212 API Secret too — both are required.');return;}
   const isNew=!T212_KEY;
   T212_KEY=val;LS.set('st_t212',T212_KEY);
-  T212_SECRET=sec;LS.set('st_t212_secret',T212_SECRET);
+  T212_SECRET=sec;LS.set('st_t212_secret',T212_SECRET);saveUserConfig();
   renderProfile();
   // Re-open the panel after re-render
   setTimeout(()=>{
@@ -4105,7 +4121,7 @@ function addUserTickerAlias(from,to){
   if(!from||!to||from===to)return;
   USER_TICKER_MAP[from.toUpperCase()]=to.toUpperCase();
   LS.set('st_user_tickers',USER_TICKER_MAP);
-  if(FB_ACTIVE)fbWrite(userPath('config'),{userTickers:USER_TICKER_MAP,updatedAt:Date.now()}).catch(()=>{});
+  if(FB_ACTIVE)saveUserConfig();
 }
 
 function normalizeTicker(raw){
@@ -4776,12 +4792,15 @@ function showAiPerfModal(){
   const acc=a=>a.length?Math.round((a.filter(p=>oc(p)==='correct').length+a.filter(p=>oc(p)==='partial').length*0.5)/a.length*100)+'%':'—';
   // "Follow the AI" gauge: sum of the day's move in the called direction (not compounded)
   const follow=av.reduce((s,p)=>{const d=dirOf(p);const mv=typeof p.movePct==='number'?p.movePct:0;return s+(d==='BUY'?mv:d==='SELL'?-mv:0);},0);
-  // Per-ticker (min 2 verified)
-  const byT={};av.forEach(p=>{(byT[p.ticker]=byT[p.ticker]||[]).push(p);});
-  const rows=Object.entries(byT).filter(([,a])=>a.length>=2)
-    .map(([t,a])=>({t,n:a.length,acc:Math.round((a.filter(p=>oc(p)==='correct').length+a.filter(p=>oc(p)==='partial').length*0.5)/a.length*100)}))
-    .sort((a,b)=>b.acc-a.acc);
-  const tickerRows=rows.slice(0,8).map(r=>`<div style="display:flex;justify-content:space-between;font-size:12px;padding:4px 0;border-bottom:1px solid var(--b);"><span style="font-weight:800;color:var(--t);">${r.t} <span style="color:var(--t4);font-weight:600;">×${r.n}</span></span><span style="font-weight:800;color:${r.acc>=60?'#16b981':r.acc>=40?'#f7a83c':'#f24d6a'};">${r.acc}%</span></div>`).join('');
+  // Per-ticker — ALL analyzed tickers (verified accuracy + pending count); n=1 marked as small sample
+  const byT={};dailyPredictions.forEach(p=>{(byT[p.ticker]=byT[p.ticker]||[]).push(p);});
+  const rows=Object.entries(byT).map(([t,a])=>{
+    const v=a.filter(p=>p.verified);
+    const pend=a.length-v.length;
+    const acc=v.length?Math.round((v.filter(p=>oc(p)==='correct').length+v.filter(p=>oc(p)==='partial').length*0.5)/v.length*100):null;
+    return {t,n:v.length,pend,acc};
+  }).sort((a,b)=>(b.n-a.n)||((b.acc??-1)-(a.acc??-1)));
+  const tickerRows=rows.map(r=>`<div style="display:flex;justify-content:space-between;font-size:12px;padding:4px 0;border-bottom:1px solid var(--b);"><span style="font-weight:800;color:var(--t);">${r.t} <span style="color:var(--t4);font-weight:600;">×${r.n} verified${r.pend?` · ${r.pend} pending`:''}</span></span><span style="font-weight:800;color:${r.acc==null?'var(--t4)':r.acc>=60?'#16b981':r.acc>=40?'#f7a83c':'#f24d6a'};">${r.acc==null?'—':r.acc+'%'}${r.n===1?'<span style="color:var(--t4);font-weight:600;font-size:10px;"> (n=1)</span>':''}</span></div>`).join('');
   const dots=av.slice(0,14).reverse().map(p=>{const o=oc(p);const col=o==='correct'?'#16b981':o==='partial'?'#f7a83c':'#f24d6a';return `<span title="${p.ticker} ${o}" style="width:12px;height:12px;border-radius:50%;background:${col};display:inline-block;"></span>`;}).join('');
   const fCol=follow>=0?'#16b981':'#f24d6a';
   m.innerHTML=`<div style="background:var(--card);border-radius:20px;max-width:520px;width:100%;max-height:88vh;display:flex;flex-direction:column;box-shadow:var(--sh-lg);overflow:hidden;">
@@ -4800,7 +4819,7 @@ function showAiPerfModal(){
       </div>
       <div style="font-size:10px;color:var(--t4);font-weight:700;margin-bottom:4px;">LAST ${Math.min(av.length,14)} OUTCOMES (oldest → newest)</div>
       <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:14px;">${dots}</div>
-      ${tickerRows?`<div style="font-size:10px;color:var(--t4);font-weight:700;margin-bottom:4px;">BY TICKER (2+ verified)</div>${tickerRows}`:''}
+      ${tickerRows?`<div style="font-size:10px;color:var(--t4);font-weight:700;margin-bottom:4px;">BY TICKER — all analyzed</div>${tickerRows}`:''}
       <div style="font-size:10px;color:var(--t4);margin-top:14px;text-align:center;">Scored by the app against actual OHLC · partials = ½ credit · Educational, not financial advice.</div>
     </div>
   </div>`;
@@ -6133,7 +6152,7 @@ function saveProfileKey(type){
     if(!val.startsWith('sk-ant')){toastError('Claude key must start with sk-ant-...');return;}
     CK=val;LS.set('st_ck',CK);
   }
-  if(FB_ACTIVE)fbWrite(userPath('config'),{claudeKey:CK,finnhubKey:FK,updatedAt:Date.now()}).catch(e=>console.warn('FB:',e?.message||e));
+  if(FB_ACTIVE)saveUserConfig();
   renderProfile();toastSuccess('Saved!');
 }
 
