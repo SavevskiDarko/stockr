@@ -6,7 +6,7 @@
  * IMPORTANT: bump VERSION on EVERY deploy so users get the new code.
  * The old cache is deleted automatically when VERSION changes.
  */
-const VERSION = 'stockr-v1.13.2';
+const VERSION = 'stockr-v1.13.2.1';
 const CACHE = VERSION;
 
 // App shell — the files needed to load the app offline.
