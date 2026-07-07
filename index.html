@@ -1323,7 +1323,7 @@ const COLS=["#6366f1","#10b981","#f59e0b","#ef4444","#8b5cf6","#0ea5e9","#ec4899
 const LL=["Searching live markets...","Fetching prices...","Scanning news...","Running analysis...","Almost done..."];
 
 // ── STORAGE ──
-const APP_VERSION='1.12.2';
+const APP_VERSION='1.13.0';
 const LS={
   get:k=>{try{return JSON.parse(localStorage.getItem(k));}catch{return null;}},
   set:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch{}},
@@ -1779,8 +1779,14 @@ function renderFullChart(portId){
 
   const values=data.map(d=>d.v);
   const first=values[0],last=values[values.length-1];
-  const change=last-first;
-  let changePct=first>0?(change/first*100):0;
+  // Deposit-aware return (Modified Dietz, midpoint): money you added/removed is NOT performance.
+  // Net flows over the window ≈ change in cost basis recorded on each snapshot (dep).
+  const _fd=data[0]?.dep,_ld=data[data.length-1]?.dep;
+  const flows=(typeof _fd==='number'&&typeof _ld==='number')?(_ld-_fd):0;
+  const change=last-first-flows; // true gain excluding net deposits
+  const _denom=first+flows/2;
+  let changePct=_denom>0?(change/_denom*100):0;
+  const depositAdjusted=flows!==0;
   // Safety net: an implausibly large % means corrupt history — suppress rather than show nonsense
   const pctReliable=Math.abs(changePct)<10000;
   if(!pctReliable)changePct=0;
@@ -1792,7 +1798,7 @@ function renderFullChart(portId){
   if(modeBtn)modeBtn.textContent=_chartMode==='percent'?'% RETURN':'$ VALUE';
 
   if(valEl)valEl.textContent=_chartMode==='percent'?(pctReliable?`${isUp?'+':''}${changePct.toFixed(2)}%`:formatCurrency(last)):formatCurrency(last);
-  if(chgEl)chgEl.innerHTML=`<span style="color:${col};font-weight:700;font-size:13px;">${isUp?'↗':'↘'} ${isUp?'+':''}${formatCurrency(Math.abs(change))}${pctReliable?` (${isUp?'+':''}${changePct.toFixed(2)}%)`:''}</span> <span style="color:var(--t4);font-size:11px;">${range.toUpperCase()}</span>`;
+  if(chgEl)chgEl.innerHTML=`<span style="color:${col};font-weight:700;font-size:13px;">${isUp?'↗':'↘'} ${isUp?'+':''}${formatCurrency(Math.abs(change))}${pctReliable?` (${isUp?'+':''}${changePct.toFixed(2)}%)`:''}</span> <span style="color:var(--t4);font-size:11px;">${range.toUpperCase()}${depositAdjusted?' · deposit-adj':''}</span>`;
 
   const ctx=canvas.getContext('2d');
   const dpr=window.devicePixelRatio||1;
@@ -2191,22 +2197,25 @@ function periodReturnsStrip(portId,currentValue){
   if(data.length<2)return ''; // need history
   const now=new Date();
   const daysAgo=n=>{const d=new Date(now);d.setDate(d.getDate()-n);return d.toISOString().split('T')[0];};
-  // Find the snapshot value at-or-before a target date
-  const valueAt=dateStr=>{
+  // Find the snapshot at-or-before a target date (object, so we can deposit-adjust)
+  const snapAt=dateStr=>{
     let best=null;
     for(const s of data){if(s.d<=dateStr)best=s;else break;}
-    return best?best.v:(data[0]?data[0].v:null);
+    return best||data[0]||null;
   };
+  const endDep=data[data.length-1]?.dep;
   const periods=[
-    {label:'Today',from:valueAt(daysAgo(1))},
-    {label:'1W',from:valueAt(daysAgo(7))},
-    {label:'1M',from:valueAt(daysAgo(30))},
-    {label:'1Y',from:valueAt(daysAgo(365))},
-    {label:'All',from:data[0].v}
+    {label:'Today',from:snapAt(daysAgo(1))},
+    {label:'1W',from:snapAt(daysAgo(7))},
+    {label:'1M',from:snapAt(daysAgo(30))},
+    {label:'1Y',from:snapAt(daysAgo(365))},
+    {label:'All',from:data[0]}
   ];
   const cells=periods.map(p=>{
-    if(p.from==null||p.from<=0||currentValue==null)return null;
-    const pct=(currentValue/p.from-1)*100;
+    if(!p.from||p.from.v<=0||currentValue==null)return null;
+    const _fl=(typeof p.from.dep==='number'&&typeof endDep==='number')?(endDep-p.from.dep):0;
+    const _dn=p.from.v+_fl/2;
+    const pct=_dn>0?((currentValue-p.from.v-_fl)/_dn*100):0;
     // Skip periods where the start point equals now (no real data span)
     if(Math.abs(pct)<0.001&&p.label!=='Today')return null;
     const col=pct>=0?'#16b981':'#f24d6a';
@@ -2393,7 +2402,20 @@ function renderPORT(){
     centerH+=chartSection;
     centerH+=periodReturnsStrip(port.id,lT>0?lT:null);
     centerH+=allocationDonut(port.id);
-    centerH+=`<div id="div-card"></div><div id="earn-card"></div>`;
+    // ── LIFETIME P&L: realized + unrealized in one honest number ──
+    if(hasPx){
+      const _rz=(typeof realizedSales!=='undefined'&&Array.isArray(realizedSales)?realizedSales:(LS.get('st_realized')||[])).reduce((s,r)=>s+(Number(r.realized)||0),0);
+      const _lt=_rz+pnl;
+      const _lc=_lt>=0?'#16b981':'#f24d6a';
+      centerH+=`<div style="background:var(--card);border-radius:16px;padding:14px 20px;margin-bottom:12px;box-shadow:var(--sh-sm);">
+        <div style="font-size:11px;font-weight:800;letter-spacing:1px;color:var(--t4);margin-bottom:6px;">🏆 LIFETIME P&L</div>
+        <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;">
+          <div class="sval" style="font-size:24px;font-weight:800;color:${_lc};line-height:1;">${_lt>=0?'+':'-'}$${Math.abs(_lt).toLocaleString('en',{maximumFractionDigits:0})}</div>
+          <div class="sval" style="font-size:12px;color:var(--t3);font-weight:600;">Realized ${_rz>=0?'+':'-'}$${Math.abs(_rz).toLocaleString('en',{maximumFractionDigits:0})} · Unrealized ${pnl>=0?'+':'-'}$${Math.abs(pnl).toLocaleString('en',{maximumFractionDigits:0})}</div>
+        </div>
+      </div>`;
+    }
+    centerH+=`<div id="div-card"></div><div id="earn-card"></div><div id="sector-card"></div>`;
     // Search/filter box (shows when 8+ positions)
     if(posRaw.length>=8){
       centerH+=`<div style="margin-bottom:10px;"><input id="pos-search" oninput="filterPositions(this.value)" placeholder="🔍 Search positions..." class="mob-finp" style="width:100%;" value="${_posSearch||''}"></div>`;
@@ -2462,6 +2484,7 @@ function renderPORT(){
     PORTFOLIOS.forEach(p=>{if(!_activeChartRange[p.id])_activeChartRange[p.id]='1m';renderFullChart(p.id);});
     loadDividendCard(port.id);
     loadEarningsCard();
+    loadSectorCard(port.id);
   },50);
 
   // Restore edit panel if one was open before re-render
@@ -3943,6 +3966,54 @@ async function loadEarningsCard(){
   </div>`;
 }
 
+// ── SECTOR ALLOCATION (Finnhub industry per holding, 30-day cache) ──
+async function loadSectorCard(portId){
+  const el=document.getElementById('sector-card');
+  if(!el)return;
+  const port=PORTFOLIOS.find(p=>p.id===portId)||activePort();
+  const pos=port?.positions||[];
+  if(pos.length<2){el.innerHTML='';return;}
+  const cache=LS.get('st_sector_cache')||{};
+  const now=Date.now(), TTL=30*86400000;
+  const tickers=[...new Set(pos.map(p=>p.ticker))];
+  const need=tickers.filter(t=>!(cache[t]&&now-cache[t].ts<TTL));
+  try{
+    for(let i=0;i<need.length;i+=5){
+      await Promise.all(need.slice(i,i+5).map(async t=>{
+        try{
+          const r=await finnhubFetch(`stock/profile2?symbol=${t}`,8000);
+          const d=r.ok?await r.json():null;
+          cache[t]={sec:d?.finnhubIndustry||'Other',ts:now};
+        }catch(e){cache[t]={sec:'Other',ts:now};}
+      }));
+    }
+    LS.set('st_sector_cache',cache);
+  }catch(e){}
+  // Aggregate market value by sector
+  const bySec={};let total=0;
+  pos.forEach(p=>{
+    const q=PC[p.ticker];const v=p.shares*(q?q.c:p.cost);
+    const sec=cache[p.ticker]?.sec||'Other';
+    bySec[sec]=(bySec[sec]||0)+v;total+=v;
+  });
+  if(total<=0){el.innerHTML='';return;}
+  let rows=Object.entries(bySec).map(([s,v])=>({s,w:v/total*100})).sort((a,b)=>b.w-a.w);
+  if(rows.length<2){el.innerHTML='';return;} // single sector: bar adds nothing
+  const palette=['#5b5bf0','#2bd96e','#f7a83c','#56cfe1','#f78fb3','#8b6cf6','#fbc16a','#94a3b8'];
+  const top=rows.slice(0,7);
+  const other=rows.slice(7).reduce((s,r)=>s+r.w,0);
+  if(other>0)top.push({s:'Other',w:other});
+  const bar=top.map((r,i)=>`<div title="${r.s} ${r.w.toFixed(1)}%" style="width:${r.w}%;background:${palette[i%palette.length]};"></div>`).join('');
+  const legend=top.map((r,i)=>`<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;"><span style="color:var(--t2);font-weight:600;"><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${palette[i%palette.length]};margin-right:7px;"></span>${r.s}</span><span style="color:var(--t);font-weight:800;">${r.w.toFixed(1)}%</span></div>`).join('');
+  const topW=rows[0].w;
+  const warn=topW>60?`<div style="font-size:10px;color:#f7a83c;font-weight:700;margin-top:6px;">⚠ ${topW.toFixed(0)}% in one sector — high concentration</div>`:'';
+  el.innerHTML=`<div style="background:var(--card);border-radius:16px;padding:16px 20px;margin-bottom:12px;box-shadow:var(--sh-sm);">
+    <div style="font-size:11px;font-weight:800;letter-spacing:1px;color:var(--t4);margin-bottom:10px;">🧭 SECTOR ALLOCATION</div>
+    <div style="display:flex;height:10px;border-radius:6px;overflow:hidden;margin-bottom:10px;">${bar}</div>
+    ${legend}${warn}
+  </div>`;
+}
+
 // ── FUNDAMENTALS end ──
 async function anzOne(ticker){
   if(!ticker)return;
@@ -4274,7 +4345,7 @@ function renderDailyHistoryList(){
       const tp=Math.round(v.c/v.t*100);const tc=tp>=60?'#16b981':tp>=40?'#f7a83c':'#f24d6a';
       return `<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:${tc}18;color:${tc};">${tk} ${tp}%</span>`;
     }).join('')}</div>`:'';
-    statsHTML=`<div style="background:linear-gradient(135deg,${col}18,${col}08);border:1px solid ${col}40;border-radius:12px;padding:10px 12px;margin-bottom:10px;">
+    statsHTML=`<div onclick="showAiPerfModal()" style="cursor:pointer;background:linear-gradient(135deg,${col}18,${col}08);border:1px solid ${col}40;border-radius:12px;padding:10px 12px;margin-bottom:10px;">
       <div style="display:flex;align-items:center;justify-content:space-between;">
         <div style="font-size:10px;font-weight:700;color:var(--t3);letter-spacing:1px;">AI ACCURACY</div>
         <div style="font-size:18px;font-weight:800;color:${col};">${pct}%</div>
@@ -4373,6 +4444,10 @@ ${(()=>{
   const buys=av.filter(p=>p.action==='BUY'), sells=av.filter(p=>p.action==='SELL');
   const acc=a=>a.length?Math.round((a.filter(p=>oc(p)==='correct').length+a.filter(p=>oc(p)==='partial').length*0.5)/a.length*100)+'%':'n/a';
   return `GLOBAL CALIBRATION (all tickers, ${av.length} verified): ${Math.round((c+pa*0.5)/av.length*100)}% weighted · ${c} correct / ${pa} partial / ${w} wrong. BUY calls: ${buys.length} (${acc(buys)} acc) · SELL calls: ${sells.length} (${acc(sells)} acc). If one direction dominates with weaker accuracy, correct that systematic bias today.`;
+})()}
+${(()=>{
+  const ls=dailyPredictions.filter(p=>p.verified&&p.lesson).slice(0,6).map(p=>'- '+p.lesson);
+  return ls.length?`RECENT LESSONS (all tickers — do NOT repeat these mistakes today):\n${ls.join('\n')}`:'';
 })()}
 `:`No previous analyses for ${ticker} — establishing baseline.`;
 
@@ -4678,6 +4753,74 @@ function scoreTradeOutcome(p,closePrice,dayHigh,dayLow){
   return {outcome,movePct:parseFloat(movePct.toFixed(2)),haveRange};
 }
 
+// ── AI PERFORMANCE DASHBOARD ──
+function showAiPerfModal(){
+  loadDailyPredictions();
+  const av=dailyPredictions.filter(p=>p.verified);
+  let m=document.getElementById('aiperf-modal');
+  if(!m){
+    m=document.createElement('div');m.id='aiperf-modal';
+    m.style.cssText='position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.6);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:16px;';
+    m.onclick=(e)=>{if(e.target===m)m.remove();};
+    document.body.appendChild(m);
+  }
+  if(!av.length){
+    m.innerHTML=`<div style="background:var(--card);border-radius:20px;padding:32px;max-width:420px;width:100%;box-shadow:var(--sh-lg);"><div style="font-size:16px;font-weight:800;color:var(--t);margin-bottom:8px;">📊 AI Performance</div><div style="font-size:13px;color:var(--t3);margin-bottom:16px;">No verified predictions yet. Generate daily trades and let auto-verify score them — this dashboard fills itself.</div><button class="btn pri" style="width:100%;" onclick="document.getElementById('aiperf-modal').remove()">Close</button></div>`;
+    return;
+  }
+  const oc=p=>p.outcome||(p.correct?'correct':'wrong');
+  const dirOf=p=>(p.action==='BUY'||p.bias==='BUY')?'BUY':(p.action==='SELL'||p.bias==='SELL')?'SELL':'HOLD';
+  const c=av.filter(p=>oc(p)==='correct').length, pa=av.filter(p=>oc(p)==='partial').length, w=av.length-c-pa;
+  const wacc=Math.round((c+pa*0.5)/av.length*100);
+  const buys=av.filter(p=>dirOf(p)==='BUY'), sells=av.filter(p=>dirOf(p)==='SELL');
+  const acc=a=>a.length?Math.round((a.filter(p=>oc(p)==='correct').length+a.filter(p=>oc(p)==='partial').length*0.5)/a.length*100)+'%':'—';
+  // "Follow the AI" gauge: sum of the day's move in the called direction (not compounded)
+  const follow=av.reduce((s,p)=>{const d=dirOf(p);const mv=typeof p.movePct==='number'?p.movePct:0;return s+(d==='BUY'?mv:d==='SELL'?-mv:0);},0);
+  // Per-ticker (min 2 verified)
+  const byT={};av.forEach(p=>{(byT[p.ticker]=byT[p.ticker]||[]).push(p);});
+  const rows=Object.entries(byT).filter(([,a])=>a.length>=2)
+    .map(([t,a])=>({t,n:a.length,acc:Math.round((a.filter(p=>oc(p)==='correct').length+a.filter(p=>oc(p)==='partial').length*0.5)/a.length*100)}))
+    .sort((a,b)=>b.acc-a.acc);
+  const tickerRows=rows.slice(0,8).map(r=>`<div style="display:flex;justify-content:space-between;font-size:12px;padding:4px 0;border-bottom:1px solid var(--b);"><span style="font-weight:800;color:var(--t);">${r.t} <span style="color:var(--t4);font-weight:600;">×${r.n}</span></span><span style="font-weight:800;color:${r.acc>=60?'#16b981':r.acc>=40?'#f7a83c':'#f24d6a'};">${r.acc}%</span></div>`).join('');
+  const dots=av.slice(0,14).reverse().map(p=>{const o=oc(p);const col=o==='correct'?'#16b981':o==='partial'?'#f7a83c':'#f24d6a';return `<span title="${p.ticker} ${o}" style="width:12px;height:12px;border-radius:50%;background:${col};display:inline-block;"></span>`;}).join('');
+  const fCol=follow>=0?'#16b981':'#f24d6a';
+  m.innerHTML=`<div style="background:var(--card);border-radius:20px;max-width:520px;width:100%;max-height:88vh;display:flex;flex-direction:column;box-shadow:var(--sh-lg);overflow:hidden;">
+    <div style="padding:18px 22px;border-bottom:1px solid var(--b);display:flex;align-items:center;justify-content:space-between;">
+      <div style="font-size:16px;font-weight:800;color:var(--t);">📊 AI Performance</div>
+      <button onclick="document.getElementById('aiperf-modal').remove()" style="background:none;border:none;font-size:22px;color:var(--t3);cursor:pointer;line-height:1;">×</button>
+    </div>
+    <div style="padding:18px 22px;overflow-y:auto;">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">
+        <div style="flex:1;min-width:100px;background:var(--bg);border-radius:10px;padding:8px 10px;"><div style="font-size:10px;color:var(--t4);font-weight:700;">WEIGHTED ACCURACY</div><div style="font-size:18px;font-weight:800;color:var(--t);">${wacc}%</div><div style="font-size:10px;color:var(--t4);">${c}✓ · ${pa}◐ · ${w}✗ of ${av.length}</div></div>
+        <div style="flex:1;min-width:100px;background:var(--bg);border-radius:10px;padding:8px 10px;"><div style="font-size:10px;color:var(--t4);font-weight:700;">FOLLOW-THE-AI</div><div style="font-size:18px;font-weight:800;color:${fCol};">${follow>=0?'+':''}${follow.toFixed(1)}%</div><div style="font-size:10px;color:var(--t4);">sum of day moves, not compounded</div></div>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:14px;">
+        <div style="flex:1;background:var(--bg);border-radius:10px;padding:8px 10px;"><div style="font-size:10px;color:var(--t4);font-weight:700;">BUY CALLS</div><div style="font-size:14px;font-weight:800;color:var(--t);">${buys.length} · ${acc(buys)}</div></div>
+        <div style="flex:1;background:var(--bg);border-radius:10px;padding:8px 10px;"><div style="font-size:10px;color:var(--t4);font-weight:700;">SELL CALLS</div><div style="font-size:14px;font-weight:800;color:var(--t);">${sells.length} · ${acc(sells)}</div></div>
+      </div>
+      <div style="font-size:10px;color:var(--t4);font-weight:700;margin-bottom:4px;">LAST ${Math.min(av.length,14)} OUTCOMES (oldest → newest)</div>
+      <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:14px;">${dots}</div>
+      ${tickerRows?`<div style="font-size:10px;color:var(--t4);font-weight:700;margin-bottom:4px;">BY TICKER (2+ verified)</div>${tickerRows}`:''}
+      <div style="font-size:10px;color:var(--t4);margin-top:14px;text-align:center;">Scored by the app against actual OHLC · partials = ½ credit · Educational, not financial advice.</div>
+    </div>
+  </div>`;
+}
+
+// ── LESSON EXTRACTION: one-line diagnosis of WHY a prediction missed (fed back into future prompts) ──
+function makeLesson(p,outcome,close,hi,lo){
+  try{
+    if(outcome==='correct')return '';
+    const t=p.targetNum,s=p.stopLossNum,base=p.priceAtAnalysis;
+    const dir=(p.action==='BUY'||p.bias==='BUY')?'BUY':(p.action==='SELL'||p.bias==='SELL')?'SELL':'HOLD';
+    if(dir==='BUY'&&s!=null&&lo!=null&&lo<=s)return `Stop too tight on ${p.ticker}: day low $${lo.toFixed(2)} tagged stop $${s} before the target could pay`;
+    if(dir==='SELL'&&s!=null&&hi!=null&&hi>=s)return `Stop too tight on ${p.ticker}: day high $${hi.toFixed(2)} tagged stop $${s}`;
+    if(outcome==='partial'&&dir==='BUY'&&t!=null&&hi!=null&&base>0)return `Target too far on ${p.ticker}: needed $${t} (${((t-base)/base*100).toFixed(1)}% in one session), day high was $${hi.toFixed(2)}`;
+    if(outcome==='partial'&&dir==='SELL'&&t!=null&&lo!=null&&base>0)return `Target too far on ${p.ticker}: needed $${t}, day low was $${lo.toFixed(2)}`;
+    if(outcome==='wrong'&&base>0&&close!=null)return `Direction wrong on ${p.ticker}: called ${dir}, price moved ${((close-base)/base*100).toFixed(1)}%`;
+  }catch(e){}
+  return '';
+}
+
 // ── AUTO-VERIFY: fetch a month of daily candles for a ticker (proxy first, then public mirrors) ──
 async function fetchMonthCandles(ticker){
   const sym=TICKER_CACHE[ticker]||ticker;
@@ -4743,7 +4886,7 @@ async function autoVerifyPastPredictions(){
         const c=candleForDate(candles,p.dateKey);
         if(!c)continue;
         const s=scoreTradeOutcome(p,c.c,c.h,c.l);
-        dailyPredictions[i]={...p,verified:true,outcome:s.outcome,correct:s.outcome==='correct',actualClose:c.c,dayHigh:c.h,dayLow:c.l,verifyMethod:'auto-eod',movePct:s.movePct,autoVerified:true};
+        dailyPredictions[i]={...p,verified:true,outcome:s.outcome,correct:s.outcome==='correct',actualClose:c.c,dayHigh:c.h,dayLow:c.l,verifyMethod:'auto-eod',movePct:s.movePct,autoVerified:true,lesson:makeLesson(p,s.outcome,c.c,c.h,c.l)};
         done++;
       }
     }
@@ -4776,7 +4919,7 @@ async function verifyPrediction(idx){
   const s=scoreTradeOutcome(p,closePrice,dayHigh,dayLow);
   const outcome=s.outcome;
 
-  dailyPredictions[idx]={...p,verified:true,outcome,correct:outcome==='correct',actualClose:closePrice,dayHigh,dayLow,verifyMethod:s.haveRange?'intraday':'close',movePct:s.movePct};
+  dailyPredictions[idx]={...p,verified:true,outcome,correct:outcome==='correct',actualClose:closePrice,dayHigh,dayLow,verifyMethod:s.haveRange?'intraday':'close',movePct:s.movePct,lesson:makeLesson(p,outcome,closePrice,dayHigh,dayLow)};
   saveDailyPredictions();
   renderDailyHistoryList();
   showDailyReport(idx);
@@ -5747,7 +5890,7 @@ function clearAllLocalData(){
   // (Device/UI prefs like dark mode, language, currency are intentionally NOT cleared.)
   ['st_ck','st_portfolios','st_watch','st_sessions','st_active_port','st_ticker_cache','st_auth',
    'st_alerts','st_daily','st_marketpreps','st_realized','st_reports','st_snapshots','st_user_tickers',
-   'st_t212','st_t212_secret','st_polygon','st_realized','st_div_cache','st_earn_cache'].forEach(k=>LS.del(k));
+   'st_t212','st_t212_secret','st_polygon','st_realized','st_div_cache','st_earn_cache','st_sector_cache'].forEach(k=>LS.del(k));
   CK='';FK=APP_FK;T212_KEY='';T212_SECRET='';POLYGON_KEY='';PORTFOLIOS=[];WATCH=[];sessions=[];curId=null;MSGS=[];PC={};ACTIVE_PORT_ID='';
   if(typeof dailyPredictions!=='undefined')dailyPredictions=[];
   if(typeof marketPreps!=='undefined')marketPreps=[];
