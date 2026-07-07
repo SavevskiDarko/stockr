@@ -6,7 +6,7 @@
  * IMPORTANT: bump VERSION on EVERY deploy so users get the new code.
  * The old cache is deleted automatically when VERSION changes.
  */
-const VERSION = 'stockr-v1.13.0';
+const VERSION = 'stockr-v1.13.2';
 const CACHE = VERSION;
 
 // App shell — the files needed to load the app offline.
@@ -85,4 +85,3 @@ self.addEventListener('fetch', (e) => {
 self.addEventListener('message', (e) => {
   if (e.data === 'skipWaiting') self.skipWaiting();
 });
-
