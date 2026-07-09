@@ -2,6 +2,8 @@
   "$schema": "https://unpkg.com/wrangler/config-schema.json",
   "name": "stockr",
   "compatibility_date": "2026-07-07",
-  "assets": { "directory": "." },
+  "main": "src/push-worker.js",
+  "assets": { "directory": ".", "binding": "ASSETS" },
+  "triggers": { "crons": ["*/10 * * * *"] },
   "observability": { "enabled": true }
 }

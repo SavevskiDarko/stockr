@@ -1323,7 +1323,7 @@ const COLS=["#6366f1","#10b981","#f59e0b","#ef4444","#8b5cf6","#0ea5e9","#ec4899
 const LL=["Searching live markets...","Fetching prices...","Scanning news...","Running analysis...","Almost done..."];
 
 // ── STORAGE ──
-const APP_VERSION='1.13.3';
+const APP_VERSION='1.14.0';
 const LS={
   get:k=>{try{return JSON.parse(localStorage.getItem(k));}catch{return null;}},
   set:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch{}},
@@ -2728,6 +2728,92 @@ function setCurrency(c){
   fetchFXRates().then(()=>{renderPORT();renderWATCH();renderProfile();});
 }
 
+
+// ── FULL BACKUP / RESTORE ──
+const BACKUP_KEYS=['st_portfolios','st_watch','st_snapshots','st_daily','st_marketpreps','st_reports','st_realized','st_alerts','st_user_tickers','st_sessions','st_active_port','st_model','st_currency','st_lang','st_dark','st_t212_env','st_move_alerts'];
+function exportBackup(){
+  const data={_app:'ElaksInsights',_v:APP_VERSION,_ts:Date.now(),_user:USER_EMAIL||'guest'};
+  BACKUP_KEYS.forEach(k=>{const v=LS.get(k);if(v!=null)data[k]=v;});
+  // API keys included so a restore is complete — the file itself must be stored safely
+  data._keys={claudeKey:CK,finnhubKey:FK,t212Key:T212_KEY,t212Secret:T212_SECRET,polygonKey:POLYGON_KEY};
+  const blob=new Blob([JSON.stringify(data,null,1)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='elaksinsights-backup-'+new Date().toISOString().split('T')[0]+'.json';
+  a.click();URL.revokeObjectURL(a.href);
+  toastSuccess('💾 Backup downloaded — keep it somewhere safe (it contains your API keys).');
+}
+function importBackup(inp){
+  const f=inp.files?.[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=()=>{
+    try{
+      const d=JSON.parse(r.result);
+      if(d._app!=='ElaksInsights')throw new Error('Not an ElaksInsights backup file.');
+      if(!confirm(`Restore backup from ${new Date(d._ts).toLocaleString()} (${d._user})?\nThis REPLACES the data on this device for the current account.`))return;
+      BACKUP_KEYS.forEach(k=>{if(d[k]!=null)LS.set(k,d[k]);});
+      if(d._keys){
+        if(d._keys.claudeKey){CK=d._keys.claudeKey;LS.set('st_ck',CK);}
+        if(d._keys.t212Key){T212_KEY=d._keys.t212Key;LS.set('st_t212',T212_KEY);}
+        if(d._keys.t212Secret){T212_SECRET=d._keys.t212Secret;LS.set('st_t212_secret',T212_SECRET);}
+        if(d._keys.polygonKey){POLYGON_KEY=d._keys.polygonKey;LS.set('st_polygon',POLYGON_KEY);}
+      }
+      toastSuccess('✓ Backup restored — reloading…');
+      setTimeout(()=>location.reload(),900);
+    }catch(e){toastError('Restore failed: '+e.message);}
+  };
+  r.readAsText(f);
+}
+
+// ── PUSH NOTIFICATIONS (real web push via the site Worker cron) ──
+const VAPID_PUBLIC='BBNxXzgIrc3nd5X76uEz8AfLd6k_kdjh1y6YV3oX-hPJ_22MKyZdhwIyjRLOvqSJudU05gk1oF9ImKEWo5iAFQk';
+function _b64uToU8(s){const p=s.replace(/-/g,'+').replace(/_/g,'/');const b=atob(p+'='.repeat((4-p.length%4)%4));return Uint8Array.from(b,c=>c.charCodeAt(0));}
+async function enablePush(){
+  try{
+    if(!('serviceWorker' in navigator)||!('PushManager' in window)){toastError('Push not supported on this device/browser.');return;}
+    const perm=await Notification.requestPermission();
+    if(perm!=='granted'){toastWarning('Notifications were not allowed.');return;}
+    const reg=await navigator.serviceWorker.ready;
+    const sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:_b64uToU8(VAPID_PUBLIC)});
+    // Save to a fixed registry doc the Worker cron reads (read-modify-write merge)
+    const registry=(await fbRead('stockr_push/registry').catch(()=>null))||{users:{}};
+    const uid=USER_ID||'guest';
+    const u=registry.users[uid]||{subs:[],email:USER_EMAIL};
+    const j=sub.toJSON();
+    if(!u.subs.some(s=>s.endpoint===j.endpoint))u.subs.push(j);
+    u.email=USER_EMAIL;u.moveAlerts=LS.get('st_move_alerts')!==false;
+    registry.users[uid]=u;
+    await fbWrite('stockr_push/registry',registry);
+    LS.set('st_push_on',true);
+    toastSuccess('🔔 Push enabled on this device! Alerts + big moves (±5%/±10%) will notify you.');
+    renderProfile();
+  }catch(e){toastError('Push setup failed: '+(e.message||e.name));}
+}
+async function disablePush(){
+  try{
+    const reg=await navigator.serviceWorker.ready;
+    const sub=await reg.pushManager.getSubscription();
+    if(sub){
+      const registry=(await fbRead('stockr_push/registry').catch(()=>null));
+      if(registry?.users?.[USER_ID||'guest']){
+        registry.users[USER_ID||'guest'].subs=(registry.users[USER_ID||'guest'].subs||[]).filter(s=>s.endpoint!==sub.endpoint);
+        await fbWrite('stockr_push/registry',registry);
+      }
+      await sub.unsubscribe();
+    }
+    LS.set('st_push_on',false);
+    toastSuccess('Push disabled on this device.');renderProfile();
+  }catch(e){toastError('Failed: '+e.message);}
+}
+function toggleMoveAlerts(on){
+  LS.set('st_move_alerts',on);
+  // sync preference into the registry so the Worker respects it
+  fbRead('stockr_push/registry').then(reg=>{
+    if(reg?.users?.[USER_ID||'guest']){reg.users[USER_ID||'guest'].moveAlerts=on;return fbWrite('stockr_push/registry',reg);}
+  }).catch(()=>{});
+  toastSuccess(on?'±5% / ±10% move alerts ON':'Move alerts OFF');
+  renderProfile();
+}
 
 // Pin the WebAuthn relying-party ID to the apex domain, so credentials work on both
 // elaks.ai and www.elaks.ai (a hostname mismatch fails AFTER the fingerprint passes).
@@ -6097,6 +6183,24 @@ function renderProfile(){
   }
 
   // ── Trading 212 ──
+  html+=`<div style="font-size:10px;font-weight:700;color:var(--t3);letter-spacing:2px;margin:14px 2px 8px;">NOTIFICATIONS & BACKUP</div>`;
+  html+=`<div style="background:var(--card);border:1px solid var(--b);border-radius:var(--rad);padding:16px;margin-bottom:12px;box-shadow:var(--sh-sm);">
+    <div style="font-size:14px;font-weight:800;color:var(--t);margin-bottom:4px;">🔔 Push Notifications</div>
+    <div style="font-size:12px;color:var(--t3);margin-bottom:10px;">Price alerts + automatic ±5% / ±10% daily-move alerts for your watchlist — even when the app is closed. Checked every ~10 min during US market hours.</div>
+    ${LS.get('st_push_on')?`<button class="btn" style="width:100%;background:var(--rl);color:var(--r);border:1px solid var(--r);" onclick="disablePush()">Disable push on this device</button>`:`<button class="btn pri" style="width:100%;" onclick="enablePush()">Enable push on this device</button>`}
+    <label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12px;color:var(--t2);font-weight:600;cursor:pointer;">
+      <input type="checkbox" ${LS.get('st_move_alerts')!==false?'checked':''} onchange="toggleMoveAlerts(this.checked)"> Big-move alerts (±5% and ±10%) for watchlist stocks
+    </label>
+  </div>`;
+  html+=`<div style="background:var(--card);border:1px solid var(--b);border-radius:var(--rad);padding:16px;margin-bottom:12px;box-shadow:var(--sh-sm);">
+    <div style="font-size:14px;font-weight:800;color:var(--t);margin-bottom:4px;">💾 Backup & Restore</div>
+    <div style="font-size:12px;color:var(--t3);margin-bottom:10px;">Everything: portfolios, snapshots, predictions, reports, lessons, settings and API keys — one file. Store it safely.</div>
+    <div style="display:flex;gap:8px;">
+      <button class="btn pri" style="flex:1;" onclick="exportBackup()">⬇ Backup</button>
+      <button class="btn" style="flex:1;border:1px solid var(--b2);" onclick="document.getElementById('restore-file').click()">⬆ Restore</button>
+      <input type="file" id="restore-file" accept=".json" style="display:none;" onchange="importBackup(this)">
+    </div>
+  </div>`;
   html+=`<div style="font-size:10px;font-weight:700;color:var(--t3);letter-spacing:2px;margin:14px 2px 8px;">BROKER INTEGRATION</div>`;
   
   html+=`<div style="background:var(--card);border-radius:14px;overflow:hidden;margin-bottom:10px;box-shadow:var(--sh-sm);">

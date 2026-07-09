@@ -6,7 +6,7 @@
  * IMPORTANT: bump VERSION on EVERY deploy so users get the new code.
  * The old cache is deleted automatically when VERSION changes.
  */
-const VERSION = 'stockr-v1.13.3';
+const VERSION = 'stockr-v1.14.0';
 const CACHE = VERSION;
 
 // App shell — the files needed to load the app offline.
@@ -84,4 +84,56 @@ self.addEventListener('fetch', (e) => {
 // Allow the page to trigger an immediate update
 self.addEventListener('message', (e) => {
   if (e.data === 'skipWaiting') self.skipWaiting();
+});
+
+// ═══ PUSH NOTIFICATIONS ═══
+// Pushes arrive with NO payload (v1 keeps encryption out of the Worker).
+// On push, we fetch the latest alert messages the Worker wrote to Firestore and show them.
+const FB_PID = 'stockr-app-65c0e';
+const FB_KEY = 'AIzaSyBOgX2B9euy64XMO7gBfHWvWctN74Wt2Tc';
+
+async function fetchLatestPushMessages() {
+  try {
+    const r = await fetch(`https://firestore.googleapis.com/v1/projects/${FB_PID}/databases/(default)/documents/stockr_push/latest?key=${FB_KEY}`, { cache: 'no-store' });
+    if (!r.ok) return null;
+    const doc = await r.json();
+    const raw = doc?.fields?.d?.stringValue;
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    // only show messages from the last 20 minutes (avoid replaying stale ones)
+    if (Date.now() - (data.ts || 0) > 20 * 60 * 1000) return null;
+    return data.messages || null;
+  } catch (e) { return null; }
+}
+
+self.addEventListener('push', (e) => {
+  e.waitUntil((async () => {
+    const msgs = await fetchLatestPushMessages();
+    if (msgs && msgs.length) {
+      // group into one notification if several fired together
+      const title = msgs.length === 1 ? msgs[0].title : `📈 ${msgs.length} price alerts`;
+      const body  = msgs.map(m => m.body).join('\n');
+      await self.registration.showNotification(title, {
+        body, icon: '/icon-192.png', badge: '/icon-192.png',
+        tag: 'elaks-price-alert', renotify: true,
+        data: { url: '/' }
+      });
+    } else {
+      await self.registration.showNotification('📈 ElaksInsights', {
+        body: 'A price alert triggered — tap to view.',
+        icon: '/icon-192.png', badge: '/icon-192.png',
+        tag: 'elaks-price-alert', renotify: true,
+        data: { url: '/' }
+      });
+    }
+  })());
+});
+
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  e.waitUntil((async () => {
+    const all = await clients.matchAll({ type: 'window', includeUncontrolled: true });
+    for (const c of all) { if ('focus' in c) return c.focus(); }
+    return clients.openWindow('/');
+  })());
 });
