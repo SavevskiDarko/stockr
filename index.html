@@ -1935,6 +1935,7 @@ async function startApp(){
   initUI();
   startRegimeBar();
   setTimeout(autoVerifyPastPredictions,2500); // score yesterday's predictions vs their day's OHLC
+  setTimeout(()=>syncT212Portfolio(false),3500); // reconcile linked portfolio with actual T212 positions
 
   // If Firebase already connected (login flow set it up)
   if(FB_ACTIVE && USER_ID){
@@ -3087,6 +3088,67 @@ async function syncT212Prices(){
     }
   });
   if(updated>0){renderPORT();renderWATCH();toastSuccess(`✓ Prices updated from Trading 212 (${updated} stocks)`);}
+}
+
+// ── T212 POSITION SYNC: make the linked portfolio mirror the actual broker account ──
+// Adds new buys, updates share counts / avg costs, and records sells into realized P&L.
+async function syncT212Portfolio(manual=false){
+  if(!T212_KEY)return;
+  let port=PORTFOLIOS.find(p=>p.t212);
+  if(!port)port=PORTFOLIOS.find(p=>/trading\s*212/i.test(p.name||''));
+  if(!port){if(manual)toastWarning('No portfolio linked to Trading 212 — import positions first or name one "Trading 212".');return;}
+  port.t212=true; // stamp the link so future syncs are unambiguous
+  const btn=document.getElementById('t212-sync-pos-btn');
+  if(btn){btn.disabled=true;btn.textContent='⟳ Syncing…';}
+  const positions=await fetchT212Positions();
+  if(btn){btn.disabled=false;btn.textContent='↻ Sync Positions';}
+  if(!positions){if(manual)toastError('Could not reach Trading 212.');return;}
+  const live={};
+  positions.forEach(p=>{
+    const raw=p.ticker||p.instrument?.ticker||'';
+    const tk=t212Ticker(raw);
+    if(!tk)return;
+    live[tk]={shares:parseFloat((p.quantity||0).toFixed(6)),cost:parseFloat((p.averagePricePaid||0).toFixed(4)),cur:p.currentPrice||null};
+    if(p.currentPrice>0){const c=p.currentPrice,pc=p.averagePricePaid||c;PC[tk]={c,d:c-pc,dp:pc>0?((c-pc)/pc)*100:0,h:c,l:c,pc,src:'t212',currency:p.instrument?.currency||'USD'};}
+  });
+  const added=[],updated=[],sold=[];
+  loadRealized();
+  const sellEntry=(ticker,qty,cost,px)=>realizedSales.unshift({ticker,shares:qty,cost,sellPrice:parseFloat(px.toFixed(4)),realized:parseFloat(((px-cost)*qty).toFixed(2)),pct:cost>0?parseFloat(((px/cost-1)*100).toFixed(2)):0,date:new Date().toISOString().split('T')[0],src:'t212-sync',approx:true});
+  port.positions=port.positions.filter(pos=>{
+    const lv=live[pos.ticker];
+    if(!lv||lv.shares<=0){ // fully sold on the broker
+      sellEntry(pos.ticker,pos.shares,pos.cost,(PC[pos.ticker]?.c)||pos.cost);
+      sold.push(pos.ticker);
+      return false;
+    }
+    if(lv.shares<pos.shares-0.000001){ // partial sell
+      sellEntry(pos.ticker,pos.shares-lv.shares,pos.cost,(PC[pos.ticker]?.c)||lv.cur||pos.cost);
+      sold.push(pos.ticker+' (part)');
+      pos.shares=lv.shares;pos.cost=lv.cost;updated.push(pos.ticker);
+    }else if(lv.shares>pos.shares+0.000001||Math.abs(lv.cost-pos.cost)>0.0001){ // bought more / avg cost moved
+      pos.shares=lv.shares;pos.cost=lv.cost;updated.push(pos.ticker);
+    }
+    return true;
+  });
+  Object.entries(live).forEach(([tk,lv])=>{ // new buys
+    if(lv.shares>0&&lv.cost>0&&!port.positions.some(p=>p.ticker===tk)){
+      port.positions.push({ticker:tk,shares:lv.shares,cost:lv.cost});
+      added.push(tk);
+    }
+  });
+  if(added.length||updated.length||sold.length){
+    if(sold.length)saveRealized();
+    saveLocal();
+    if(FB_ACTIVE)fbWrite(userPath('portfolios'),{portfolios:PORTFOLIOS,updatedAt:Date.now()}).catch(()=>{});
+    renderPortSwitcher();renderPORT();
+    const parts=[];
+    if(added.length)parts.push('+'+added.join(', '));
+    if(sold.length)parts.push('sold '+sold.join(', '));
+    if(updated.length&&!sold.length)parts.push(updated.length+' updated');
+    toastSuccess('↻ T212 synced: '+parts.join(' · '));
+  }else if(manual){
+    toastSuccess('✓ Portfolio already matches Trading 212.');
+  }
 }
 
 function savePolygonKey(){
@@ -6224,7 +6286,7 @@ function renderProfile(){
         <button onclick="saveT212Key()" class="mob-add-btn" style="font-size:12px;padding:11px;flex:1;">${T212_KEY?'Update Key':'Connect T212'}</button>
         ${T212_KEY?'<button onclick="removeT212Key()" style="background:#fee2e2;border:none;color:#b91c1c;font-size:12px;font-weight:700;padding:11px 14px;border-radius:12px;cursor:pointer;font-family:inherit;">Remove</button>':''}
       </div>
-      ${T212_KEY?'<div style="display:flex;gap:8px;"><button id=\"t212-import-btn\" onclick="importFromT212()" style="flex:1;background:linear-gradient(135deg,#10b981,#059669);border:none;color:#fff;font-size:12px;font-weight:700;padding:11px;border-radius:12px;cursor:pointer;font-family:inherit;">⬇ Import Positions</button><button onclick="syncT212Prices()" style="flex:1;background:#f0f4ff;border:none;color:#6366f1;font-size:12px;font-weight:700;padding:11px;border-radius:12px;cursor:pointer;font-family:inherit;">🔄 Sync Prices</button></div>':''}
+      ${T212_KEY?'<div style="display:flex;gap:8px;"><button id=\"t212-import-btn\" onclick="importFromT212()" style="flex:1;background:linear-gradient(135deg,#10b981,#059669);border:none;color:#fff;font-size:12px;font-weight:700;padding:11px;border-radius:12px;cursor:pointer;font-family:inherit;">⬇ Import Positions</button><button id=\\"t212-sync-pos-btn\\" onclick="syncT212Portfolio(true)" style="flex:1;background:var(--pl);border:none;color:var(--p);font-size:12px;font-weight:700;padding:11px;border-radius:12px;cursor:pointer;font-family:inherit;">↻ Sync Positions</button><button onclick="syncT212Prices()" style="flex:1;background:var(--pl);border:none;color:var(--p);font-size:12px;font-weight:700;padding:11px;border-radius:12px;cursor:pointer;font-family:inherit;">🔄 Sync Prices</button></div>':''}
     </div>
   </div>`;
 
