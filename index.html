@@ -1323,7 +1323,7 @@ const COLS=["#6366f1","#10b981","#f59e0b","#ef4444","#8b5cf6","#0ea5e9","#ec4899
 const LL=["Searching live markets...","Fetching prices...","Scanning news...","Running analysis...","Almost done..."];
 
 // ── STORAGE ──
-const APP_VERSION='1.15.0';
+const APP_VERSION='1.15.1';
 const LS={
   get:k=>{try{return JSON.parse(localStorage.getItem(k));}catch{return null;}},
   set:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch{}},
@@ -2346,9 +2346,17 @@ function renderPORT(){
   let pos=posAll;
   if(_posSearch){pos=posAll.filter(p=>p.ticker.toLowerCase().includes(_posSearch.toLowerCase()));}
   const tot=posAll.reduce((s,p)=>s+p.shares*p.cost,0);
-  let lT=0,lC=0;
-  posAll.forEach(p=>{const q=PC[p.ticker];if(q){lT+=p.shares*q.c;lC+=p.shares*p.cost;}});
-  const pnl=lT-lC,pnlP=lC>0?pnl/lC*100:0,hasPx=lT>0;
+  // Value EVERY position: priced ones at market, unpriced ones at cost (0 gain — unknown, not omitted).
+  // This keeps DEPOSIT + P&L = TOTAL ACCOUNT exact. lcPriced is the honest denominator for the % .
+  let lT=0,lC=0,lcPriced=0,nPriced=0,nUnpriced=0;
+  posAll.forEach(p=>{
+    const q=PC[p.ticker];
+    const c=p.shares*p.cost;
+    lC+=c;
+    if(q){lT+=p.shares*q.c;lcPriced+=c;nPriced++;}
+    else{lT+=c;nUnpriced++;}
+  });
+  const pnl=lT-lC,pnlP=lcPriced>0?pnl/lcPriced*100:0,hasPx=nPriced>0;
 
   // ── Left panel (desktop only): name + add form ──
   const desktopAddForm=`
@@ -2390,11 +2398,13 @@ function renderPORT(){
     <div class="sc2" style="background:${hasPx?(pnl>=0?'#ecfdf5':'#fef2f2'):'#f8fafc'};border-color:${hasPx?(pnl>=0?'#a7f3d0':'#fecaca'):'#e2e8f0'}">
       <div class="slbl" style="color:${hasPx?(pnl>=0?'#10b981':'#ef4444'):'#94a3b8'}">UNREALIZED P&L</div>
       <div class="sval ${hasPx?(pnl>=0?'up':'dn'):''}">${hasPx?(pnl>=0?'+':'-')+'$'+Math.abs(pnl).toLocaleString('en',{maximumFractionDigits:0})+' ('+fpct(pnlP)+')':'—'}</div>
+      ${nUnpriced>0&&hasPx?`<div style="font-size:10px;color:var(--t4);margin-top:2px">on ${nPriced} priced position${nPriced>1?'s':''}</div>`:''}
     </div>
     <div class="sc2" style="background:#ecfdf5;border-color:#a7f3d0"><div class="slbl" style="color:#10b981">POSITIONS</div><div class="sval" style="color:#047857">${pos.length}</div></div>
     <div class="sc2" style="background:var(--al);border-color:var(--a)"><div class="slbl" style="color:#f59e0b">TOP HOLDING</div><div class="sval" style="color:var(--a)">${top?.ticker||'—'}</div></div>
     <div class="sc2" style="background:var(--gl);border-color:var(--g);cursor:pointer" onclick="promptSetCash('${port.id}')"><div class="slbl" style="color:var(--g)">CASH · FREE FUNDS</div><div class="sval" style="color:var(--g)">${port.cash!=null?'$'+Number(port.cash).toLocaleString('en',{maximumFractionDigits:0}):'—'}</div><div style="font-size:10px;color:var(--t4);margin-top:2px">${port.cash!=null&&!port.cashManual?'from Trading 212':'tap to set ↗'}</div></div>
-    <div class="sc2" style="background:var(--pl);border-color:var(--pl2)"><div class="slbl" style="color:var(--p)">TOTAL ACCOUNT</div><div class="sval" style="color:var(--p)">${hasPx?'$'+(lT+(Number(port.cash)||0)).toLocaleString('en',{maximumFractionDigits:0}):'—'}</div><div style="font-size:10px;color:var(--t4);margin-top:2px">stocks + cash</div></div>
+    ${nUnpriced>0?`<div class="sc2" style="grid-column:1/-1;background:var(--al);border-color:var(--a);cursor:pointer" onclick="refresh('p')"><div class="slbl" style="color:var(--a)">⚠ ${nUnpriced} OF ${posAll.length} POSITIONS HAVE NO LIVE PRICE</div><div style="font-size:11px;color:var(--t3);margin-top:3px;font-weight:600">They're valued at cost, so gains on them are unknown. Tap to retry prices, or fix the ticker symbol.</div></div>`:''}
+    <div class="sc2" style="background:var(--pl);border-color:var(--pl2)"><div class="slbl" style="color:var(--p)">TOTAL ACCOUNT</div><div class="sval" style="color:var(--p)">${hasPx?'$'+(lT+(Number(port.cash)||0)).toLocaleString('en',{maximumFractionDigits:0}):'—'}</div><div style="font-size:10px;color:var(--t4);margin-top:2px">${nUnpriced>0?nUnpriced+' valued at cost':'stocks + cash'}</div></div>
   </div>`:'';
   // Desktop: analyze + delete inside right panel. Mobile: sticky bar + ⋯ menu
   const chartSection=pos.length?portfolioChartCard(port.id):'';
