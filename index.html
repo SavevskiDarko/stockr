@@ -1323,7 +1323,7 @@ const COLS=["#6366f1","#10b981","#f59e0b","#ef4444","#8b5cf6","#0ea5e9","#ec4899
 const LL=["Searching live markets...","Fetching prices...","Scanning news...","Running analysis...","Almost done..."];
 
 // ── STORAGE ──
-const APP_VERSION='1.15.1';
+const APP_VERSION='1.16.0';
 const LS={
   get:k=>{try{return JSON.parse(localStorage.getItem(k));}catch{return null;}},
   set:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch{}},
@@ -2166,8 +2166,8 @@ function switchPort(id){
   renderPortSwitcher();renderPORT();
 }
 
-function createPortfolio(){
-  const name=prompt('Portfolio name:','New Portfolio');
+async function createPortfolio(){
+  const name=await showInputModal({title:'➕ New portfolio',sub:'Name it — you can rename it later.',value:'New Portfolio',placeholder:'Portfolio name',confirmLabel:'Create'});
   if(!name)return;
   const p={id:'p_'+Date.now(),name:name.trim(),positions:[]};
   PORTFOLIOS.push(p);ACTIVE_PORT_ID=p.id;
@@ -2742,6 +2742,67 @@ function setCurrency(c){
 }
 
 
+// ── IN-APP DIALOGS (replace native prompt()/confirm(), which leak the worker URL) ──
+function _closeAppModal(){const m=document.getElementById('app-modal');if(m)m.remove();}
+function _appModalShell(){
+  _closeAppModal();
+  const m=document.createElement('div');
+  m.id='app-modal';
+  m.style.cssText='position:fixed;inset:0;z-index:10001;background:rgba(0,0,0,0.6);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:18px;';
+  document.body.appendChild(m);
+  return m;
+}
+// Returns the entered string, or null if cancelled
+function showInputModal({title,sub,value='',placeholder='',type='text',inputmode='',confirmLabel='Save'}){
+  return new Promise(resolve=>{
+    const m=_appModalShell();
+    m.innerHTML=`<div style="background:var(--card);border-radius:20px;padding:22px;max-width:420px;width:100%;box-shadow:var(--sh-lg);">
+      <div id="am-title" style="font-size:16px;font-weight:800;color:var(--t);"></div>
+      <div id="am-sub" style="font-size:12px;color:var(--t3);margin-top:4px;line-height:1.5;"></div>
+      <input id="am-field" type="${type}" ${inputmode?`inputmode="${inputmode}"`:''} placeholder="" style="width:100%;margin-top:14px;background:var(--bg);border:1.5px solid var(--b2);border-radius:12px;padding:12px 14px;font-size:15px;font-weight:600;color:var(--t);font-family:inherit;outline:none;box-sizing:border-box;">
+      <div style="display:flex;gap:8px;margin-top:16px;">
+        <button id="am-cancel" style="flex:1;background:none;border:1.5px solid var(--b2);color:var(--t2);font-size:13px;font-weight:700;padding:12px;border-radius:12px;cursor:pointer;font-family:inherit;">Cancel</button>
+        <button id="am-ok" style="flex:1;background:var(--p);border:none;color:#fff;font-size:13px;font-weight:700;padding:12px;border-radius:12px;cursor:pointer;font-family:inherit;"></button>
+      </div>
+    </div>`;
+    // textContent for anything user/data-derived — no HTML injection
+    m.querySelector('#am-title').textContent=title||'';
+    m.querySelector('#am-sub').textContent=sub||'';
+    const f=m.querySelector('#am-field');
+    f.value=value==null?'':String(value);
+    f.placeholder=placeholder||'';
+    m.querySelector('#am-ok').textContent=confirmLabel;
+    const done=v=>{_closeAppModal();resolve(v);};
+    m.querySelector('#am-ok').onclick=()=>done(f.value);
+    m.querySelector('#am-cancel').onclick=()=>done(null);
+    m.onclick=e=>{if(e.target===m)done(null);};
+    f.onkeydown=e=>{if(e.key==='Enter')done(f.value);if(e.key==='Escape')done(null);};
+    setTimeout(()=>{f.focus();f.select();},40);
+  });
+}
+// Returns true / false
+function showConfirmModal({title,sub,confirmLabel='Confirm',danger=false}){
+  return new Promise(resolve=>{
+    const m=_appModalShell();
+    m.innerHTML=`<div style="background:var(--card);border-radius:20px;padding:22px;max-width:420px;width:100%;box-shadow:var(--sh-lg);">
+      <div id="am-title" style="font-size:16px;font-weight:800;color:var(--t);"></div>
+      <div id="am-sub" style="font-size:12px;color:var(--t3);margin-top:6px;line-height:1.55;white-space:pre-line;"></div>
+      <div style="display:flex;gap:8px;margin-top:18px;">
+        <button id="am-cancel" style="flex:1;background:none;border:1.5px solid var(--b2);color:var(--t2);font-size:13px;font-weight:700;padding:12px;border-radius:12px;cursor:pointer;font-family:inherit;">Cancel</button>
+        <button id="am-ok" style="flex:1;background:${danger?'var(--r)':'var(--p)'};border:none;color:#fff;font-size:13px;font-weight:700;padding:12px;border-radius:12px;cursor:pointer;font-family:inherit;"></button>
+      </div>
+    </div>`;
+    m.querySelector('#am-title').textContent=title||'';
+    m.querySelector('#am-sub').textContent=sub||'';
+    m.querySelector('#am-ok').textContent=confirmLabel;
+    const done=v=>{_closeAppModal();resolve(v);};
+    m.querySelector('#am-ok').onclick=()=>done(true);
+    m.querySelector('#am-cancel').onclick=()=>done(false);
+    m.onclick=e=>{if(e.target===m)done(false);};
+    document.addEventListener('keydown',function esc(e){if(e.key==='Escape'){document.removeEventListener('keydown',esc);done(false);}});
+  });
+}
+
 // ── FULL BACKUP / RESTORE ──
 const BACKUP_KEYS=['st_portfolios','st_watch','st_snapshots','st_daily','st_marketpreps','st_reports','st_realized','st_alerts','st_user_tickers','st_sessions','st_active_port','st_model','st_currency','st_lang','st_dark','st_t212_env','st_move_alerts'];
 function exportBackup(){
@@ -2759,11 +2820,11 @@ function exportBackup(){
 function importBackup(inp){
   const f=inp.files?.[0];if(!f)return;
   const r=new FileReader();
-  r.onload=()=>{
+  r.onload=async()=>{
     try{
       const d=JSON.parse(r.result);
       if(d._app!=='ElaksInsights')throw new Error('Not an ElaksInsights backup file.');
-      if(!confirm(`Restore backup from ${new Date(d._ts).toLocaleString()} (${d._user})?\nThis REPLACES the data on this device for the current account.`))return;
+      if(!await showConfirmModal({title:'Restore this backup?',sub:`From ${new Date(d._ts).toLocaleString()} (${d._user}).\n\nThis REPLACES the data on this device for the current account.`,confirmLabel:'Restore',danger:true}))return;
       BACKUP_KEYS.forEach(k=>{if(d[k]!=null)LS.set(k,d[k]);});
       if(d._keys){
         if(d._keys.claudeKey){CK=d._keys.claudeKey;LS.set('st_ck',CK);}
@@ -2973,10 +3034,14 @@ async function fetchT212Cash(){
 }
 
 // Manual cash entry (for portfolios not linked to a broker)
-function promptSetCash(id){
+async function promptSetCash(id){
   const port=PORTFOLIOS.find(p=>p.id===id);if(!port)return;
   const cur=port.cash!=null?port.cash:'';
-  const v=prompt(`Uninvested cash / free funds in "${port.name}"\n(money sitting in the account, not in stocks)`,cur);
+  const v=await showInputModal({
+    title:'💵 Cash / free funds',
+    sub:`Money sitting uninvested in "${port.name}" — not in stocks.`,
+    value:cur,placeholder:'e.g. 1000',inputmode:'decimal',confirmLabel:'Save cash'
+  });
   if(v===null)return;
   const n=parseFloat(String(v).replace(/[^0-9.\-]/g,''));
   if(isNaN(n)){toastError('Enter a number, e.g. 1000');return;}
@@ -3268,9 +3333,9 @@ function removeT212Key(){
   renderProfile();toastSuccess('Trading 212 disconnected.');
 }
 
-function mobileRenamePort(){
+async function mobileRenamePort(){
   const port=activePort();if(!port)return;
-  const name=prompt(LANG==='mk'?'Внеси ново име за портфолиото:':'Enter new portfolio name:',port.name);
+  const name=await showInputModal({title:LANG==='mk'?'✏️ Преименувај портфолио':'✏️ Rename portfolio',sub:LANG==='mk'?'Внеси ново име за портфолиото.':'Give this portfolio a new name.',value:port.name,confirmLabel:LANG==='mk'?'Зачувај':'Rename'});
   if(name&&name.trim()&&name.trim()!==port.name){
     port.name=name.trim();
     saveLocal();renderPortSwitcher();renderPORT();
@@ -3390,7 +3455,7 @@ async function saveEdit(i){
   if(FB_ACTIVE)fbWrite(userPath('portfolios'),{portfolios:PORTFOLIOS,updatedAt:Date.now()}).catch(e=>console.warn('FB:',e?.message||e));
 }
 
-function delP(i){
+async function delP(i){
   const port=activePort();if(!port)return;
   const p=port.positions[i];if(!p)return;
   const q=PC[p.ticker];
@@ -3398,11 +3463,11 @@ function delP(i){
   if(q&&q.c>0){
     const realized=(q.c-p.cost)*p.shares;
     const sign=realized>=0?'+':'';
-    if(confirm(`Remove ${p.ticker}?\n\nCurrent value: ${formatCurrency(q.c*p.shares)}\nRealized P&L: ${sign}${formatCurrency(realized)}\n\nOK = record as a sale (saved to history)\nCancel = just remove`)){
+    if(await showConfirmModal({title:`Remove ${p.ticker}?`,sub:`Current value: ${formatCurrency(q.c*p.shares)}\nRealized P&L: ${sign}${formatCurrency(realized)}\n\n"Record sale" saves it to your realized history.\n"Cancel" removes it without recording.`,confirmLabel:'Record sale'})){
       recordRealizedSale(p,q.c,realized);
     }
   }else{
-    if(!confirm(`Remove ${p.ticker} from portfolio?`))return;
+    if(!await showConfirmModal({title:`Remove ${p.ticker}?`,sub:'It will be removed from this portfolio.',confirmLabel:'Remove',danger:true}))return;
   }
   port.positions.splice(i,1);saveLocal();renderPORT();
   if(FB_ACTIVE)fbWrite(userPath('portfolios'),{portfolios:PORTFOLIOS,updatedAt:Date.now()}).catch(e=>console.warn('FB:',e?.message||e));
@@ -3449,9 +3514,9 @@ function showRealizedHistory(){
   document.body.setAttribute('data-sheet-open','news');
 }
 
-function deletePortfolio(){
+async function deletePortfolio(){
   const port=activePort();if(!port||PORTFOLIOS.length<=1)return;
-  if(!confirm(`Delete portfolio "${port.name}"? This cannot be undone.`))return;
+  if(!await showConfirmModal({title:'Delete portfolio?',sub:`"${port.name}" and its positions will be removed. This cannot be undone.`,confirmLabel:'Delete',danger:true}))return;
   PORTFOLIOS=PORTFOLIOS.filter(p=>p.id!==ACTIVE_PORT_ID);
   ACTIVE_PORT_ID=PORTFOLIOS[0].id;
   saveLocal();renderPortSwitcher();renderPORT();
@@ -4356,7 +4421,7 @@ function mergeLots(a,b){
   return{ticker:a.ticker,shares:parseFloat(totalShares.toFixed(6)),cost:parseFloat(avgCost.toFixed(4))};
 }
 // Scan a portfolio for duplicate tickers (after normalization) and merge them
-function cleanupDuplicates(){
+async function cleanupDuplicates(){
   const port=activePort();if(!port||!port.positions.length){toastWarning('No positions to clean up.');return;}
   // Group by normalized ticker
   const groups={};
@@ -4368,7 +4433,7 @@ function cleanupDuplicates(){
   const dupes=Object.entries(groups).filter(([,lots])=>lots.length>1);
   if(!dupes.length){toastSuccess('No duplicates found — your portfolio is clean!');return;}
   const names=dupes.map(([tk,lots])=>`${tk} (${lots.length} entries)`).join(', ');
-  if(!confirm(`Found duplicates: ${names}.\n\nMerge each into a single position with weighted-average cost?`))return;
+  if(!await showConfirmModal({title:'Merge duplicates?',sub:`Found: ${names}.\n\nEach will become a single position with weighted-average cost.`,confirmLabel:'Merge'}))return;
   const merged=[];
   Object.entries(groups).forEach(([tk,lots])=>{
     if(lots.length===1){merged.push({ticker:tk,shares:lots[0].shares,cost:lots[0].cost});}
@@ -4444,9 +4509,9 @@ function showPortMenu(e,portId){
   document.body.appendChild(overlay);
 }
 function closePortMenu(){document.querySelectorAll('.tab-menu-overlay').forEach(el=>el.remove());}
-function promptRenamePort(id){
+async function promptRenamePort(id){
   const port=PORTFOLIOS.find(p=>p.id===id);if(!port)return;
-  const name=prompt('Rename portfolio:',port.name);
+  const name=await showInputModal({title:'✏️ Rename portfolio',sub:'Give this portfolio a new name.',value:port.name,placeholder:'Portfolio name',confirmLabel:'Rename'});
   if(name&&name.trim()){port.name=name.trim();saveLocal();renderPortSwitcher();renderPORT();
     if(FB_ACTIVE)fbWrite(userPath('portfolios'),{portfolios:PORTFOLIOS,updatedAt:Date.now()}).catch(e=>console.warn('FB:',e?.message||e));}
 }
@@ -4473,8 +4538,8 @@ function togglePortHidden(id){
   toastSuccess(port.hidden?`🙈 "${port.name}" hidden from switcher`:`👁 "${port.name}" visible again`);
   if(FB_ACTIVE)fbWrite(userPath('portfolios'),{portfolios:PORTFOLIOS,updatedAt:Date.now()}).catch(e=>console.warn('FB:',e?.message||e));
 }
-function deletePortfolioById(id){
-  if(!confirm(`Delete this portfolio? This cannot be undone.`))return;
+async function deletePortfolioById(id){
+  if(!await showConfirmModal({title:'Delete portfolio?',sub:'This portfolio and its positions will be removed. This cannot be undone.',confirmLabel:'Delete',danger:true}))return;
   PORTFOLIOS=PORTFOLIOS.filter(p=>p.id!==id);
   if(ACTIVE_PORT_ID===id)ACTIVE_PORT_ID=PORTFOLIOS[0]?.id||'';
   saveLocal();renderPortSwitcher();renderPORT();
@@ -5219,8 +5284,8 @@ function moveDailyPrediction(idx,dir){
   renderDailyHistoryList();
 }
 
-function deleteDailyReport(idx){
-  if(!confirm('Delete this daily report?'))return;
+async function deleteDailyReport(idx){
+  if(!await showConfirmModal({title:'Delete this daily report?',sub:'Its verified outcome and lesson will be removed from your learning history.',confirmLabel:'Delete',danger:true}))return;
   loadDailyPredictions();
   dailyPredictions.splice(idx,1);
   saveDailyPredictions();
@@ -5356,8 +5421,8 @@ function showMarketPrep(idx){
   setTimeout(()=>{document.getElementById('mp-report').innerHTML=marketPrepBody(p,idx);},10);
 }
 
-function deleteMarketPrep(idx){
-  if(!confirm('Delete this market prep briefing?'))return;
+async function deleteMarketPrep(idx){
+  if(!await showConfirmModal({title:'Delete this briefing?',sub:'This market prep will be removed.',confirmLabel:'Delete',danger:true}))return;
   loadMarketPreps();
   marketPreps.splice(idx,1);
   saveMarketPreps();
@@ -5685,8 +5750,8 @@ function compareReports(idx){
   </div>`;
 }
 
-function deleteReport(idx){
-  if(!confirm('Delete this report?'))return;
+async function deleteReport(idx){
+  if(!await showConfirmModal({title:'Delete this report?',sub:'This weekly report will be removed from your history.',confirmLabel:'Delete',danger:true}))return;
   weeklyReports.splice(idx,1);saveReports();renderReportsList();
 }
 
@@ -6042,7 +6107,7 @@ async function authLogin(){
     setTimeout(async()=>{try{
       if((!LS.get('st_biometric')||_bioAssertFailed)&&window.PublicKeyCredential&&await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()){
         const q=_bioAssertFailed?'Your saved fingerprint/face unlock stopped working on this device. Re-enable it now (recommended)?':'Enable fingerprint / face unlock on this device for faster sign-in?';
-        if(confirm(q)){_bioAssertFailed=false;registerBiometric();}
+        if(await showConfirmModal({title:'Fingerprint / face unlock',sub:q,confirmLabel:'Enable'})){_bioAssertFailed=false;registerBiometric();}
       }
     }catch(e){}},1200);
   }catch(e){showErr('auth-err',e.message);btn.disabled=false;btn.textContent=t('auth_signin');}
@@ -6078,7 +6143,7 @@ async function authResetPassword(emailOverride){
   if(!emailOverride){
     const email=(document.getElementById('auth-email')?.value||'').trim().toLowerCase();
     if(!email){showErr('auth-err','Enter your email address above first.');return;}
-    const newPass=prompt('Enter new password for '+email+' (min 6 characters):');
+    const newPass=await showInputModal({title:'🔑 Set a new password',sub:`For ${email} — at least 6 characters.`,type:'password',placeholder:'New password',confirmLabel:'Set password'});
     if(!newPass){return;}
     if(newPass.length<6){showErr('auth-err','Password must be at least 6 characters.');return;}
     emailOverride=email;
@@ -6100,7 +6165,7 @@ async function authResetPassword(emailOverride){
     const expiry=Date.now()+3600000;
     await fbWrite(`stockr_accounts/${key}_reset`,{token,expiry});
     // Since we can't send email without a backend, show the token to the user
-    const newPass=prompt(`Enter a new password for ${email} (min 6 characters):`);
+    const newPass=await showInputModal({title:'🔑 Set a new password',sub:`For ${email} — at least 6 characters.`,type:'password',placeholder:'New password',confirmLabel:'Set password'});
     if(!newPass||newPass.length<6){toastError('Password must be at least 6 characters.');return;return;}
     const salt=Math.random().toString(36).slice(2)+Date.now().toString(36);
     const passwordHash=await sha256(newPass+salt);
@@ -6128,8 +6193,8 @@ function clearAllLocalData(){
   if(typeof USER_TICKER_MAP!=='undefined')USER_TICKER_MAP={};
 }
 
-function authLogout(){
-  if(!confirm('Sign out of ElaksInsights?'))return;
+async function authLogout(){
+  if(!await showConfirmModal({title:'Sign out?',sub:'Your cloud data stays safe — local data on this device is cleared.',confirmLabel:'Sign out'}))return;
   clearAllLocalData();
   USER_ID='';USER_EMAIL='';IS_GUEST=false;
   FB_ACTIVE=false;FB_PID=APP_FB_PID;FB_KEY=APP_FB_KEY;
