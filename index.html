@@ -1323,7 +1323,7 @@ const COLS=["#6366f1","#10b981","#f59e0b","#ef4444","#8b5cf6","#0ea5e9","#ec4899
 const LL=["Searching live markets...","Fetching prices...","Scanning news...","Running analysis...","Almost done..."];
 
 // ── STORAGE ──
-const APP_VERSION='1.14.1';
+const APP_VERSION='1.15.0';
 const LS={
   get:k=>{try{return JSON.parse(localStorage.getItem(k));}catch{return null;}},
   set:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch{}},
@@ -2393,6 +2393,8 @@ function renderPORT(){
     </div>
     <div class="sc2" style="background:#ecfdf5;border-color:#a7f3d0"><div class="slbl" style="color:#10b981">POSITIONS</div><div class="sval" style="color:#047857">${pos.length}</div></div>
     <div class="sc2" style="background:var(--al);border-color:var(--a)"><div class="slbl" style="color:#f59e0b">TOP HOLDING</div><div class="sval" style="color:var(--a)">${top?.ticker||'—'}</div></div>
+    <div class="sc2" style="background:var(--gl);border-color:var(--g);cursor:pointer" onclick="promptSetCash('${port.id}')"><div class="slbl" style="color:var(--g)">CASH · FREE FUNDS</div><div class="sval" style="color:var(--g)">${port.cash!=null?'$'+Number(port.cash).toLocaleString('en',{maximumFractionDigits:0}):'—'}</div><div style="font-size:10px;color:var(--t4);margin-top:2px">${port.cash!=null&&!port.cashManual?'from Trading 212':'tap to set ↗'}</div></div>
+    <div class="sc2" style="background:var(--pl);border-color:var(--pl2)"><div class="slbl" style="color:var(--p)">TOTAL ACCOUNT</div><div class="sval" style="color:var(--p)">${hasPx?'$'+(lT+(Number(port.cash)||0)).toLocaleString('en',{maximumFractionDigits:0}):'—'}</div><div style="font-size:10px;color:var(--t4);margin-top:2px">stocks + cash</div></div>
   </div>`:'';
   // Desktop: analyze + delete inside right panel. Mobile: sticky bar + ⋯ menu
   const chartSection=pos.length?portfolioChartCard(port.id):'';
@@ -2937,6 +2939,44 @@ function t212Ticker(raw){
   return T212_TICKER_FIXES[t]||t;
 }
 
+// ── T212 FREE FUNDS / CASH ──
+async function fetchT212Cash(){
+  if(!T212_KEY||!T212_SECRET)return null;
+  const useProxy=PROXY_URL&&PROXY_URL.startsWith('http');
+  const t212Env=LS.get('st_t212_env')||'live';
+  const t212Host=t212Env==='demo'?'https://demo.trading212.com':'https://live.trading212.com';
+  const basicAuth='Basic '+btoa(`${T212_KEY}:${T212_SECRET}`);
+  const endpoint=useProxy
+    ? PROXY_URL.replace(/\/$/,'')+'/t212/api/v0/equity/account/cash?host='+encodeURIComponent(t212Host)
+    : t212Host+'/api/v0/equity/account/cash';
+  try{
+    const r=await fetch(endpoint,{
+      headers: useProxy ? {'X-T212-Auth':basicAuth} : {'Authorization':basicAuth},
+      signal: AbortSignal.timeout(12000)
+    });
+    if(!r.ok)return null;
+    const d=await r.json();
+    // T212 returns: free (uninvested), invested, total, ppl, blocked
+    if(typeof d?.free==='number')return {free:d.free,invested:d.invested,total:d.total};
+    return null;
+  }catch(e){return null;}
+}
+
+// Manual cash entry (for portfolios not linked to a broker)
+function promptSetCash(id){
+  const port=PORTFOLIOS.find(p=>p.id===id);if(!port)return;
+  const cur=port.cash!=null?port.cash:'';
+  const v=prompt(`Uninvested cash / free funds in "${port.name}"\n(money sitting in the account, not in stocks)`,cur);
+  if(v===null)return;
+  const n=parseFloat(String(v).replace(/[^0-9.\-]/g,''));
+  if(isNaN(n)){toastError('Enter a number, e.g. 1000');return;}
+  port.cash=n;port.cashManual=true;
+  saveLocal();
+  if(FB_ACTIVE)fbWrite(userPath('portfolios'),{portfolios:PORTFOLIOS,updatedAt:Date.now()}).catch(()=>{});
+  renderPortSwitcher();renderPORT();
+  toastSuccess(`Cash set to $${n.toLocaleString('en',{maximumFractionDigits:2})}`);
+}
+
 async function fetchT212Positions(){
   if(!T212_KEY){toastError('Add your Trading 212 API key in Profile first.');return null;}
   if(!T212_SECRET){toastError('Add your Trading 212 API Secret in Profile — both key and secret are required.');return null;}
@@ -3111,6 +3151,9 @@ async function syncT212Portfolio(manual=false){
     live[tk]={shares:parseFloat((p.quantity||0).toFixed(6)),cost:parseFloat((p.averagePricePaid||0).toFixed(4)),cur:p.currentPrice||null};
     if(p.currentPrice>0){const c=p.currentPrice,pc=p.averagePricePaid||c;PC[tk]={c,d:c-pc,dp:pc>0?((c-pc)/pc)*100:0,h:c,l:c,pc,src:'t212',currency:p.instrument?.currency||'USD'};}
   });
+  // Pull free funds alongside positions (never overwrites a manually set value with nothing)
+  const cashInfo=await fetchT212Cash();
+  if(cashInfo&&typeof cashInfo.free==='number'){port.cash=parseFloat(cashInfo.free.toFixed(2));port.cashManual=false;}
   const added=[],updated=[],sold=[];
   loadRealized();
   const sellEntry=(ticker,qty,cost,px)=>realizedSales.unshift({ticker,shares:qty,cost,sellPrice:parseFloat(px.toFixed(4)),realized:parseFloat(((px-cost)*qty).toFixed(2)),pct:cost>0?parseFloat(((px/cost-1)*100).toFixed(2)):0,date:new Date().toISOString().split('T')[0],src:'t212-sync',approx:true});
@@ -4383,6 +4426,7 @@ function showPortMenu(e,portId){
     <button class="tab-menu-item" onclick="closePortMenu();promptRenamePort('${portId}')">✏️ Rename</button>
     ${_pi>0?`<button class="tab-menu-item" onclick="closePortMenu();movePortfolio('${portId}',-1)">⬅️ Move left</button>`:''}
     ${_pi<PORTFOLIOS.length-1?`<button class="tab-menu-item" onclick="closePortMenu();movePortfolio('${portId}',1)">➡️ Move right</button>`:''}
+    <button class="tab-menu-item" onclick="closePortMenu();promptSetCash('${portId}')">💵 Set cash / free funds</button>
     <button class="tab-menu-item" onclick="closePortMenu();togglePortHidden('${portId}')">${port.hidden?'👁 Show portfolio':'🙈 Hide portfolio'}</button>
     ${PORTFOLIOS.length>1?`<button class="tab-menu-item danger" onclick="closePortMenu();deletePortfolioById('${portId}')">🗑 Delete portfolio</button>`:''}`;
   overlay.appendChild(menu);
